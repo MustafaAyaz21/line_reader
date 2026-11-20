@@ -20,4 +20,17 @@ abstract final class SelectionModeChannel {
       // Desteklenmeyen platformda veya kanal hazır değilse sessizce geç.
     }
   }
+
+  /// Kalem modunda seçilen kelime Flutter'a ulaştıktan sonra WebView'deki
+  /// aktif native ActionMode'u (ve seçim tutamaçlarını) temizce kapatır.
+  static Future<void> finishActionMode() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+      return;
+    }
+    try {
+      await _channel.invokeMethod<void>('finishActionMode');
+    } catch (_) {
+      // Desteklenmeyen platformda veya aktif mod yoksa sessizce geç.
+    }
+  }
 }

@@ -183,10 +183,10 @@ class BrowserAddressBar extends StatelessWidget {
               return TextField(
                 controller: controller,
                 focusNode: focusNode,
-                keyboardType: TextInputType.url,
+                keyboardType: TextInputType.text,
                 textInputAction: TextInputAction.go,
-                autocorrect: false,
-                enableSuggestions: false,
+                autocorrect: true,
+                enableSuggestions: true,
                 onSubmitted: onSubmitted,
                 onTap: () {
                   controller.selection = TextSelection(

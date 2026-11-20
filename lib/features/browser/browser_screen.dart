@@ -41,6 +41,24 @@ enum _BrowserViewMode {
   web,
 }
 
+/// Sistem geri tuşu / yandan kaydırma hareketini önce tarayıcı geçmişine
+/// yönlendirmek için kullanılan hafif köprü.
+class BrowserBackController {
+  Future<bool> Function()? _handler;
+
+  void attach(Future<bool> Function()? handler) {
+    _handler = handler;
+  }
+
+  /// Tarayıcı içinde geri gidilecek bir sayfa/görünüm varsa `true` döner;
+  /// tarayıcı geçmişi bittiyse `false` döner (Ana Menü'ye dönülebilir).
+  Future<bool> handleSystemBack() async {
+    final handler = _handler;
+    if (handler == null) return false;
+    return handler();
+  }
+}
+
 /// Line Apps tasarım diline uygun, ilk açılışta harici bir sayfa (google.com vb.)
 /// yüklemeyen, kendi arama kutusu ve sade sonuç listesiyle arka plan araması
 /// yapan, reklam engelleyici ve Kalem modu destekli tarayıcı ekranı.
@@ -52,6 +70,7 @@ class BrowserScreen extends StatefulWidget {
     this.translationService,
     this.ttsService,
     this.onReturnToMenu,
+    this.backController,
   });
 
   final AddWordCallback? onAddWord;
@@ -59,6 +78,7 @@ class BrowserScreen extends StatefulWidget {
   final WordTranslationService? translationService;
   final TtsService? ttsService;
   final VoidCallback? onReturnToMenu;
+  final BrowserBackController? backController;
 
   @override
   State<BrowserScreen> createState() => _BrowserScreenState();
@@ -90,7 +110,10 @@ class _BrowserScreenState extends State<BrowserScreen> {
   bool _isWordSheetOpen = false;
   bool _isBackgroundColorSynced = false;
   bool _hasEarlyInjectedCurrentPage = false;
+  bool _openedWebFromSearch = false;
   String _currentPageTitle = '';
+  String? _lastTriggeredWord;
+  DateTime? _lastTriggeredAt;
 
   // Uygulama içi arama sonuçları durumu
   String _lastSearchQuery = '';
@@ -188,6 +211,16 @@ class _BrowserScreenState extends State<BrowserScreen> {
     );
 
     _webViewWidget = WebViewFactory.createWidget(_webViewController);
+    widget.backController?.attach(_handleSystemBack);
+  }
+
+  @override
+  void didUpdateWidget(covariant BrowserScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.backController != widget.backController) {
+      oldWidget.backController?.attach(null);
+      widget.backController?.attach(_handleSystemBack);
+    }
   }
 
   @override
@@ -203,6 +236,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
 
   @override
   void dispose() {
+    widget.backController?.attach(null);
     if (_ownsTranslationService) {
       _translationService.dispose();
     }
@@ -286,8 +320,8 @@ class _BrowserScreenState extends State<BrowserScreen> {
           initialPenMode: _isPenMode.value,
         ),
       );
-    } catch (_) {
-      // JS çalıştırılamayan sayfalarda sessizce geç.
+    } catch (error) {
+      debugPrint('[BrowserScreen] WordSelectionScript enjeksiyon hatasi: $error');
     }
 
     try {
@@ -296,8 +330,8 @@ class _BrowserScreenState extends State<BrowserScreen> {
           enabled: _resolveAdBlockerNotifier().value,
         ),
       );
-    } catch (_) {
-      // JS çalıştırılamayan sayfalarda sessizce geç.
+    } catch (error) {
+      debugPrint('[BrowserScreen] AdBlocker enjeksiyon hatasi: $error');
     }
   }
 
@@ -349,6 +383,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
 
   void _returnToBrowserStart() {
     _addressFocusNode.unfocus();
+    _openedWebFromSearch = false;
     _loadingProgress.value = 0;
     _currentUrl.value = '';
     _addressController.clear();
@@ -362,6 +397,9 @@ class _BrowserScreenState extends State<BrowserScreen> {
     await SelectionModeChannel.setPenMode(nextMode);
     if (_resolveViewMode().value == _BrowserViewMode.web) {
       try {
+        await _webViewController.runJavaScript(
+          WordSelectionScript.buildInjectionScript(initialPenMode: nextMode),
+        );
         await _webViewController.runJavaScript(
           WordSelectionScript.setPenModeScript(nextMode),
         );
@@ -471,12 +509,14 @@ class _BrowserScreenState extends State<BrowserScreen> {
   Future<void> _handleSelectFavoriteSite(FavoriteSite site) async {
     final uri = UrlHelper.tryParseDirectUrl(site.url);
     if (uri == null) return;
+    _openedWebFromSearch = false;
     await _openWebUrl(uri, initialTitle: site.displayTitle);
   }
 
   Future<void> _handleSelectSearchResult(WebSearchResult result) async {
     final uri = UrlHelper.tryParseDirectUrl(result.url);
     if (uri == null) return;
+    _openedWebFromSearch = true;
     await _openWebUrl(uri, initialTitle: result.title);
   }
 
@@ -489,10 +529,24 @@ class _BrowserScreenState extends State<BrowserScreen> {
     }
 
     final payload = WordSelectionPayload.fromMessage(message.message);
-    if (payload == null) return;
+    if (payload == null || payload.word.trim().isEmpty) return;
+
+    // Son seçilen aynı kelimenin milisaniyeler içinde çift tetiklenmesini engelle.
+    final normalizedWord = payload.word.trim().toLowerCase();
+    final now = DateTime.now();
+    final prevAt = _lastTriggeredAt;
+    if (_lastTriggeredWord == normalizedWord &&
+        prevAt != null &&
+        now.difference(prevAt).inMilliseconds < 900) {
+      return;
+    }
+    _lastTriggeredWord = normalizedWord;
+    _lastTriggeredAt = now;
 
     _addressFocusNode.unfocus();
     _isWordSheetOpen = true;
+    // Seçim yakalandıktan sonra Android'deki native ActionMode / tutamaçları temizle.
+    SelectionModeChannel.finishActionMode();
 
     try {
       final wordLists = widget.loadWordLists != null
@@ -511,6 +565,11 @@ class _BrowserScreenState extends State<BrowserScreen> {
       );
     } finally {
       _isWordSheetOpen = false;
+      try {
+        await _webViewController.runJavaScript(
+          WordSelectionScript.clearSelectionScript,
+        );
+      } catch (_) {}
     }
   }
 
@@ -589,6 +648,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
     // Google sayfası göstermeden kendi arka plan arama ekranımızda listele.
     final directUri = UrlHelper.tryParseDirectUrl(trimmed);
     if (directUri != null) {
+      _openedWebFromSearch = false;
       await _openWebUrl(directUri);
       return;
     }
@@ -596,28 +656,40 @@ class _BrowserScreenState extends State<BrowserScreen> {
     await _performBackgroundSearch(trimmed);
   }
 
-  Future<void> _handleBack() async {
+  /// Sistem geri tuşu / yandan kaydırma hareketini tarayıcı geçmişinde
+  /// adım adım geri alarak işler. Tarayıcıda geri gidilecek ekran kalmadıysa
+  /// `false` döner (Ana Menü'ye geçilebilir).
+  Future<bool> _handleSystemBack() async {
     final mode = _resolveViewMode().value;
     if (mode == _BrowserViewMode.web) {
       if (await _webViewController.canGoBack()) {
         await _webViewController.goBack();
         await _updateNavigationState();
-        return;
+        return true;
       }
-      if (_lastSearchQuery.isNotEmpty && _searchResults.isNotEmpty) {
+      if (_openedWebFromSearch &&
+          _lastSearchQuery.isNotEmpty &&
+          _searchResults.isNotEmpty) {
         _loadingProgress.value = 0;
         _currentUrl.value = '';
         _addressController.text = _lastSearchQuery;
         _resolveViewMode().value = _BrowserViewMode.searchResults;
-        return;
+        return true;
       }
       _returnToBrowserStart();
-      return;
+      return true;
     }
 
     if (mode == _BrowserViewMode.searchResults) {
       _returnToBrowserStart();
+      return true;
     }
+
+    return false;
+  }
+
+  Future<void> _handleBack() async {
+    await _handleSystemBack();
   }
 
   Future<void> _handleForward() async {

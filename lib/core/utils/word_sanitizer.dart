@@ -1,7 +1,7 @@
 /// WebView üzerinden yakalanan ham metni temizleyip normalize eder.
 abstract final class WordSanitizer {
-  static const int _maxLength = 48;
-  static const int _maxWordCount = 3;
+  static const int _maxLength = 64;
+  static const int _maxWordCount = 5;
 
   static final RegExp _edgeNonLetters = RegExp(
     r'^[^\p{L}\p{M}]+|[^\p{L}\p{M}]+$',

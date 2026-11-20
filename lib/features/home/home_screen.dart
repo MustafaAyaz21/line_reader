@@ -44,6 +44,7 @@ class _HomeScreenState extends State<HomeScreen> {
   CachedTranslationService? _translationService;
   TtsService? _ttsService;
   AppUpdateController? _updateController;
+  BrowserBackController? _browserBackController;
 
   @override
   void initState() {
@@ -90,6 +91,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     _updateController ??= AppUpdateController();
+    _browserBackController ??= BrowserBackController();
   }
 
   Future<void> _checkForAppUpdateSilently() async {
@@ -153,6 +155,15 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  Future<void> _handleBrowserSystemBack() async {
+    _ensureInitialized();
+    final handledInsideBrowser =
+        await _browserBackController!.handleSystemBack();
+    if (!handledInsideBrowser && mounted) {
+      _returnToMainMenu();
+    }
+  }
+
   void _onDestinationSelected(int index) {
     _ensureInitialized();
 
@@ -194,7 +205,7 @@ class _HomeScreenState extends State<HomeScreen> {
       canPop: canPopNormally,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop && _selectedIndex == _mainMenuTabIndex && _isBrowserOpen) {
-          _returnToMainMenu();
+          _handleBrowserSystemBack();
         }
       },
       child: Scaffold(
@@ -216,6 +227,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 translationService: _translationService!,
                 ttsService: _ttsService,
                 onReturnToMenu: _returnToMainMenu,
+                backController: _browserBackController,
               )
             else
               const SizedBox.shrink(),

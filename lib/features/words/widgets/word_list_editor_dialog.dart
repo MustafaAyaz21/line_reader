@@ -149,6 +149,8 @@ class _WordListEditorDialogState extends State<WordListEditorDialog> {
               controller: _nameController,
               enabled: !_isDefaultList && !_isSaving,
               autofocus: !_isEditing,
+              autocorrect: true,
+              enableSuggestions: true,
               textCapitalization: TextCapitalization.words,
               textInputAction: TextInputAction.done,
               onChanged: (_) {

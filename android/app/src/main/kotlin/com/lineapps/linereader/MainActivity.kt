@@ -22,6 +22,7 @@ class MainActivity : FlutterActivity() {
     }
 
     private var isPenModeActive: Boolean = true
+    private var activeActionMode: ActionMode? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,6 +43,11 @@ class MainActivity : FlutterActivity() {
             when (call.method) {
                 "setPenMode" -> {
                     isPenModeActive = call.argument<Boolean>("enabled") ?: true
+                    result.success(null)
+                }
+                "finishActionMode" -> {
+                    activeActionMode?.finish()
+                    activeActionMode = null
                     result.success(null)
                 }
                 else -> result.notImplemented()
@@ -114,16 +120,26 @@ class MainActivity : FlutterActivity() {
         super.onActionModeStarted(mode)
         if (mode == null) return
 
+        activeActionMode = mode
         val menu = mode.menu ?: return
         if (isPenModeActive) {
-            // Kalem modu aktifken sistemin Copy / Select All / Share vb. menülerini engelle.
+            // Kalem modu aktifken Copy / Select All / Share menüsünü temizleyip
+            // gizle; ancak mode.finish() çağrısını hemen YAPMA ki Chromium
+            // WebView metin seçimini silmeden JS `selectionchange` / `touchend`
+            // üzerinden kelimeyi Flutter'a iletebilsin.
             menu.clear()
-            mode.finish()
             return
         }
 
         // Kalem modu kapalıyken yalnızca Kopyala ve Tümünü Seç aksiyonlarını bırak.
         filterMenuToCopyAndSelectAll(menu)
+    }
+
+    override fun onActionModeFinished(mode: ActionMode?) {
+        super.onActionModeFinished(mode)
+        if (activeActionMode == mode) {
+            activeActionMode = null
+        }
     }
 
     private fun filterMenuToCopyAndSelectAll(menu: Menu) {
