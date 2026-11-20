@@ -18,6 +18,42 @@ enum ApkInstallResult {
   failed,
 }
 
+/// Kurulu sürüm ve uzaktaki `version.json` kontrolünün birleşik sonucu.
+class AppUpdateCheckResult {
+  const AppUpdateCheckResult({
+    required this.currentVersion,
+    required this.currentBuildNumber,
+    this.remoteInfo,
+    this.errorMessage,
+  });
+
+  final String currentVersion;
+  final int currentBuildNumber;
+  final AppUpdateInfo? remoteInfo;
+  final String? errorMessage;
+
+  bool get hasUpdate {
+    final remote = remoteInfo;
+    if (remote == null) return false;
+    return remote.versionCode > currentBuildNumber &&
+        remote.apkUrl.startsWith('http');
+  }
+}
+
+/// Canlı APK indirme ilerleme verisi.
+class ApkDownloadProgress {
+  const ApkDownloadProgress({
+    required this.fraction,
+    required this.receivedBytes,
+    required this.totalBytes,
+  });
+
+  /// `0.0..1.0` arası yüzde değeri; sunucu boyut bildirmezse `null`.
+  final double? fraction;
+  final int receivedBytes;
+  final int totalBytes;
+}
+
 /// GitHub'daki `version.json` üzerinden yeni sürüm kontrolü yapan, APK'yı
 /// indirip Android FileProvider üzerinden kurulum ekranını açan servis.
 class AppUpdateService {
@@ -36,18 +72,23 @@ class AppUpdateService {
   final http.Client _httpClient;
   final bool _ownsClient;
 
-  /// Arka planda sessizce güncelleme kontrolü yapar.
-  /// Yeni bir `version_code` varsa `AppUpdateInfo` döner, yoksa veya ağ
-  /// erişilemiyorsa sessizce `null` döner.
-  Future<AppUpdateInfo?> checkForUpdate() async {
-    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
-      return null;
+  /// Kurulu uygulamanın sürüm ve build bilgisini okur.
+  Future<({String version, int buildNumber})> getCurrentAppVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      final build = int.tryParse(info.buildNumber) ?? 0;
+      return (version: info.version, buildNumber: build);
+    } catch (_) {
+      return (version: '0.0.0', buildNumber: 0);
     }
+  }
+
+  /// Kurulu sürüm ile GitHub `version.json` verisini karşılaştırır.
+  /// Hata durumunda istisna fırlatmak yerine `errorMessage` dolu bir sonuç döner.
+  Future<AppUpdateCheckResult> checkUpdateStatus() async {
+    final installed = await getCurrentAppVersion();
 
     try {
-      final packageInfo = await PackageInfo.fromPlatform();
-      final currentBuild = int.tryParse(packageInfo.buildNumber) ?? 0;
-
       final uri = Uri.parse(versionJsonUrl).replace(
         queryParameters: <String, String>{
           't': DateTime.now().millisecondsSinceEpoch.toString(),
@@ -56,30 +97,53 @@ class AppUpdateService {
 
       final response = await _httpClient.get(uri).timeout(_checkTimeout);
       if (response.statusCode != 200) {
-        return null;
+        return AppUpdateCheckResult(
+          currentVersion: installed.version,
+          currentBuildNumber: installed.buildNumber,
+          errorMessage:
+              'Güncelleme bilgisi alınamadı (HTTP ${response.statusCode}).',
+        );
       }
 
       final decoded = jsonDecode(response.body);
       if (decoded is! Map<String, Object?>) {
-        return null;
+        return AppUpdateCheckResult(
+          currentVersion: installed.version,
+          currentBuildNumber: installed.buildNumber,
+          errorMessage: 'Güncelleme bilgisi okunamadı.',
+        );
       }
 
       final remoteInfo = AppUpdateInfo.fromJson(decoded);
-      if (remoteInfo.versionCode > currentBuild &&
-          remoteInfo.apkUrl.startsWith('http')) {
-        return remoteInfo;
-      }
-      return null;
+      return AppUpdateCheckResult(
+        currentVersion: installed.version,
+        currentBuildNumber: installed.buildNumber,
+        remoteInfo: remoteInfo,
+      );
     } catch (error) {
-      debugPrint('[AppUpdateService] Sessiz guncelleme kontrolu atlandi: $error');
-      return null;
+      debugPrint('[AppUpdateService] Guncelleme kontrol hatasi: $error');
+      return AppUpdateCheckResult(
+        currentVersion: installed.version,
+        currentBuildNumber: installed.buildNumber,
+        errorMessage:
+            'Güncelleme sunucusuna ulaşılamadı. İnternet bağlantınızı kontrol edin.',
+      );
     }
   }
 
-  /// Yeni sürüm APK dosyasını uygulama önbellek dizinine indirir ve ilerlemeyi bildirir.
+  /// Arka planda sessizce güncelleme kontrolü yapar; yeni sürüm varsa döner.
+  Future<AppUpdateInfo?> checkForUpdate() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+      return null;
+    }
+    final result = await checkUpdateStatus();
+    return result.hasUpdate ? result.remoteInfo : null;
+  }
+
+  /// Yeni sürüm APK dosyasını uygulama önbellek dizinine indirir ve canlı ilerlemeyi bildirir.
   Future<File> downloadApk({
     required String apkUrl,
-    required void Function(double? progress) onProgress,
+    required void Function(ApkDownloadProgress progress) onProgress,
   }) async {
     final uri = Uri.parse(apkUrl);
     final request = http.Request('GET', uri);
@@ -102,15 +166,27 @@ class AppUpdateService {
 
     final sink = targetFile.openWrite();
     var downloadedBytes = 0;
+    var lastReportedAt = DateTime.fromMillisecondsSinceEpoch(0);
 
     try {
       await for (final chunk in streamedResponse.stream) {
         sink.add(chunk);
         downloadedBytes += chunk.length;
-        if (totalBytes > 0) {
-          onProgress((downloadedBytes / totalBytes).clamp(0.0, 1.0));
-        } else {
-          onProgress(null);
+
+        final now = DateTime.now();
+        // Arayüzü akıcı tutarken gereksiz rebuild yağmurunu önle (~80ms aralık)
+        if (now.difference(lastReportedAt).inMilliseconds >= 80 ||
+            (totalBytes > 0 && downloadedBytes >= totalBytes)) {
+          lastReportedAt = now;
+          onProgress(
+            ApkDownloadProgress(
+              fraction: totalBytes > 0
+                  ? (downloadedBytes / totalBytes).clamp(0.0, 1.0)
+                  : null,
+              receivedBytes: downloadedBytes,
+              totalBytes: totalBytes,
+            ),
+          );
         }
       }
       await sink.flush();
@@ -123,13 +199,23 @@ class AppUpdateService {
     }
 
     await sink.close();
-    onProgress(1.0);
+    onProgress(
+      ApkDownloadProgress(
+        fraction: 1.0,
+        receivedBytes: downloadedBytes,
+        totalBytes: totalBytes > 0 ? totalBytes : downloadedBytes,
+      ),
+    );
     return targetFile;
   }
 
   /// Android'de "Bilinmeyen uygulamaları yükle" iznini kontrol eder; izin yoksa
   /// ayarlar ekranını açar, izin varsa FileProvider üzerinden kurulumu başlatır.
   Future<ApkInstallResult> installApk(String filePath) async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+      return ApkInstallResult.failed;
+    }
+
     try {
       final canInstall =
           await _channel.invokeMethod<bool>('canInstallPackages') ?? false;

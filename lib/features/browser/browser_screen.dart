@@ -11,6 +11,7 @@ import '../translation/services/word_translation_service.dart';
 import '../words/data/word_repository.dart';
 import '../words/models/saved_word.dart';
 import '../words/models/word_list.dart';
+import 'adblock/ad_blocker.dart';
 import 'config/webview_factory.dart';
 import 'controllers/favorite_sites_controller.dart';
 import 'data/favorite_sites_repository.dart';
@@ -41,8 +42,8 @@ enum _BrowserViewMode {
 }
 
 /// Line Apps tasarım diline uygun, ilk açılışta harici bir sayfa (google.com vb.)
-/// yüklemeyen, kendi arama kutusu ve native sonuç listesiyle arka plan araması
-/// yapan, seçilen siteleri ise yerleşik WebView/WKWebView içinde açan tarayıcı.
+/// yüklemeyen, kendi arama kutusu ve sade sonuç listesiyle arka plan araması
+/// yapan, reklam engelleyici ve Kalem modu destekli tarayıcı ekranı.
 class BrowserScreen extends StatefulWidget {
   const BrowserScreen({
     super.key,
@@ -80,6 +81,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
   final ValueNotifier<bool> _isPenMode = ValueNotifier<bool>(true);
   final ValueNotifier<String> _currentUrl = ValueNotifier<String>('');
 
+  ValueNotifier<bool>? _isAdBlockerEnabled;
   ValueNotifier<_BrowserViewMode>? _viewMode;
   FavoriteSitesController? _favoriteSitesController;
   WebSearchService? _searchService;
@@ -87,6 +89,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
 
   bool _isWordSheetOpen = false;
   bool _isBackgroundColorSynced = false;
+  bool _hasEarlyInjectedCurrentPage = false;
   String _currentPageTitle = '';
 
   // Uygulama içi arama sonuçları durumu
@@ -99,6 +102,10 @@ class _BrowserScreenState extends State<BrowserScreen> {
   bool get _isLoading {
     final progress = _loadingProgress.value;
     return progress > 0 && progress < 100;
+  }
+
+  ValueNotifier<bool> _resolveAdBlockerNotifier() {
+    return _isAdBlockerEnabled ??= ValueNotifier<bool>(true);
   }
 
   ValueNotifier<_BrowserViewMode> _resolveViewMode() {
@@ -130,6 +137,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
       _canGoBack,
       _canGoForward,
       _isPenMode,
+      _resolveAdBlockerNotifier(),
       _currentUrl,
       _resolveViewMode(),
       _resolveFavoriteSitesController(),
@@ -142,7 +150,6 @@ class _BrowserScreenState extends State<BrowserScreen> {
     final mode = _resolveViewMode().value;
     if (mode == _BrowserViewMode.home) return false;
     if (mode == _BrowserViewMode.searchResults) return true;
-    // Web görünümündeyken WebView geçmişi yoksa başlangıç/arama ekranına dönülebilir.
     return true;
   }
 
@@ -155,6 +162,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
           cacheRepository: TranslationCacheRepository(AppDatabase.instance),
         );
 
+    _resolveAdBlockerNotifier();
     _resolveViewMode();
     _resolveSearchService();
     _resolveFavoriteSitesController();
@@ -168,6 +176,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
       channelName: WordSelectionScript.channelName,
       onMessageReceived: _handleWordSelectionMessage,
       navigationDelegate: NavigationDelegate(
+        onNavigationRequest: _handleNavigationRequest,
         onPageStarted: _handlePageStarted,
         onProgress: _handleProgress,
         onPageFinished: _handlePageFinished,
@@ -199,6 +208,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
     }
     _favoriteSitesController?.dispose();
     _searchService?.dispose();
+    _isAdBlockerEnabled?.dispose();
     _viewMode?.dispose();
     _addressController.dispose();
     _addressFocusNode.dispose();
@@ -210,8 +220,18 @@ class _BrowserScreenState extends State<BrowserScreen> {
     super.dispose();
   }
 
+  NavigationDecision _handleNavigationRequest(NavigationRequest request) {
+    if (_resolveAdBlockerNotifier().value &&
+        AdBlocker.shouldBlockUrl(request.url)) {
+      debugPrint('[AdBlocker] Engellendi: ${request.url}');
+      return NavigationDecision.prevent;
+    }
+    return NavigationDecision.navigate;
+  }
+
   void _handlePageStarted(String url) {
     if (!mounted) return;
+    _hasEarlyInjectedCurrentPage = false;
     _syncAddressBar(url);
     _loadingProgress.value = 10;
   }
@@ -223,6 +243,13 @@ class _BrowserScreenState extends State<BrowserScreen> {
     if (progress == 0 || progress == 100 || (progress - previous).abs() >= 5) {
       _loadingProgress.value = progress;
     }
+
+    // Ağır haber sitelerinde `onPageFinished` gecikse bile metin göründüğü anda
+    // uzun basma ve reklam temizliği çalışsın diye erken enjeksiyon yap.
+    if (progress >= 65 && !_hasEarlyInjectedCurrentPage) {
+      _hasEarlyInjectedCurrentPage = true;
+      _injectPageScripts();
+    }
   }
 
   Future<void> _handlePageFinished(String url) async {
@@ -231,7 +258,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
     _loadingProgress.value = 100;
 
     await Future.wait<void>(<Future<void>>[
-      _injectWordSelectionListener(),
+      _injectPageScripts(),
       _updateNavigationState(),
       _updatePageTitle(),
     ]);
@@ -252,7 +279,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
     _addressController.text = url;
   }
 
-  Future<void> _injectWordSelectionListener() async {
+  Future<void> _injectPageScripts() async {
     try {
       await _webViewController.runJavaScript(
         WordSelectionScript.buildInjectionScript(
@@ -260,13 +287,24 @@ class _BrowserScreenState extends State<BrowserScreen> {
         ),
       );
     } catch (_) {
-      // JS çalıştırılamayan sayfalarda (ör. hata sayfaları) sessizce geç.
+      // JS çalıştırılamayan sayfalarda sessizce geç.
+    }
+
+    try {
+      await _webViewController.runJavaScript(
+        AdBlocker.buildInjectionScript(
+          enabled: _resolveAdBlockerNotifier().value,
+        ),
+      );
+    } catch (_) {
+      // JS çalıştırılamayan sayfalarda sessizce geç.
     }
   }
 
   Future<void> _openWebUrl(Uri uri, {String? initialTitle}) async {
     _addressFocusNode.unfocus();
     _currentPageTitle = initialTitle ?? '';
+    _hasEarlyInjectedCurrentPage = false;
     _resolveViewMode().value = _BrowserViewMode.web;
     _syncAddressBar(uri.toString());
     _loadingProgress.value = 10;
@@ -339,6 +377,38 @@ class _BrowserScreenState extends State<BrowserScreen> {
             nextMode
                 ? 'Kalem modu açık: Kelimeye basılı tutarak hızlıca çeviri açabilirsiniz.'
                 : 'Kalem modu kapalı: Metin seçiminde Kopyala ve Tümünü Seç kullanılabilir.',
+          ),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+  }
+
+  Future<void> _handleToggleAdBlocker() async {
+    final notifier = _resolveAdBlockerNotifier();
+    final nextEnabled = !notifier.value;
+    notifier.value = nextEnabled;
+
+    if (_resolveViewMode().value == _BrowserViewMode.web) {
+      try {
+        await _webViewController.runJavaScript(
+          AdBlocker.buildInjectionScript(enabled: nextEnabled),
+        );
+        await _webViewController.runJavaScript(
+          AdBlocker.setEnabledScript(nextEnabled),
+        );
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            nextEnabled
+                ? 'Reklam engelleyici açıldı.'
+                : 'Reklam engelleyici kapatıldı.',
           ),
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),
@@ -584,6 +654,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
     final favoritesController = _resolveFavoriteSitesController();
     final toolbarListenable = _resolveToolbarListenable();
     final viewModeNotifier = _resolveViewMode();
+    final adBlockerNotifier = _resolveAdBlockerNotifier();
 
     return SafeArea(
       child: Column(
@@ -599,6 +670,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
                 canGoBack: _effectiveCanGoBack,
                 canGoForward: isWebMode && _canGoForward.value,
                 isPenMode: _isPenMode.value,
+                isAdBlockerEnabled: adBlockerNotifier.value,
                 isCurrentSiteFavorite: isWebMode &&
                     favoritesController.isFavorite(_currentUrl.value),
                 onSubmitted: _handleSubmit,
@@ -606,6 +678,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
                 onForward: _handleForward,
                 onReloadOrStop: _handleReloadOrStop,
                 onTogglePenMode: _handleTogglePenMode,
+                onToggleAdBlocker: _handleToggleAdBlocker,
                 onToggleFavoriteSite: _handleToggleFavoriteSite,
                 onOpenFavoriteSites: _handleOpenFavoriteSites,
                 onReturnToMenu: widget.onReturnToMenu,

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 /// Line Apps tasarım diline uygun, Chrome'dan farklı sade ve modern tarayıcı
-/// üst çubuğu. Kalem modu anahtarı ve Favori site aksiyonlarını içerir.
+/// üst çubuğu. Kalem modu, Reklam Engelleyici ve Favori site aksiyonlarını içerir.
 class BrowserAddressBar extends StatelessWidget {
   const BrowserAddressBar({
     super.key,
@@ -11,12 +11,14 @@ class BrowserAddressBar extends StatelessWidget {
     required this.canGoBack,
     required this.canGoForward,
     required this.isPenMode,
+    required this.isAdBlockerEnabled,
     required this.isCurrentSiteFavorite,
     required this.onSubmitted,
     required this.onBack,
     required this.onForward,
     required this.onReloadOrStop,
     required this.onTogglePenMode,
+    required this.onToggleAdBlocker,
     required this.onToggleFavoriteSite,
     required this.onOpenFavoriteSites,
     this.onReturnToMenu,
@@ -28,12 +30,14 @@ class BrowserAddressBar extends StatelessWidget {
   final bool canGoBack;
   final bool canGoForward;
   final bool isPenMode;
+  final bool isAdBlockerEnabled;
   final bool isCurrentSiteFavorite;
   final ValueChanged<String> onSubmitted;
   final VoidCallback onBack;
   final VoidCallback onForward;
   final VoidCallback onReloadOrStop;
   final VoidCallback onTogglePenMode;
+  final VoidCallback onToggleAdBlocker;
   final VoidCallback onToggleFavoriteSite;
   final VoidCallback onOpenFavoriteSites;
   final VoidCallback? onReturnToMenu;
@@ -49,7 +53,7 @@ class BrowserAddressBar extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Üst aksiyon satırı: Ana Menü, gezinme, Kalem modu ve Favori site araçları
+          // Üst aksiyon satırı: Ana Menü, gezinme, Kalem modu, Ad Blocker ve Favoriler
           Row(
             children: [
               if (onReturnToMenu != null)
@@ -113,7 +117,36 @@ class BrowserAddressBar extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 6),
+              // Reklam Engelleyici (Ad Blocker) butonu — Kalem ikonunun hemen yanında
+              Tooltip(
+                message: isAdBlockerEnabled
+                    ? 'Reklam Engelleyici Açık'
+                    : 'Reklam Engelleyici Kapalı',
+                child: Material(
+                  color: isAdBlockerEnabled
+                      ? colorScheme.primaryContainer
+                      : colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(20),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: onToggleAdBlocker,
+                    child: Padding(
+                      padding: const EdgeInsets.all(6),
+                      child: Icon(
+                        isAdBlockerEnabled
+                            ? Icons.shield_rounded
+                            : Icons.shield_outlined,
+                        size: 18,
+                        color: isAdBlockerEnabled
+                            ? colorScheme.primary
+                            : colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 2),
               IconButton(
                 onPressed: onToggleFavoriteSite,
                 icon: Icon(

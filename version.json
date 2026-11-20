@@ -1,6 +1,6 @@
 {
-  "latest_version": "0.1.1",
-  "version_code": 2,
-  "apk_url": "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.1/app-release.apk",
-  "release_notes": "Line Reader v0.1.1: Uygulama içi otomatik güncelleme kontrolü, özgün Line Reader tarayıcı başlangıç ekranı, arka plan araması, kalem modu, favori siteler, özel kelime listeleri, 4 anlamlı çeviri ve çift modlu sesli dinleme."
+  "latest_version": "0.1.2",
+  "version_code": 3,
+  "apk_url": "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.2/app-release.apk",
+  "release_notes": "Google tarzı sade arama sonuçları, telefonda basılı tutarak kelime anlamı açma düzeltmesi, reklam engelleyici (Ad Blocker) butonu ve sağ üst güncelleme ikonu ile canlı indirme sayfası eklendi."
 }

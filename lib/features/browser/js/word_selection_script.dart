@@ -1,9 +1,12 @@
 /// WebView içinde iki farklı metin seçim modunu (Kalem Açık / Kalem Kapalı)
-/// kaydırma akıcılığını bozmadan yöneten JavaScript köprü yapılandırması:
-/// - Kalem Açık: Sistemin Copy / Select All / Share menülerini engeller,
-///   kelimeye basılı tutulduğunda kelime + bağlam cümlesini çeviri paneline gönderir.
-/// - Kalem Kapalı: Metin seçimini serbest bırakır (native Android ActionMode
-///   yalnızca Kopyala ve Tümünü Seç aksiyonlarını gösterir), çeviri panelini açmaz.
+/// gerçek cihazlarda ve emülatörlerde kararlı biçimde yöneten JS köprüsü:
+/// - Kalem Açık: `user-select: none` KULLANMADAN (Android Chromium'da
+///   `caretRangeFromPoint` bozulmasın diye) basılı tutma, `contextmenu` ve
+///   `selectionchange` olaylarını birlikte yakalar; native sistem menüsü
+///   Android `MainActivity.onActionModeStarted` tarafından engellenir ve
+///   kelime + bağlam cümlesi doğrudan çeviri BottomSheet'ine iletilir.
+/// - Kalem Kapalı: Çeviri panelini tetiklemez; normal metin seçimi çalışır ve
+///   Android sistem menüsünde yalnızca Kopyala + Tümünü Seç bırakılır.
 abstract final class WordSelectionScript {
   static const String channelName = 'LineReaderWordSelection';
 
@@ -50,11 +53,11 @@ abstract final class WordSelectionScript {
       if (!existing) {
         var style = document.createElement('style');
         style.id = STYLE_ID;
+        // Not: user-select: none Android WebView'de caretRangeFromPoint'i
+        // bozduğu için kullanılmaz; yalnızca touch-callout bastırılır.
         style.textContent =
           'body, body *:not(input):not(textarea):not([contenteditable="true"]) {' +
           ' -webkit-touch-callout: none !important;' +
-          ' -webkit-user-select: none !important;' +
-          ' user-select: none !important;' +
           '}';
         (document.head || document.documentElement).appendChild(style);
       }
@@ -79,20 +82,14 @@ abstract final class WordSelectionScript {
   window.__lineReaderSetPenMode(__INITIAL_PEN_MODE__);
 
   var longPressTimer = null;
+  var selectionTimer = null;
+  var pendingSelection = null;
   var scrollIdleTimer = null;
   var isScrolling = false;
   var touchStartX = 0;
   var touchStartY = 0;
   var lastSentKey = '';
   var lastSentAt = 0;
-
-  function runWhenIdle(callback) {
-    if (typeof window.requestIdleCallback === 'function') {
-      window.requestIdleCallback(callback, { timeout: 200 });
-    } else {
-      callback();
-    }
-  }
 
   function isEditableElement(element) {
     if (!element) return false;
@@ -104,6 +101,13 @@ abstract final class WordSelectionScript {
     if (longPressTimer !== null) {
       clearTimeout(longPressTimer);
       longPressTimer = null;
+    }
+  }
+
+  function clearSelectionTimer() {
+    if (selectionTimer !== null) {
+      clearTimeout(selectionTimer);
+      selectionTimer = null;
     }
   }
 
@@ -188,7 +192,7 @@ abstract final class WordSelectionScript {
         ? Math.min(Math.max(offset, 0), (node.textContent || '').length)
         : 0;
       prefixRange.setEnd(node, safeOffset);
-      focusIndex = prefixRange.toString().replace(/\s+/g, ' ').trimStart().length;
+      focusIndex = prefixRange.toString().replace(/\s+/g, ' ').replace(/^\s+/, '').length;
     } catch (_) {
       var normalized = containerText.replace(/\s+/g, ' ').trim();
       focusIndex = normalized.toLowerCase().indexOf(word.toLowerCase());
@@ -212,6 +216,10 @@ abstract final class WordSelectionScript {
     lastSentKey = key;
     lastSentAt = now;
 
+    if (window.getSelection) {
+      try { window.getSelection().removeAllRanges(); } catch (_) {}
+    }
+
     var channel = window[CHANNEL_NAME];
     if (channel && typeof channel.postMessage === 'function') {
       channel.postMessage(JSON.stringify({
@@ -219,6 +227,49 @@ abstract final class WordSelectionScript {
         sentence: cleanSentence
       }));
     }
+  }
+
+  function getSelectionPayload() {
+    if (isScrolling || isEditableElement(document.activeElement)) return null;
+    var selection = window.getSelection ? window.getSelection() : null;
+    if (!selection || selection.rangeCount === 0) return null;
+
+    var word = selection.toString().trim();
+    if (!word) return null;
+
+    var range = selection.getRangeAt(0);
+    var sentence = extractContextSentence(
+      range.startContainer,
+      range.startOffset,
+      word
+    );
+    return { word: word, sentence: sentence };
+  }
+
+  function findTextNodeInElementAtPoint(element, x, y) {
+    if (!element || !element.childNodes) return null;
+    var walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null);
+    var textNode;
+    while ((textNode = walker.nextNode())) {
+      if (!textNode.textContent || !textNode.textContent.trim()) continue;
+      try {
+        var r = document.createRange();
+        r.selectNodeContents(textNode);
+        var rects = r.getClientRects();
+        for (var i = 0; i < rects.length; i++) {
+          var rect = rects[i];
+          if (x >= rect.left - 6 && x <= rect.right + 6 &&
+              y >= rect.top - 6 && y <= rect.bottom + 6) {
+            // Yaklaşık karakter konumunu yatay orandan hesapla
+            var ratio = rect.width > 0 ? (x - rect.left) / rect.width : 0;
+            ratio = Math.max(0, Math.min(1, ratio));
+            var approxOffset = Math.floor(ratio * textNode.textContent.length);
+            return { node: textNode, offset: approxOffset };
+          }
+        }
+      } catch (_) {}
+    }
+    return null;
   }
 
   function extractWordPayloadAtPoint(x, y) {
@@ -240,6 +291,25 @@ abstract final class WordSelectionScript {
       }
     }
 
+    if (node && node.nodeType !== Node.TEXT_NODE) {
+      var found = findTextNodeInElementAtPoint(node, x, y);
+      if (found) {
+        node = found.node;
+        offset = found.offset;
+      }
+    }
+
+    if (!node || node.nodeType !== Node.TEXT_NODE) {
+      var el = document.elementFromPoint ? document.elementFromPoint(x, y) : null;
+      if (el && !isEditableElement(el)) {
+        var fromEl = findTextNodeInElementAtPoint(el, x, y);
+        if (fromEl) {
+          node = fromEl.node;
+          offset = fromEl.offset;
+        }
+      }
+    }
+
     if (!node || node.nodeType !== Node.TEXT_NODE || !node.textContent) {
       return null;
     }
@@ -253,6 +323,8 @@ abstract final class WordSelectionScript {
     if (!WORD_CHAR_REGEX.test(text[offset])) {
       if (offset > 0 && WORD_CHAR_REGEX.test(text[offset - 1])) {
         offset -= 1;
+      } else if (offset + 1 < text.length && WORD_CHAR_REGEX.test(text[offset + 1])) {
+        offset += 1;
       } else {
         return null;
       }
@@ -275,10 +347,25 @@ abstract final class WordSelectionScript {
     return { word: word, sentence: sentence };
   }
 
+  function emitWordForPointOrSelection(x, y) {
+    if (!window.__lineReaderPenMode || isScrolling) return;
+    var selected = getSelectionPayload();
+    if (selected) {
+      postWordPayload(selected.word, selected.sentence);
+      return;
+    }
+    var atPoint = extractWordPayloadAtPoint(x, y);
+    if (atPoint) {
+      postWordPayload(atPoint.word, atPoint.sentence);
+    }
+  }
+
   // Aktif kaydırma sırasında hiçbir DOM okuma/seçim sorgusu çalıştırma.
   window.addEventListener('scroll', function() {
     isScrolling = true;
+    pendingSelection = null;
     clearLongPressTimer();
+    clearSelectionTimer();
 
     if (scrollIdleTimer !== null) {
       clearTimeout(scrollIdleTimer);
@@ -289,13 +376,36 @@ abstract final class WordSelectionScript {
     }, 180);
   }, { passive: true, capture: true });
 
-  // Kalem modu aktifken uzun basmada tarayıcı bağlam menüsünü engelle.
+  // Sinyal 1: Kalem modu aktifken uzun basmada bağlam menüsünü engelleyip kelimeyi yakala.
   document.addEventListener('contextmenu', function(event) {
-    if (window.__lineReaderPenMode && !isEditableElement(event.target)) {
-      event.preventDefault();
-    }
+    if (!window.__lineReaderPenMode || isEditableElement(event.target)) return;
+    event.preventDefault();
+    clearLongPressTimer();
+    var cx = typeof event.clientX === 'number' && event.clientX > 0 ? event.clientX : touchStartX;
+    var cy = typeof event.clientY === 'number' && event.clientY > 0 ? event.clientY : touchStartY;
+    emitWordForPointOrSelection(cx, cy);
   });
 
+  // Sinyal 2: Kalem modu aktifken Android WebView'in uzun basma ile seçtiği
+  // kelimeyi senkron yakala (MainActivity mode.finish() seçimi hemen temizlese
+  // bile yakalanan kelime kaybolmasın).
+  document.addEventListener('selectionchange', function() {
+    if (!window.__lineReaderPenMode || isScrolling) return;
+    var selected = getSelectionPayload();
+    if (!selected) return;
+
+    pendingSelection = selected;
+    clearSelectionTimer();
+    selectionTimer = setTimeout(function() {
+      selectionTimer = null;
+      var payload = pendingSelection;
+      pendingSelection = null;
+      if (!window.__lineReaderPenMode || isScrolling || !payload) return;
+      postWordPayload(payload.word, payload.sentence);
+    }, 50);
+  }, { passive: true });
+
+  // Sinyal 3: Doğrudan parmakla basılı tutma (380ms, gerçek parmak titreşimine toleranslı).
   document.addEventListener('touchstart', function(event) {
     clearLongPressTimer();
     if (!window.__lineReaderPenMode) return;
@@ -308,14 +418,8 @@ abstract final class WordSelectionScript {
 
     longPressTimer = setTimeout(function() {
       longPressTimer = null;
-      if (isScrolling || !window.__lineReaderPenMode) return;
-      runWhenIdle(function() {
-        var pointPayload = extractWordPayloadAtPoint(touchStartX, touchStartY);
-        if (pointPayload) {
-          postWordPayload(pointPayload.word, pointPayload.sentence);
-        }
-      });
-    }, 420);
+      emitWordForPointOrSelection(touchStartX, touchStartY);
+    }, 380);
   }, { passive: true });
 
   document.addEventListener('touchmove', function(event) {
@@ -325,7 +429,7 @@ abstract final class WordSelectionScript {
     var touch = event.touches[0];
     var dx = Math.abs(touch.clientX - touchStartX);
     var dy = Math.abs(touch.clientY - touchStartY);
-    if (dx > 10 || dy > 10) {
+    if (dx > 18 || dy > 18) {
       clearLongPressTimer();
     }
   }, { passive: true });

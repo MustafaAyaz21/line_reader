@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../core/settings/api_key_controller.dart';
 import '../../core/tts/tts_service.dart';
 import '../settings/widgets/api_key_dialog.dart';
+import '../update/controllers/app_update_controller.dart';
+import '../update/widgets/update_action_button.dart';
 import 'controllers/words_controller.dart';
 import 'list_words_screen.dart';
 import 'models/word_list.dart';
@@ -16,12 +18,14 @@ class WordsScreen extends StatelessWidget {
     super.key,
     required this.controller,
     this.apiKeyController,
+    this.updateController,
     this.ttsService,
     this.onClearCache,
   });
 
   final WordsController controller;
   final ApiKeyController? apiKeyController;
+  final AppUpdateController? updateController;
   final TtsService? ttsService;
   final Future<void> Function()? onClearCache;
 
@@ -131,6 +135,8 @@ class WordsScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Kelimelerim'),
         actions: [
+          if (updateController != null)
+            UpdateActionButton(controller: updateController!),
           if (apiKeyController != null) ...[
             ApiKeyActionButton(
               controller: apiKeyController!,

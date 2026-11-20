@@ -65,7 +65,7 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
         apkUrl: widget.updateInfo.apkUrl,
         onProgress: (progress) {
           if (!mounted) return;
-          setState(() => _downloadProgress = progress);
+          setState(() => _downloadProgress = progress.fraction);
         },
       );
       if (!mounted) return;

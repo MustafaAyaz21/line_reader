@@ -8,8 +8,7 @@ import '../browser/browser_screen.dart';
 import '../translation/data/translation_cache_repository.dart';
 import '../translation/models/word_meaning.dart';
 import '../translation/services/cached_translation_service.dart';
-import '../update/services/app_update_service.dart';
-import '../update/widgets/app_update_dialog.dart';
+import '../update/controllers/app_update_controller.dart';
 import '../words/controllers/words_controller.dart';
 import '../words/data/word_repository.dart';
 import '../words/models/saved_word.dart';
@@ -44,7 +43,7 @@ class _HomeScreenState extends State<HomeScreen> {
   ApiKeyController? _apiKeyController;
   CachedTranslationService? _translationService;
   TtsService? _ttsService;
-  AppUpdateService? _updateService;
+  AppUpdateController? _updateController;
 
   @override
   void initState() {
@@ -90,7 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _apiKeyController?.shouldAttemptGemini ?? false,
     );
 
-    _updateService ??= AppUpdateService();
+    _updateController ??= AppUpdateController();
   }
 
   Future<void> _checkForAppUpdateSilently() async {
@@ -98,14 +97,9 @@ class _HomeScreenState extends State<HomeScreen> {
     _hasCheckedUpdate = true;
 
     _ensureInitialized();
-    final updateInfo = await _updateService!.checkForUpdate();
-    if (updateInfo == null || !mounted) return;
-
-    await AppUpdateDialog.show(
-      context,
-      updateInfo: updateInfo,
-      updateService: _updateService!,
-    );
+    // Açılışta otomatik popup/dialog göstermez; yeni sürüm varsa yalnızca
+    // üst bardaki güncelleme ikonunun kırmızı göstergesini yakar.
+    await _updateController!.checkSilently();
   }
 
   @override
@@ -114,7 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _apiKeyController?.dispose();
     _translationService?.dispose();
     _ttsService?.dispose();
-    _updateService?.dispose();
+    _updateController?.dispose();
     super.dispose();
   }
 
@@ -211,6 +205,7 @@ class _HomeScreenState extends State<HomeScreen> {
               key: const ValueKey<String>('main_menu_screen'),
               onOpenBrowser: _openBrowser,
               apiKeyController: _apiKeyController!,
+              updateController: _updateController!,
               onClearCache: _handleClearTranslationCache,
             ),
             if ((_hasOpenedBrowser ?? false) || _isBrowserOpen)
@@ -228,6 +223,7 @@ class _HomeScreenState extends State<HomeScreen> {
               key: const ValueKey<String>('words_screen'),
               controller: _wordsController!,
               apiKeyController: _apiKeyController!,
+              updateController: _updateController!,
               ttsService: _ttsService,
               onClearCache: _handleClearTranslationCache,
             ),

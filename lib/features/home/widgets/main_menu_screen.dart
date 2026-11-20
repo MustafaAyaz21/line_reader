@@ -2,20 +2,24 @@ import 'package:flutter/material.dart';
 
 import '../../../core/settings/api_key_controller.dart';
 import '../../settings/widgets/api_key_dialog.dart';
+import '../../update/controllers/app_update_controller.dart';
+import '../../update/widgets/update_action_button.dart';
 
 /// Uygulamanın sade Ana Menü ekranı.
-/// Tam ortada belirgin "Tarayıcı" kartı, sağ üstte ise Gemini API anahtarı
-/// ayar ikonu yer alır.
+/// Tam ortada belirgin "Tarayıcı" kartı, sağ üstte ise güncelleme ikonu ve
+/// Gemini API anahtarı ayar ikonu yer alır.
 class MainMenuScreen extends StatelessWidget {
   const MainMenuScreen({
     super.key,
     required this.onOpenBrowser,
     required this.apiKeyController,
+    this.updateController,
     this.onClearCache,
   });
 
   final VoidCallback onOpenBrowser;
   final ApiKeyController apiKeyController;
+  final AppUpdateController? updateController;
   final Future<void> Function()? onClearCache;
 
   @override
@@ -27,6 +31,8 @@ class MainMenuScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Ana Menü'),
         actions: [
+          if (updateController != null)
+            UpdateActionButton(controller: updateController!),
           ApiKeyActionButton(
             controller: apiKeyController,
             onClearCache: onClearCache,
