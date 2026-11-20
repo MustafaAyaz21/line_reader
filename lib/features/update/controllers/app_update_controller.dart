@@ -17,6 +17,7 @@ class AppUpdateController extends ChangeNotifier {
 
   bool _isChecking = false;
   bool _hasCompletedInitialCheck = false;
+  DateTime? _lastCheckedAt;
   String _currentVersion = '';
   int _currentBuildNumber = 0;
   AppUpdateInfo? _remoteInfo;
@@ -43,12 +44,11 @@ class AppUpdateController extends ChangeNotifier {
   AppUpdateInfo? get remoteInfo => _remoteInfo;
   String? get checkError => _checkError;
 
-  bool get hasUpdate {
-    final remote = _remoteInfo;
-    if (remote == null) return false;
-    return remote.versionCode > _currentBuildNumber &&
-        remote.apkUrl.startsWith('http');
-  }
+  bool get hasUpdate => AppUpdateService.isUpdateAvailable(
+        currentVersion: _currentVersion,
+        currentBuildNumber: _currentBuildNumber,
+        remoteInfo: _remoteInfo,
+      );
 
   bool get isDownloading => _isDownloading;
   double? get downloadProgress => _downloadProgress;
@@ -65,15 +65,21 @@ class AppUpdateController extends ChangeNotifier {
     }
   }
 
-  /// Uygulama açılışında arka planda sessizce `version.json` kontrolü yapar.
-  /// Kullanıcıya otomatik popup/dialog göstermez; yalnızca yeni sürüm varsa
-  /// üst bardaki güncelleme ikonunun kırmızı göstergesini aktif eder.
-  Future<void> checkSilently() async {
-    if (_isChecking || _hasCompletedInitialCheck) return;
+  /// Uygulama açılışında veya arka plandan ön plana dönüldüğünde sessizce
+  /// güncelleme kontrolü yapar (otomatik popup göstermez, yalnızca yeni sürüm
+  /// varsa üst bardaki kırmızı göstergeyi yakar).
+  Future<void> checkSilently({bool force = false}) async {
+    if (_isChecking || _isDownloading) return;
+    final last = _lastCheckedAt;
+    if (!force &&
+        last != null &&
+        DateTime.now().difference(last).inSeconds < 20) {
+      return;
+    }
     await checkForUpdates(silent: true);
   }
 
-  /// `version.json` dosyasını kontrol eder ve mevcut/yeni sürüm bilgisini günceller.
+  /// `version.json` ve GitHub Releases API'yi kontrol eder, sürüm bilgisini günceller.
   Future<void> checkForUpdates({bool silent = false}) async {
     if (_isChecking) return;
 
@@ -88,6 +94,7 @@ class AppUpdateController extends ChangeNotifier {
       _currentVersion = result.currentVersion;
       _currentBuildNumber = result.currentBuildNumber;
       _hasCompletedInitialCheck = true;
+      _lastCheckedAt = DateTime.now();
 
       if (result.remoteInfo != null) {
         final previousUrl = _remoteInfo?.apkUrl;

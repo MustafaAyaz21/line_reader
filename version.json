@@ -1,6 +1,6 @@
 {
-  "latest_version": "0.1.3",
-  "version_code": 4,
-  "apk_url": "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.3/app-release.apk",
-  "release_notes": "Telefonda WebView kelime seçimi düzeltildi, sistem geri tuşu/yandan kaydırma tarayıcı geçmişine bağlandı, Ana Menü'ye Makaleler (Yakında...) eklendi, tarayıcı başlangıç ekranına kalın Line Reader ve akan kesik çizgi animasyonu eklendi, klavye otomatik düzeltme/tamamlama açıldı."
+  "latest_version": "0.1.4",
+  "version_code": 5,
+  "apk_url": "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.4/app-release.apk",
+  "release_notes": "Güncelleme kontrolü 3 kaynaklı anlık (CDN önbelleksiz) yapıya geçirildi; uygulama ön plana döndüğünde ve Güncellemeler sayfası açıldığında otomatik yenilenir."
 }

@@ -26,7 +26,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   static const int _mainMenuTabIndex = 0;
   static const int _wordsTabIndex = 1;
 
@@ -37,7 +37,6 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = _mainMenuTabIndex;
   bool _isBrowserOpen = false;
   bool? _hasOpenedBrowser;
-  bool? _hasCheckedUpdate;
 
   WordsController? _wordsController;
   ApiKeyController? _apiKeyController;
@@ -49,10 +48,18 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _ensureInitialized();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkForAppUpdateSilently();
+      _checkForAppUpdateSilently(force: true);
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkForAppUpdateSilently();
+    }
   }
 
   /// Hem normal açılışta (`initState`) hem de Hot Reload sonrası eksik alan
@@ -94,18 +101,18 @@ class _HomeScreenState extends State<HomeScreen> {
     _browserBackController ??= BrowserBackController();
   }
 
-  Future<void> _checkForAppUpdateSilently() async {
-    if ((_hasCheckedUpdate ?? false) || !mounted) return;
-    _hasCheckedUpdate = true;
+  Future<void> _checkForAppUpdateSilently({bool force = false}) async {
+    if (!mounted) return;
 
     _ensureInitialized();
-    // Açılışta otomatik popup/dialog göstermez; yeni sürüm varsa yalnızca
-    // üst bardaki güncelleme ikonunun kırmızı göstergesini yakar.
-    await _updateController!.checkSilently();
+    // Açılışta ve arka plandan dönüldüğünde otomatik popup göstermez;
+    // yeni sürüm varsa üst bardaki güncelleme ikonunun kırmızı göstergesini yakar.
+    await _updateController!.checkSilently(force: force);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _wordsController?.dispose();
     _apiKeyController?.dispose();
     _translationService?.dispose();

@@ -23,9 +23,8 @@ class _AppUpdateScreenState extends State<AppUpdateScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      // Sayfa ilk kez açılırken henüz kontrol yapılmadıysa veya hata varsa tazele.
-      if (!widget.controller.hasCompletedInitialCheck ||
-          widget.controller.remoteInfo == null) {
+      // Sayfa açıldığında indirme yoksa her zaman en güncel sürümü tazele.
+      if (!widget.controller.isDownloading) {
         widget.controller.checkForUpdates();
       }
     });
@@ -74,7 +73,9 @@ class _AppUpdateScreenState extends State<AppUpdateScreen> {
               ? 'v${controller.currentVersion} (Build ${controller.currentBuildNumber})'
               : 'Okunuyor...';
           final latestLabel = remote != null && remote.latestVersion.isNotEmpty
-              ? 'v${remote.latestVersion} (Build ${remote.versionCode})'
+              ? (remote.versionCode > 0
+                  ? 'v${remote.latestVersion} (Build ${remote.versionCode})'
+                  : 'v${remote.latestVersion}')
               : '-';
 
           final progressFraction = controller.downloadProgress;
