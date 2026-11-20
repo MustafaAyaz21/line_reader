@@ -37,7 +37,7 @@ class WordSelectionPayload {
       }
     }
 
-    final cleanedWord = WordSanitizer.clean(rawWord);
+    final cleanedWord = WordSanitizer.clean(rawWord) ?? _fallbackClean(rawWord);
     if (cleanedWord == null) return null;
 
     final cleanedSentence = rawSentence
@@ -51,5 +51,11 @@ class WordSelectionPayload {
               ? cleanedSentence
               : null,
     );
+  }
+
+  static String? _fallbackClean(String raw) {
+    final normalized = raw.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (normalized.isEmpty || normalized.length > 80) return null;
+    return normalized;
   }
 }

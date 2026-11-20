@@ -15,7 +15,8 @@ class WordPreviewSheet extends StatefulWidget {
     super.key,
     required this.word,
     required this.translationService,
-    required this.wordLists,
+    this.wordLists = const <WordList>[],
+    this.loadWordLists,
     required this.onAddWord,
     this.contextSentence,
     this.ttsService,
@@ -25,6 +26,7 @@ class WordPreviewSheet extends StatefulWidget {
   final String? contextSentence;
   final WordTranslationService translationService;
   final List<WordList> wordLists;
+  final Future<List<WordList>> Function()? loadWordLists;
   final TtsService? ttsService;
   final void Function(
     String word,
@@ -38,7 +40,8 @@ class WordPreviewSheet extends StatefulWidget {
     BuildContext context, {
     required String word,
     required WordTranslationService translationService,
-    required List<WordList> wordLists,
+    List<WordList> wordLists = const <WordList>[],
+    Future<List<WordList>> Function()? loadWordLists,
     required void Function(
       String word,
       String meaning,
@@ -61,6 +64,7 @@ class WordPreviewSheet extends StatefulWidget {
           contextSentence: contextSentence,
           translationService: translationService,
           wordLists: wordLists,
+          loadWordLists: loadWordLists,
           ttsService: ttsService,
           onAddWord: (
             selectedWord,
@@ -92,6 +96,7 @@ class _WordPreviewSheetState extends State<WordPreviewSheet> {
   String? _errorMessage;
   bool _isLoading = true;
   int? _selectedListId;
+  late List<WordList> _wordLists;
 
   TtsService? _ttsService;
   bool _ownsTtsService = false;
@@ -121,9 +126,26 @@ class _WordPreviewSheetState extends State<WordPreviewSheet> {
   @override
   void initState() {
     super.initState();
+    _wordLists = List<WordList>.from(widget.wordLists);
     _resolveTtsService().clearError(notify: false);
     _selectedListId = _resolveInitialListId();
+    _loadWordListsAsync();
     _fetchMeaning();
+  }
+
+  Future<void> _loadWordListsAsync() async {
+    final loader = widget.loadWordLists;
+    if (loader == null) return;
+    try {
+      final loaded = await loader();
+      if (!mounted || loaded.isEmpty) return;
+      setState(() {
+        _wordLists = loaded;
+        _selectedListId ??= _resolveInitialListId();
+      });
+    } catch (_) {
+      // Liste yüklenemezse varsayılan Favoriler ile devam et.
+    }
   }
 
   @override
@@ -140,16 +162,16 @@ class _WordPreviewSheetState extends State<WordPreviewSheet> {
   }
 
   int? _resolveInitialListId() {
-    if (widget.wordLists.isEmpty) return null;
-    for (final list in widget.wordLists) {
+    if (_wordLists.isEmpty) return null;
+    for (final list in _wordLists) {
       if (list.isDefault) return list.id;
     }
-    return widget.wordLists.first.id;
+    return _wordLists.first.id;
   }
 
   WordList? _findSelectedList() {
     if (_selectedListId == null) return null;
-    for (final list in widget.wordLists) {
+    for (final list in _wordLists) {
       if (list.id == _selectedListId) return list;
     }
     return null;
@@ -294,7 +316,7 @@ class _WordPreviewSheetState extends State<WordPreviewSheet> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (widget.wordLists.isNotEmpty) ...[
+                      if (_wordLists.isNotEmpty) ...[
                         _buildListSelector(theme),
                         const SizedBox(height: 10),
                       ],
@@ -492,7 +514,7 @@ class _WordPreviewSheetState extends State<WordPreviewSheet> {
           borderRadius: BorderRadius.circular(12),
         ),
       ),
-      items: widget.wordLists.map((list) {
+      items: _wordLists.map((list) {
         return DropdownMenuItem<int>(
           value: list.id,
           child: Row(

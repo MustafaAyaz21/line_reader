@@ -110,6 +110,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
   bool _isWordSheetOpen = false;
   bool _isBackgroundColorSynced = false;
   bool _hasEarlyInjectedCurrentPage = false;
+  bool _hasLoadedAnyWebPage = false;
   bool _openedWebFromSearch = false;
   String _currentPageTitle = '';
   String? _lastTriggeredWord;
@@ -203,6 +204,12 @@ class _BrowserScreenState extends State<BrowserScreen> {
         onPageStarted: _handlePageStarted,
         onProgress: _handleProgress,
         onPageFinished: _handlePageFinished,
+        onUrlChange: (change) {
+          final nextUrl = change.url;
+          if (!mounted || nextUrl == null || nextUrl.isEmpty) return;
+          _syncAddressBar(nextUrl);
+          _injectPageScripts();
+        },
         onWebResourceError: (_) {
           if (!mounted) return;
           _loadingProgress.value = 0;
@@ -339,6 +346,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
     _addressFocusNode.unfocus();
     _currentPageTitle = initialTitle ?? '';
     _hasEarlyInjectedCurrentPage = false;
+    _hasLoadedAnyWebPage = true;
     _resolveViewMode().value = _BrowserViewMode.web;
     _syncAddressBar(uri.toString());
     _loadingProgress.value = 10;
@@ -521,10 +529,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
   }
 
   Future<void> _handleWordSelectionMessage(JavaScriptMessage message) async {
-    if (!mounted ||
-        _isWordSheetOpen ||
-        !_isPenMode.value ||
-        _resolveViewMode().value != _BrowserViewMode.web) {
+    if (!mounted || _isWordSheetOpen || !_isPenMode.value) {
       return;
     }
 
@@ -549,17 +554,16 @@ class _BrowserScreenState extends State<BrowserScreen> {
     SelectionModeChannel.finishActionMode();
 
     try {
-      final wordLists = widget.loadWordLists != null
-          ? await widget.loadWordLists!()
-          : await WordRepository(AppDatabase.instance).getAllLists();
-      if (!mounted) return;
-
+      // Çeviri veya veritabanı sorgusunu beklemeden BottomSheet'i ANINDA aç;
+      // seçilen kelime + yükleniyor göstergesi hemen görünsün, listeler ve 4 anlam
+      // geldikçe sheet içindeki state güncellensin.
       await WordPreviewSheet.show(
         context,
         word: payload.word,
         contextSentence: payload.contextSentence,
         translationService: _translationService,
-        wordLists: wordLists,
+        loadWordLists: widget.loadWordLists ??
+            () => WordRepository(AppDatabase.instance).getAllLists(),
         ttsService: widget.ttsService,
         onAddWord: _handleAddWord,
       );
@@ -825,7 +829,12 @@ class _BrowserScreenState extends State<BrowserScreen> {
                       onRetry: () => _performBackgroundSearch(_lastSearchQuery),
                       onBackToStart: _returnToBrowserStart,
                     ),
-                    _webViewWidget,
+                    // WebView'i başlangıç ekranında görünmez (offstage) başlatma;
+                    // ilk kez bir web sayfası açıldığında görünür olarak bağla.
+                    if (_hasLoadedAnyWebPage || mode == _BrowserViewMode.web)
+                      _webViewWidget
+                    else
+                      const SizedBox.shrink(),
                   ],
                 );
               },
