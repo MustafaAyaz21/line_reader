@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -112,9 +115,13 @@ class _BrowserScreenState extends State<BrowserScreen> {
   bool _hasEarlyInjectedCurrentPage = false;
   bool _hasLoadedAnyWebPage = false;
   bool _openedWebFromSearch = false;
+  bool _isPollingSelection = false;
   String _currentPageTitle = '';
   String? _lastTriggeredWord;
   DateTime? _lastTriggeredAt;
+  String? _pendingPolledWord;
+  DateTime? _pendingPolledSince;
+  Timer? _selectionPollTimer;
 
   // Uygulama içi arama sonuçları durumu
   String _lastSearchQuery = '';
@@ -219,6 +226,13 @@ class _BrowserScreenState extends State<BrowserScreen> {
 
     _webViewWidget = WebViewFactory.createWidget(_webViewController);
     widget.backController?.attach(_handleSystemBack);
+
+    // JS kanalına ek olarak Dart tarafında da 400ms yedek seçim okuma
+    // çalıştır; böylece hiçbir sitede mavi seçili kelime cevapsız kalmaz.
+    _selectionPollTimer = Timer.periodic(
+      const Duration(milliseconds: 400),
+      (_) => _pollSelectionFromDart(),
+    );
   }
 
   @override
@@ -243,6 +257,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
 
   @override
   void dispose() {
+    _selectionPollTimer?.cancel();
     widget.backController?.attach(null);
     if (_ownsTranslationService) {
       _translationService.dispose();
@@ -529,11 +544,88 @@ class _BrowserScreenState extends State<BrowserScreen> {
   }
 
   Future<void> _handleWordSelectionMessage(JavaScriptMessage message) async {
+    await _openWordPreviewFromRawMessage(message.message);
+  }
+
+  String _unwrapJsStringResult(Object raw) {
+    var text = raw.toString().trim();
+    if (text.isEmpty ||
+        text == 'null' ||
+        text == 'undefined' ||
+        text == '""') {
+      return '';
+    }
+    for (var i = 0; i < 2; i++) {
+      if (text.startsWith('"') && text.endsWith('"')) {
+        try {
+          final decoded = jsonDecode(text);
+          if (decoded is String) {
+            text = decoded.trim();
+            continue;
+          }
+        } catch (_) {}
+      }
+      break;
+    }
+    return text;
+  }
+
+  Future<void> _pollSelectionFromDart() async {
+    if (!mounted ||
+        _isWordSheetOpen ||
+        !_isPenMode.value ||
+        _isPollingSelection ||
+        !_hasLoadedAnyWebPage ||
+        _resolveViewMode().value != _BrowserViewMode.web) {
+      return;
+    }
+
+    _isPollingSelection = true;
+    try {
+      final rawResult = await _webViewController.runJavaScriptReturningResult(
+        WordSelectionScript.readSelectionOnceScript,
+      );
+      if (!mounted || _isWordSheetOpen || !_isPenMode.value) return;
+
+      final unwrapped = _unwrapJsStringResult(rawResult);
+      if (unwrapped.isEmpty) {
+        _pendingPolledWord = null;
+        _pendingPolledSince = null;
+        return;
+      }
+
+      final payload = WordSelectionPayload.fromMessage(unwrapped);
+      if (payload == null || payload.word.trim().isEmpty) return;
+
+      final normalized = payload.word.trim().toLowerCase();
+      final now = DateTime.now();
+
+      if (_pendingPolledWord != normalized) {
+        _pendingPolledWord = normalized;
+        _pendingPolledSince = now;
+        return;
+      }
+
+      // Seçim tutamaçlarının yerleşmesi için ~300ms bekle, sonra aç.
+      final since = _pendingPolledSince;
+      if (since != null && now.difference(since).inMilliseconds >= 280) {
+        _pendingPolledWord = null;
+        _pendingPolledSince = null;
+        await _openWordPreviewFromRawMessage(unwrapped);
+      }
+    } catch (_) {
+      // Sayfa geçişi sırasında JS değerlendirmesi başarısız olursa sessizce geç.
+    } finally {
+      _isPollingSelection = false;
+    }
+  }
+
+  Future<void> _openWordPreviewFromRawMessage(String rawMessage) async {
     if (!mounted || _isWordSheetOpen || !_isPenMode.value) {
       return;
     }
 
-    final payload = WordSelectionPayload.fromMessage(message.message);
+    final payload = WordSelectionPayload.fromMessage(rawMessage);
     if (payload == null || payload.word.trim().isEmpty) return;
 
     // Son seçilen aynı kelimenin milisaniyeler içinde çift tetiklenmesini engelle.
@@ -547,6 +639,8 @@ class _BrowserScreenState extends State<BrowserScreen> {
     }
     _lastTriggeredWord = normalizedWord;
     _lastTriggeredAt = now;
+    _pendingPolledWord = null;
+    _pendingPolledSince = null;
 
     _addressFocusNode.unfocus();
     _isWordSheetOpen = true;

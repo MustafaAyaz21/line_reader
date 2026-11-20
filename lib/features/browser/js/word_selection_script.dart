@@ -22,11 +22,47 @@ abstract final class WordSelectionScript {
   }
 
   static String buildInjectionScript({required bool initialPenMode}) {
-    return _baseInjectionScript.replaceFirst(
+    return _baseInjectionScript.replaceAll(
       '__INITIAL_PEN_MODE__',
       initialPenMode ? 'true' : 'false',
     );
   }
+
+  /// Dart tarafından yedek olarak doğrudan seçili metni + cümleyi okuyan tek seferlik JS.
+  static const String readSelectionOnceScript = r'''
+(function() {
+  try {
+    var sel = window.getSelection ? window.getSelection() : null;
+    var text = sel ? sel.toString().replace(/\s+/g, ' ').trim() : '';
+    if (!text) {
+      var frames = document.querySelectorAll('iframe');
+      for (var i = 0; i < frames.length; i++) {
+        try {
+          var fw = frames[i].contentWindow;
+          var fs = fw && fw.getSelection ? fw.getSelection() : null;
+          var ft = fs ? fs.toString().replace(/\s+/g, ' ').trim() : '';
+          if (ft) { sel = fs; text = ft; break; }
+        } catch (_) {}
+      }
+    }
+    if (!text) return '';
+    var sentence = '';
+    try {
+      if (sel && sel.rangeCount > 0) {
+        var node = sel.getRangeAt(0).startContainer;
+        var el = node && node.nodeType === 3 ? node.parentElement : node;
+        if (el && el.textContent) {
+          var raw = el.textContent.replace(/\s+/g, ' ').trim();
+          sentence = raw.length > 280 ? raw.slice(0, 280) : raw;
+        }
+      }
+    } catch (_) {}
+    return JSON.stringify({ word: text, sentence: sentence });
+  } catch (_) {
+    return '';
+  }
+})()
+''';
 
   static const String _baseInjectionScript = r'''
 (function() {
@@ -85,7 +121,6 @@ abstract final class WordSelectionScript {
       window.__lineReaderSetPenMode(__INITIAL_PEN_MODE__);
       return;
     }
-    window.__lineReaderSelectionInstalled = true;
     window.__lineReaderSetPenMode(__INITIAL_PEN_MODE__);
 
     var settleTimer = null;
@@ -315,6 +350,8 @@ abstract final class WordSelectionScript {
     document.addEventListener('mouseup', function() {
       setTimeout(inspectSelection, 50);
     }, { passive: true });
+
+    window.__lineReaderSelectionInstalled = true;
   } catch (_) {}
 })();
 ''';

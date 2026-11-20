@@ -78,7 +78,7 @@ abstract final class AdBlocker {
   }
 
   static String buildInjectionScript({required bool enabled}) {
-    return _baseScript.replaceFirst(
+    return _baseScript.replaceAll(
       '__INITIAL_ADBLOCK__',
       enabled ? 'true' : 'false',
     );

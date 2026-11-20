@@ -1,6 +1,6 @@
 {
-  "latest_version": "0.1.5",
-  "version_code": 6,
-  "apk_url": "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.5/app-release.apk",
-  "release_notes": "WebView kelime seçimi tek LineReaderSelection kanalı, 350ms garantili tarama, 300ms yerleşme gecikmesi, görünür WebView bağlantısı ve beklemeden anında açılan 4 anlamlı BottomSheet ile kesin olarak çözüldü."
+  "latest_version": "0.1.6",
+  "version_code": 7,
+  "apk_url": "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.6/app-release.apk",
+  "release_notes": "WordSelectionScript ve AdBlocker enjeksiyonunda ikinci yer tutucunun değiştirilmemesine yol açan replaceFirst hatası (replaceAll ile) kesin olarak giderildi; ayrıca Dart tarafında 400ms yedek seçim okuma eklendi."
 }
