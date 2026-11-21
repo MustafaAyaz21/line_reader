@@ -1,6 +1,6 @@
 {
-  "latest_version": "0.1.7",
-  "version_code": 8,
-  "apk_url": "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.7/app-release.apk",
-  "release_notes": "Kelime listelerine + butonu ile manuel İngilizce kelime arama, 10–15 farklı anlam arasından tikleyerek (✓) çoklu seçim yapma, 3 kısa örnek cümle (çevirili ve sesli dinlemeli) ve sağ alttaki + ile seçilen anlamları listeye kaydetme özelliği eklendi."
+  "latest_version": "0.1.8",
+  "version_code": 9,
+  "apk_url": "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.8/app-release.apk",
+  "release_notes": "Kayıtlı kelimeler aratıldığında veya karttaki kalem (düzenle) ikonuna basıldığında mevcut anlamlar otomatik tikli gelir; kaydetmede 'Üstüne ekle' (ekleme/çıkarma senkronizasyonu) ve 'Yeni kelime olarak ekle' (aynı kelimeden ayrı kart) seçenekleri sunuldu."
 }

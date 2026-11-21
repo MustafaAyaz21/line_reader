@@ -13,11 +13,13 @@ class WordListTile extends StatefulWidget {
     super.key,
     required this.item,
     required this.onDelete,
+    this.onEdit,
     this.ttsService,
   });
 
   final SavedWord item;
   final VoidCallback onDelete;
+  final VoidCallback? onEdit;
   final TtsService? ttsService;
 
   @override
@@ -87,6 +89,17 @@ class _WordListTileState extends State<WordListTile> {
                     builder: (context, _) {
                       return _buildSpeakerButton(colorScheme, ttsService);
                     },
+                  ),
+                if (widget.onEdit != null)
+                  IconButton(
+                    onPressed: widget.onEdit,
+                    icon: Icon(
+                      Icons.edit_outlined,
+                      size: 19,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    tooltip: 'Anlamları Düzenle / Ekle',
+                    visualDensity: VisualDensity.compact,
                   ),
                 IconButton(
                   onPressed: _toggleExpanded,

@@ -12,14 +12,22 @@ import '../models/word_list.dart';
 import '../models/word_search_detail.dart';
 import '../services/word_dictionary_search_service.dart';
 
-/// Kelime listesi içindeki `+` butonundan açılan manuel kelime arama,
-/// 10–15 anlam arasından çoklu seçim (tik ✓) ve 3 kısa örnek cümle ekranı.
+enum _ExistingWordSaveAction {
+  overwrite,
+  addAsNew,
+}
+
+/// Kelime listesi içindeki `+` veya karttaki düzenleme (`Icons.edit_outlined`)
+/// butonundan açılan manuel kelime arama, 10–15 anlam arasından çoklu seçim
+/// (tik ✓), 3 kısa örnek cümle ve "Üstüne ekle / Yeni kelime olarak ekle" ekranı.
 class AddWordSearchScreen extends StatefulWidget {
   const AddWordSearchScreen({
     super.key,
     required this.listId,
     required this.controller,
     this.wordList,
+    this.initialWord,
+    this.editingWord,
     this.apiKeyController,
     this.ttsService,
   });
@@ -27,6 +35,8 @@ class AddWordSearchScreen extends StatefulWidget {
   final int listId;
   final WordsController controller;
   final WordList? wordList;
+  final String? initialWord;
+  final SavedWord? editingWord;
   final ApiKeyController? apiKeyController;
   final TtsService? ttsService;
 
@@ -46,7 +56,11 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
   bool _isSaving = false;
   String? _errorMessage;
   WordSearchDetail? _detail;
+  SavedWord? _matchedExistingWord;
   final Set<int> _selectedIndices = <int>{};
+
+  bool get _hasInitialWord =>
+      widget.initialWord != null && widget.initialWord!.trim().isNotEmpty;
 
   @override
   void initState() {
@@ -56,6 +70,16 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
       shouldAttemptGeminiProvider: () =>
           widget.apiKeyController?.shouldAttemptGemini ?? false,
     );
+
+    if (_hasInitialWord) {
+      final initial = widget.initialWord!.trim();
+      _searchController.text = initial;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _performSearch(initial, dismissKeyboard: true);
+        }
+      });
+    }
   }
 
   @override
@@ -65,6 +89,10 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
     _searchFocusNode.dispose();
     _searchService.dispose();
     super.dispose();
+  }
+
+  String _normalizeKey(String raw) {
+    return raw.trim().replaceAll('İ', 'i').toLowerCase();
   }
 
   void _onSearchChanged(String value) {
@@ -77,7 +105,7 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
     _debounceTimer = Timer(const Duration(milliseconds: 700), () {
       if (!mounted) return;
       if (_searchController.text.trim() == trimmed &&
-          _detail?.word != trimmed.toLowerCase()) {
+          _detail?.word != _normalizeKey(trimmed)) {
         _performSearch(trimmed, dismissKeyboard: false);
       }
     });
@@ -111,14 +139,93 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
       _isLoading = true;
       _errorMessage = null;
       _detail = null;
+      _matchedExistingWord = null;
       _selectedIndices.clear();
     });
 
     try {
-      final result = await _searchService.searchWord(query);
+      // Sözlük araması ile bu kelimenin listede zaten kayıtlı olup olmadığını paralel kontrol et.
+      final results = await Future.wait<Object?>(<Future<Object?>>[
+        _searchService.searchWord(query),
+        widget.controller.findExistingWordsInList(
+          listId: widget.listId,
+          word: query,
+        ),
+      ]);
       if (!mounted || myGen != _searchGeneration) return;
+
+      final detail = results[0] as WordSearchDetail;
+      final existingList = results[1] as List<SavedWord>;
+
+      // Düzenleme ikonundan gelindiyse ve aranan kelime aynıysa o spesifik kaydı seç;
+      // aksi halde aynı listedeki en güncel mevcut kaydı eşleştir.
+      SavedWord? matched;
+      final editing = widget.editingWord;
+      if (editing != null &&
+          _normalizeKey(editing.word) == _normalizeKey(detail.word)) {
+        matched = editing;
+        for (final item in existingList) {
+          if (item.id == editing.id) {
+            matched = item;
+            break;
+          }
+        }
+      } else if (existingList.isNotEmpty) {
+        matched = existingList.first;
+      }
+
+      final mergedMeanings = List<MeaningEntry>.from(detail.meanings);
+      final preselected = <int>{};
+
+      if (matched != null) {
+        final savedMeanings = matched.allMeanings;
+        final savedKeys = <String>{};
+        for (final savedEntry in savedMeanings) {
+          final key = _normalizeKey(savedEntry.translation);
+          if (key.isEmpty ||
+              savedEntry.translation == SavedWord.defaultPlaceholderMeaning) {
+            continue;
+          }
+          savedKeys.add(key);
+        }
+
+        // Daha önce kayıtlı olup sözlük sonuçlarında olmayan anlam varsa en başa ekle.
+        final missingFromFetched = <MeaningEntry>[];
+        final fetchedKeys =
+            mergedMeanings.map((e) => _normalizeKey(e.translation)).toSet();
+        for (final savedEntry in savedMeanings) {
+          final key = _normalizeKey(savedEntry.translation);
+          if (key.isEmpty ||
+              savedEntry.translation == SavedWord.defaultPlaceholderMeaning) {
+            continue;
+          }
+          if (!fetchedKeys.contains(key)) {
+            missingFromFetched.add(savedEntry);
+            fetchedKeys.add(key);
+          }
+        }
+        if (missingFromFetched.isNotEmpty) {
+          mergedMeanings.insertAll(0, missingFromFetched);
+        }
+
+        // Mevcut kayıtlı tüm anlamları otomatik olarak tikli (checked = true) getir.
+        for (var i = 0; i < mergedMeanings.length; i++) {
+          if (savedKeys.contains(_normalizeKey(mergedMeanings[i].translation))) {
+            preselected.add(i);
+          }
+        }
+      }
+
       setState(() {
-        _detail = result;
+        _detail = WordSearchDetail(
+          word: detail.word,
+          meanings: List<MeaningEntry>.unmodifiable(mergedMeanings),
+          examples: detail.examples,
+        );
+        _matchedExistingWord = matched;
+        _selectedIndices
+          ..clear()
+          ..addAll(preselected);
         _isLoading = false;
       });
     } on TranslationException catch (error) {
@@ -147,83 +254,259 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
     });
   }
 
+  void _clearAllSelections() {
+    if (_selectedIndices.isEmpty) return;
+    setState(() => _selectedIndices.clear());
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+  }
+
+  Future<_ExistingWordSaveAction?> _askExistingWordAction(
+    String word,
+    int selectedCount,
+  ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return showModalBottomSheet<_ExistingWordSaveAction>(
+      context: context,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: (sheetContext) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                '"$word" listede zaten kayıtlı',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Seçtiğiniz anlamları mevcut kaydın üzerine güncelleyebilir veya ayrı bir yeni kart olarak ekleyebilirsiniz.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Seçenek 1: Üstüne ekle
+              Material(
+                color: colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(14),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: () => Navigator.of(sheetContext)
+                      .pop(_ExistingWordSaveAction.overwrite),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.playlist_add_check_rounded,
+                          color: colorScheme.onPrimaryContainer,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Üstüne ekle',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: colorScheme.onPrimaryContainer,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                selectedCount == 0
+                                    ? 'Hiç anlam seçili olmadığı için mevcut kayıt listeden kaldırılır.'
+                                    : 'Mevcut kaydın anlamlarını seçili $selectedCount anlamla senkronize eder.',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onPrimaryContainer
+                                      .withAlpha(210),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              // Seçenek 2: Yeni kelime olarak ekle
+              Material(
+                color: colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(14),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: () => Navigator.of(sheetContext)
+                      .pop(_ExistingWordSaveAction.addAsNew),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.add_circle_outline_rounded,
+                          color: colorScheme.primary,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Yeni kelime olarak ekle',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: colorScheme.onSurface,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Aynı kelimeden seçili anlamlarla bağımsız yeni bir kart oluşturur.',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _handleSaveSelected() async {
     if (_isSaving) return;
 
     final detail = _detail;
     if (detail == null) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text('Önce bir kelime arayıp anlam seçin.'),
-            behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 2),
-          ),
-        );
+      _showSnack('Önce bir kelime arayıp anlam seçin.');
       return;
     }
 
-    if (_selectedIndices.isEmpty) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text('Lütfen kaydetmek için en az bir anlam seçin.'),
-            behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      return;
-    }
-
+    final existing = _matchedExistingWord;
     final sortedIndices = _selectedIndices.toList()..sort();
     final selectedMeanings = <MeaningEntry>[
       for (final idx in sortedIndices)
         detail.meanings[idx].copyWith(isContextual: false),
     ];
 
-    setState(() => _isSaving = true);
-    try {
-      final status = await widget.controller.addWord(
-        word: detail.word,
-        meaning: selectedMeanings.first.baseFormatted,
-        meanings: selectedMeanings,
-        listId: widget.listId,
-      );
-
-      if (!mounted) return;
-
-      if (status == SaveWordStatus.saved) {
-        Navigator.of(context).pop(true);
+    // Kelime listede henüz yoksa doğrudan yeni kayıt olarak ekle.
+    if (existing == null) {
+      if (selectedMeanings.isEmpty) {
+        _showSnack('Lütfen kaydetmek için en az bir anlam seçin.');
         return;
       }
 
-      setState(() => _isSaving = false);
-      final feedback = status == SaveWordStatus.alreadyExists
-          ? '"${detail.word}" zaten bu listede kayıtlı.'
-          : 'Kelime kaydedilirken bir sorun oluştu.';
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(feedback),
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 2),
-          ),
+      setState(() => _isSaving = true);
+      try {
+        final status = await widget.controller.addWord(
+          word: detail.word,
+          meaning: selectedMeanings.first.baseFormatted,
+          meanings: selectedMeanings,
+          listId: widget.listId,
+          allowDuplicate: true,
         );
+        if (!mounted) return;
+        if (status == SaveWordStatus.saved) {
+          Navigator.of(context).pop('"${detail.word}" listeye eklendi.');
+          return;
+        }
+        setState(() => _isSaving = false);
+        _showSnack('Kelime kaydedilirken bir sorun oluştu.');
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _isSaving = false);
+        _showSnack('Kelime kaydedilirken beklenmeyen bir sorun oluştu.');
+      }
+      return;
+    }
+
+    // Kelime zaten kayıtlıysa kullanıcıya iki net seçenek sun:
+    // "Üstüne ekle" veya "Yeni kelime olarak ekle".
+    final chosenAction = await _askExistingWordAction(
+      detail.word,
+      selectedMeanings.length,
+    );
+    if (chosenAction == null || !mounted) return;
+
+    if (chosenAction == _ExistingWordSaveAction.addAsNew) {
+      if (selectedMeanings.isEmpty) {
+        _showSnack('Yeni kelime olarak eklemek için en az bir anlam seçin.');
+        return;
+      }
+      setState(() => _isSaving = true);
+      try {
+        final status = await widget.controller.addWord(
+          word: detail.word,
+          meaning: selectedMeanings.first.baseFormatted,
+          meanings: selectedMeanings,
+          listId: widget.listId,
+          allowDuplicate: true,
+        );
+        if (!mounted) return;
+        if (status == SaveWordStatus.saved) {
+          Navigator.of(context)
+              .pop('"${detail.word}" yeni kayıt olarak eklendi.');
+          return;
+        }
+        setState(() => _isSaving = false);
+        _showSnack('Yeni kayıt eklenirken bir sorun oluştu.');
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _isSaving = false);
+        _showSnack('Yeni kayıt eklenirken beklenmeyen bir sorun oluştu.');
+      }
+      return;
+    }
+
+    // "Üstüne ekle": mevcut kaydı seçili anlamlarla güncelle/senkronize et.
+    setState(() => _isSaving = true);
+    try {
+      final status = await widget.controller.updateWordMeanings(
+        existingWord: existing,
+        meanings: selectedMeanings,
+      );
+      if (!mounted) return;
+      if (status == SaveWordStatus.saved) {
+        final msg = selectedMeanings.isEmpty
+            ? '"${detail.word}" tüm anlamları kaldırıldığı için listeden çıkarıldı.'
+            : '"${detail.word}" anlamları güncellendi.';
+        Navigator.of(context).pop(msg);
+        return;
+      }
+      setState(() => _isSaving = false);
+      _showSnack('Kelime güncellenirken bir sorun oluştu.');
     } catch (_) {
       if (!mounted) return;
       setState(() => _isSaving = false);
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text('Kelime kaydedilirken beklenmeyen bir sorun oluştu.'),
-            behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 2),
-          ),
-        );
+      _showSnack('Kelime güncellenirken beklenmeyen bir sorun oluştu.');
     }
   }
 
@@ -323,7 +606,7 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
                   child: TextField(
                     controller: _searchController,
                     focusNode: _searchFocusNode,
-                    autofocus: true,
+                    autofocus: !_hasInitialWord,
                     keyboardType: TextInputType.text,
                     textInputAction: TextInputAction.search,
                     autocorrect: true,
@@ -331,7 +614,7 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
                     onChanged: _onSearchChanged,
                     onSubmitted: (value) => _performSearch(value),
                     decoration: InputDecoration(
-                      hintText: 'İngilizce kelime yazın (örn. run, insight)...',
+                      hintText: 'İngilizce kelime yazın (örn. make, run)...',
                       prefixIcon: const Icon(Icons.search_rounded, size: 20),
                       suffixIcon: _searchController.text.isNotEmpty
                           ? IconButton(
@@ -340,6 +623,7 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
                                 _searchController.clear();
                                 setState(() {
                                   _detail = null;
+                                  _matchedExistingWord = null;
                                   _errorMessage = null;
                                   _selectedIndices.clear();
                                 });
@@ -476,8 +760,10 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
       );
     }
 
+    final isExisting = _matchedExistingWord != null;
+
     // İkiye Bölünmüş Düzen:
-    // - Üst Bölüm (flex: 6): 10–15 Anlam Seçimi (tikli kutucuklar)
+    // - Üst Bölüm (flex: 6): 10–15 Anlam Seçimi (mevcutlar otomatik tikli)
     // - Alt Bölüm (flex: 4): 3 Kısa Örnek Cümle
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -491,56 +777,109 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
               Container(
                 padding: const EdgeInsets.fromLTRB(16, 10, 12, 8),
                 color: colorScheme.surfaceContainerLowest,
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      detail.word,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                    if (widget.ttsService != null) ...[
-                      const SizedBox(width: 4),
-                      IconButton(
-                        onPressed: () =>
-                            _handleSpeak(detail.word, TtsSpeakingTarget.word),
-                        icon: Icon(
-                          Icons.volume_up_rounded,
-                          size: 19,
-                          color: colorScheme.primary,
+                    Row(
+                      children: [
+                        Text(
+                          detail.word,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: colorScheme.primary,
+                          ),
                         ),
-                        tooltip: 'Kelimeyi Dinle',
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(
-                          minWidth: 32,
-                          minHeight: 32,
+                        if (widget.ttsService != null) ...[
+                          const SizedBox(width: 4),
+                          IconButton(
+                            onPressed: () => _handleSpeak(
+                              detail.word,
+                              TtsSpeakingTarget.word,
+                            ),
+                            icon: Icon(
+                              Icons.volume_up_rounded,
+                              size: 19,
+                              color: colorScheme.primary,
+                            ),
+                            tooltip: 'Kelimeyi Dinle',
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                              minWidth: 32,
+                              minHeight: 32,
+                            ),
+                          ),
+                        ],
+                        const Spacer(),
+                        if (_selectedIndices.isNotEmpty)
+                          TextButton(
+                            onPressed: _clearAllSelections,
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text('Temizle'),
+                          ),
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _selectedIndices.isNotEmpty
+                                ? colorScheme.primaryContainer
+                                : colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '${_selectedIndices.length}/${detail.meanings.length} seçili',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: _selectedIndices.isNotEmpty
+                                  ? colorScheme.onPrimaryContainer
+                                  : colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (isExisting) ...[
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: colorScheme.secondaryContainer.withAlpha(140),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.check_circle_outline_rounded,
+                              size: 15,
+                              color: colorScheme.onSecondaryContainer,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Listede kayıtlı • mevcut anlamlar tikli getirildi (+ ile Üstüne ekle / Yeni ekle)',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: colorScheme.onSecondaryContainer,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _selectedIndices.isNotEmpty
-                            ? colorScheme.primaryContainer
-                            : colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        '${_selectedIndices.length}/${detail.meanings.length} seçili',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: _selectedIndices.isNotEmpty
-                              ? colorScheme.onPrimaryContainer
-                              : colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ),

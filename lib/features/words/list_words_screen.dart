@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/settings/api_key_controller.dart';
 import '../../core/tts/tts_service.dart';
 import 'controllers/words_controller.dart';
+import 'models/saved_word.dart';
 import 'models/word_list.dart';
 import 'screens/add_word_search_screen.dart';
 import 'widgets/empty_words_view.dart';
@@ -91,26 +92,29 @@ class _ListWordsScreenState extends State<ListWordsScreen> {
     );
   }
 
-  Future<void> _handleOpenAddWord(WordList? list) async {
-    final saved = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
+  Future<void> _handleOpenAddWord(
+    WordList? list, {
+    SavedWord? editingWord,
+  }) async {
+    final resultMessage = await Navigator.of(context).push<String>(
+      MaterialPageRoute<String>(
         builder: (_) => AddWordSearchScreen(
           listId: widget.listId,
           controller: widget.controller,
           wordList: list,
+          initialWord: editingWord?.word,
+          editingWord: editingWord,
           apiKeyController: widget.apiKeyController,
           ttsService: _resolveTtsService(),
         ),
       ),
     );
-    if (saved == true && mounted) {
+    if (resultMessage != null && resultMessage.isNotEmpty && mounted) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
           SnackBar(
-            content: Text(
-              'Kelime "${list?.name ?? 'Kelime Listesi'}" listesine eklendi.',
-            ),
+            content: Text(resultMessage),
             behavior: SnackBarBehavior.floating,
             duration: const Duration(seconds: 2),
           ),
@@ -237,6 +241,10 @@ class _ListWordsScreenState extends State<ListWordsScreen> {
                                 return WordListTile(
                                   item: item,
                                   ttsService: ttsService,
+                                  onEdit: () => _handleOpenAddWord(
+                                    list,
+                                    editingWord: item,
+                                  ),
                                   onDelete: () =>
                                       widget.controller.removeWord(item),
                                 );

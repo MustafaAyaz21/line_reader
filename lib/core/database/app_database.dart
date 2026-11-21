@@ -8,7 +8,7 @@ class AppDatabase {
   static final AppDatabase instance = AppDatabase._();
 
   static const String _databaseName = 'linereader.db';
-  static const int _databaseVersion = 7;
+  static const int _databaseVersion = 8;
 
   static const String wordsTable = 'words';
   static const String wordListsTable = 'word_lists';
@@ -77,6 +77,9 @@ class AppDatabase {
     if (oldVersion < 7) {
       await ensureFavoriteSitesTable(db);
     }
+    if (oldVersion < 8) {
+      await ensureWordListsAndWordsSchema(db);
+    }
   }
 
   Future<void> _onOpen(Database db) async {
@@ -108,7 +111,7 @@ class AppDatabase {
     final favoritesId = await _ensureDefaultFavoritesRow(db);
 
     final tableCheck = await db.rawQuery(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+      "SELECT name, sql FROM sqlite_master WHERE type = 'table' AND name = ?",
       <Object>[wordsTable],
     );
 
@@ -117,13 +120,17 @@ class AppDatabase {
       return favoritesId;
     }
 
+    final tableSql = (tableCheck.first['sql'] as String? ?? '').toUpperCase();
+    final hasLegacyUniqueConstraint = tableSql.contains('UNIQUE');
     final columns = await db.rawQuery('PRAGMA table_info($wordsTable)');
     final hasListId = columns.any((col) => col['name'] == 'list_id');
     final hasMeaningsJson = columns.any((col) => col['name'] == 'meanings_json');
 
-    if (!hasListId) {
+    if (!hasListId || hasLegacyUniqueConstraint) {
       // onUpgrade/onOpen zaten bir transaction içinde çalıştığından
       // iç içe `db.transaction` açmadan doğrudan güvenli şema geçişi yap.
+      // v8 itibarıyla aynı kelime farklı anlam gruplarıyla birden fazla kez
+      // eklenebileceği için UNIQUE(list_id, word) kısıtı kaldırılır.
       await db.execute('DROP TABLE IF EXISTS ${wordsTable}_migrated');
       await db.execute('''
         CREATE TABLE ${wordsTable}_migrated (
@@ -133,18 +140,29 @@ class AppDatabase {
           meaning TEXT NOT NULL,
           meanings_json TEXT,
           created_at INTEGER NOT NULL,
-          UNIQUE(list_id, word),
           FOREIGN KEY (list_id) REFERENCES $wordListsTable (id) ON DELETE CASCADE
         )
       ''');
 
-      await db.execute(
-        '''
-        INSERT OR IGNORE INTO ${wordsTable}_migrated (id, list_id, word, meaning, created_at)
-        SELECT id, ?, word, meaning, created_at FROM $wordsTable
-        ''',
-        <Object>[favoritesId],
-      );
+      if (!hasListId) {
+        await db.execute(
+          '''
+          INSERT INTO ${wordsTable}_migrated (id, list_id, word, meaning, created_at)
+          SELECT id, ?, word, meaning, created_at FROM $wordsTable
+          ''',
+          <Object>[favoritesId],
+        );
+      } else if (hasMeaningsJson) {
+        await db.execute('''
+          INSERT INTO ${wordsTable}_migrated (id, list_id, word, meaning, meanings_json, created_at)
+          SELECT id, list_id, word, meaning, meanings_json, created_at FROM $wordsTable
+        ''');
+      } else {
+        await db.execute('''
+          INSERT INTO ${wordsTable}_migrated (id, list_id, word, meaning, created_at)
+          SELECT id, list_id, word, meaning, created_at FROM $wordsTable
+        ''');
+      }
 
       await db.execute('DROP TABLE $wordsTable');
       await db.execute(
@@ -216,7 +234,6 @@ class AppDatabase {
         meaning TEXT NOT NULL,
         meanings_json TEXT,
         created_at INTEGER NOT NULL,
-        UNIQUE(list_id, word),
         FOREIGN KEY (list_id) REFERENCES $wordListsTable (id) ON DELETE CASCADE
       )
     ''');

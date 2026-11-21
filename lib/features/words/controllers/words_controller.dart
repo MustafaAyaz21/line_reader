@@ -151,12 +151,26 @@ class WordsController extends ChangeNotifier {
     }
   }
 
+  /// Belirli bir listede verilen kelimenin mevcut kayıtlarını döner.
+  Future<List<SavedWord>> findExistingWordsInList({
+    required int listId,
+    required String word,
+  }) async {
+    try {
+      return await _repository.findWordsInList(listId: listId, word: word);
+    } catch (error) {
+      debugPrint('[WordsController] Kayitli kelime sorgulanamadi: $error');
+      return const <SavedWord>[];
+    }
+  }
+
   /// Kelimeyi seçilen listeye (belirtilmezse varsayılan "Favoriler" listesine) kaydeder.
   Future<SaveWordStatus> addWord({
     required String word,
     required String meaning,
     List<MeaningEntry> meanings = const <MeaningEntry>[],
     int? listId,
+    bool allowDuplicate = false,
   }) async {
     try {
       final targetListId =
@@ -167,6 +181,7 @@ class WordsController extends ChangeNotifier {
         word: word,
         meaning: meaning,
         meanings: meanings,
+        allowDuplicate: allowDuplicate,
       );
 
       if (status == SaveWordStatus.saved) {
@@ -178,6 +193,29 @@ class WordsController extends ChangeNotifier {
       return status;
     } catch (error) {
       debugPrint('[WordsController] Kelime kaydedilemedi: $error');
+      return SaveWordStatus.error;
+    }
+  }
+
+  /// Mevcut bir kelime kaydının anlamlarını günceller (veya anlam kalmadıysa siler).
+  Future<SaveWordStatus> updateWordMeanings({
+    required SavedWord existingWord,
+    required List<MeaningEntry> meanings,
+  }) async {
+    try {
+      final status = await _repository.updateWordMeanings(
+        existingWord: existingWord,
+        meanings: meanings,
+      );
+      if (status == SaveWordStatus.saved) {
+        await Future.wait<void>(<Future<void>>[
+          loadLists(),
+          loadWordsForList(existingWord.listId),
+        ]);
+      }
+      return status;
+    } catch (error) {
+      debugPrint('[WordsController] Kelime anlamlari guncellenemedi: $error');
       return SaveWordStatus.error;
     }
   }

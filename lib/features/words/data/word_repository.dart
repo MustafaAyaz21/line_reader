@@ -170,11 +170,33 @@ class WordRepository {
     return rows.map(SavedWord.fromMap).toList();
   }
 
+  /// Belirli bir listede verilen kelimenin mevcut kayıtlarını (en yeniden eskiye) döner.
+  Future<List<SavedWord>> findWordsInList({
+    required int listId,
+    required String word,
+  }) async {
+    final trimmed = word.trim();
+    if (trimmed.isEmpty) return const <SavedWord>[];
+
+    final db = await _getReadyDatabase();
+    final rows = await db.query(
+      AppDatabase.wordsTable,
+      where: 'list_id = ? AND LOWER(word) = ?',
+      whereArgs: <Object>[
+        listId,
+        trimmed.replaceAll('İ', 'i').toLowerCase(),
+      ],
+      orderBy: 'created_at DESC',
+    );
+    return rows.map(SavedWord.fromMap).toList();
+  }
+
   Future<SaveWordStatus> saveWord({
     required int listId,
     required String word,
     required String meaning,
     List<MeaningEntry> meanings = const <MeaningEntry>[],
+    bool allowDuplicate = false,
   }) async {
     final db = await _getReadyDatabase();
     final trimmedWord = word.trim();
@@ -195,19 +217,21 @@ class WordRepository {
       resolvedListId = await _appDatabase.ensureWordListsAndWordsSchema(db);
     }
 
-    // Aynı listede aynı kelime zaten varsa açıkça tespit et.
-    final existing = await db.query(
-      AppDatabase.wordsTable,
-      columns: const <String>['id'],
-      where: 'list_id = ? AND LOWER(word) = ?',
-      whereArgs: <Object>[
-        resolvedListId,
-        trimmedWord.replaceAll('İ', 'i').toLowerCase(),
-      ],
-      limit: 1,
-    );
-    if (existing.isNotEmpty) {
-      return SaveWordStatus.alreadyExists;
+    if (!allowDuplicate) {
+      // Aynı listede aynı kelime zaten varsa açıkça tespit et.
+      final existing = await db.query(
+        AppDatabase.wordsTable,
+        columns: const <String>['id'],
+        where: 'list_id = ? AND LOWER(word) = ?',
+        whereArgs: <Object>[
+          resolvedListId,
+          trimmedWord.replaceAll('İ', 'i').toLowerCase(),
+        ],
+        limit: 1,
+      );
+      if (existing.isNotEmpty) {
+        return SaveWordStatus.alreadyExists;
+      }
     }
 
     final newWord = SavedWord(
@@ -221,7 +245,8 @@ class WordRepository {
     final insertedId = await db.insert(
       AppDatabase.wordsTable,
       newWord.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.ignore,
+      conflictAlgorithm:
+          allowDuplicate ? ConflictAlgorithm.abort : ConflictAlgorithm.ignore,
     );
 
     if (insertedId <= 0) {
@@ -230,7 +255,48 @@ class WordRepository {
 
     debugPrint(
       '[WordRepository] Kelime kaydedildi: "$trimmedWord" -> '
-      'listId=$resolvedListId (rowId=$insertedId)',
+      'listId=$resolvedListId (rowId=$insertedId, allowDuplicate=$allowDuplicate)',
+    );
+    return SaveWordStatus.saved;
+  }
+
+  /// Mevcut bir kelime kaydının seçili anlamlarını günceller.
+  /// `meanings` boşsa kaydı listeden kaldırır.
+  Future<SaveWordStatus> updateWordMeanings({
+    required SavedWord existingWord,
+    required List<MeaningEntry> meanings,
+  }) async {
+    final id = existingWord.id;
+    if (id == null) return SaveWordStatus.error;
+
+    final db = await _getReadyDatabase();
+    if (meanings.isEmpty) {
+      await db.delete(
+        AppDatabase.wordsTable,
+        where: 'id = ?',
+        whereArgs: <Object>[id],
+      );
+      return SaveWordStatus.saved;
+    }
+
+    final updated = existingWord.copyWith(
+      meaning: meanings.first.baseFormatted,
+      meanings: meanings,
+    );
+    final updatedMap = updated.toMap();
+    await db.update(
+      AppDatabase.wordsTable,
+      <String, Object?>{
+        'meaning': updatedMap['meaning'],
+        'meanings_json': updatedMap['meanings_json'],
+      },
+      where: 'id = ?',
+      whereArgs: <Object>[id],
+    );
+
+    debugPrint(
+      '[WordRepository] Kelime anlamlari guncellendi: "${existingWord.word}" '
+      '(rowId=$id, anlamSayisi=${meanings.length})',
     );
     return SaveWordStatus.saved;
   }
