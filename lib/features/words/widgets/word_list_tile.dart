@@ -235,7 +235,7 @@ class _WordListTileState extends State<WordListTile> {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                if (isPrimary)
+                if (entry.isContextual)
                   TextSpan(
                     text: ' ${MeaningEntry.contextualTag}',
                     style: theme.textTheme.bodySmall?.copyWith(

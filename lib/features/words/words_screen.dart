@@ -123,6 +123,7 @@ class WordsScreen extends StatelessWidget {
         builder: (_) => ListWordsScreen(
           listId: list.id,
           controller: controller,
+          apiKeyController: apiKeyController,
           ttsService: ttsService,
         ),
       ),

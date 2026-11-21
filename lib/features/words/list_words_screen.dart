@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../core/settings/api_key_controller.dart';
 import '../../core/tts/tts_service.dart';
 import 'controllers/words_controller.dart';
 import 'models/word_list.dart';
+import 'screens/add_word_search_screen.dart';
 import 'widgets/empty_words_view.dart';
 import 'widgets/word_list_editor_dialog.dart';
 import 'widgets/word_list_tile.dart';
@@ -13,11 +15,13 @@ class ListWordsScreen extends StatefulWidget {
     super.key,
     required this.listId,
     required this.controller,
+    this.apiKeyController,
     this.ttsService,
   });
 
   final int listId;
   final WordsController controller;
+  final ApiKeyController? apiKeyController;
   final TtsService? ttsService;
 
   @override
@@ -87,6 +91,33 @@ class _ListWordsScreenState extends State<ListWordsScreen> {
     );
   }
 
+  Future<void> _handleOpenAddWord(WordList? list) async {
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => AddWordSearchScreen(
+          listId: widget.listId,
+          controller: widget.controller,
+          wordList: list,
+          apiKeyController: widget.apiKeyController,
+          ttsService: _resolveTtsService(),
+        ),
+      ),
+    );
+    if (saved == true && mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              'Kelime "${list?.name ?? 'Kelime Listesi'}" listesine eklendi.',
+            ),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final ttsService = _resolveTtsService();
@@ -132,6 +163,11 @@ class _ListWordsScreenState extends State<ListWordsScreen> {
                       : 'Listeyi / Rengi Düzenle',
                 ),
             ],
+          ),
+          floatingActionButton: FloatingActionButton(
+            onPressed: () => _handleOpenAddWord(list),
+            tooltip: 'Kelime Ekle',
+            child: const Icon(Icons.add_rounded),
           ),
           body: Column(
             children: [
@@ -192,7 +228,7 @@ class _ListWordsScreenState extends State<ListWordsScreen> {
                             onRefresh: () => widget.controller
                                 .loadWordsForList(widget.listId),
                             child: ListView.separated(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              padding: const EdgeInsets.fromLTRB(0, 8, 0, 88),
                               itemCount: words.length,
                               separatorBuilder: (context, index) =>
                                   const Divider(height: 1),

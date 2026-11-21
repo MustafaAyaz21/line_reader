@@ -105,9 +105,7 @@ class SavedWord {
         if (item is Map<String, Object?>) {
           final entry = MeaningEntry.fromJson(item);
           if (entry.translation.isNotEmpty) {
-            list.add(
-              entry.copyWith(isContextual: list.isEmpty),
-            );
+            list.add(entry);
           }
         }
       }
