@@ -1,6 +1,6 @@
 {
-  "latest_version": "0.1.8",
-  "version_code": 9,
-  "apk_url": "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.8/app-release.apk",
-  "release_notes": "Kayıtlı kelimeler aratıldığında veya karttaki kalem (düzenle) ikonuna basıldığında mevcut anlamlar otomatik tikli gelir; kaydetmede 'Üstüne ekle' (ekleme/çıkarma senkronizasyonu) ve 'Yeni kelime olarak ekle' (aynı kelimeden ayrı kart) seçenekleri sunuldu."
+  "latest_version": "0.1.9",
+  "version_code": 10,
+  "apk_url": "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.9/app-release.apk",
+  "release_notes": "Kelime arama ekranına 'Kendi Anlamını Ekle' butonu eklendi; kullanıcılar özel anlam yazıp kelime türünü (noun, verb, adjective, adverb, phrase, idiom, preposition, conjunction) seçerek parantez içinde biçimlendirilmiş halde tikli olarak kaydedebilir."
 }

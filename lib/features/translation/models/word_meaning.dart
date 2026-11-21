@@ -1,9 +1,13 @@
-/// Kelimenin cümle içindeki sözcük türü.
+/// Kelimenin sözcük türü.
 enum WordPartOfSpeech {
   noun('noun'),
   verb('verb'),
   adjective('adjective'),
-  adverb('adverb');
+  adverb('adverb'),
+  phrase('phrase'),
+  idiom('idiom'),
+  preposition('preposition'),
+  conjunction('conjunction');
 
   const WordPartOfSpeech(this.label);
 
@@ -17,6 +21,11 @@ enum WordPartOfSpeech {
       'verb' || 'v' || 'fiil' => WordPartOfSpeech.verb,
       'adjective' || 'adj' || 'sıfat' => WordPartOfSpeech.adjective,
       'adverb' || 'adv' || 'zarf' => WordPartOfSpeech.adverb,
+      'phrase' || 'kalıp' || 'kalip' || 'ifade' => WordPartOfSpeech.phrase,
+      'idiom' || 'deyim' => WordPartOfSpeech.idiom,
+      'preposition' || 'prep' || 'edat' => WordPartOfSpeech.preposition,
+      'conjunction' || 'conj' || 'bağlaç' || 'baglac' =>
+        WordPartOfSpeech.conjunction,
       _ => null,
     };
   }

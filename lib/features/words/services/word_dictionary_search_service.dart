@@ -732,7 +732,7 @@ Respond ONLY with valid JSON:
           'They finished the project $word.',
           'Please speak $word during the meeting.',
         ],
-      WordPartOfSpeech.noun || null => <String>[
+      _ => <String>[
           'We talked about $word in class today.',
           'Understanding $word takes a little practice.',
           'This article gives a clear view of $word.',

@@ -259,6 +259,61 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
     setState(() => _selectedIndices.clear());
   }
 
+  Future<void> _showAddCustomMeaningDialog() async {
+    final currentDetail = _detail;
+    if (currentDetail == null) return;
+
+    final defaultPos = currentDetail.meanings.isNotEmpty
+        ? (currentDetail.meanings.first.partOfSpeech ?? WordPartOfSpeech.verb)
+        : WordPartOfSpeech.noun;
+
+    final addedEntry = await showDialog<MeaningEntry>(
+      context: context,
+      builder: (dialogContext) => _CustomMeaningDialog(
+        word: currentDetail.word,
+        initialPartOfSpeech: defaultPos,
+      ),
+    );
+
+    if (addedEntry == null || !mounted) return;
+
+    final addedKey = _normalizeKey(addedEntry.translation);
+    final existingIndex = currentDetail.meanings.indexWhere(
+      (entry) =>
+          _normalizeKey(entry.translation) == addedKey &&
+          entry.partOfSpeech == addedEntry.partOfSpeech,
+    );
+
+    if (existingIndex >= 0) {
+      setState(() {
+        _selectedIndices.add(existingIndex);
+      });
+      _showSnack('"${addedEntry.baseFormatted}" seçili anlamlara eklendi.');
+      return;
+    }
+
+    final updatedMeanings = <MeaningEntry>[
+      addedEntry.copyWith(isContextual: false),
+      ...currentDetail.meanings,
+    ];
+    final shiftedSelections = <int>{
+      0,
+      for (final idx in _selectedIndices) idx + 1,
+    };
+
+    setState(() {
+      _detail = WordSearchDetail(
+        word: currentDetail.word,
+        meanings: List<MeaningEntry>.unmodifiable(updatedMeanings),
+        examples: currentDetail.examples,
+      );
+      _selectedIndices
+        ..clear()
+        ..addAll(shiftedSelections);
+    });
+    _showSnack('"${addedEntry.baseFormatted}" eklendi ve tiklendi.');
+  }
+
   void _showSnack(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
@@ -880,6 +935,26 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
                         ),
                       ),
                     ],
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: OutlinedButton.icon(
+                        onPressed: _showAddCustomMeaningDialog,
+                        icon: const Icon(Icons.add_rounded, size: 17),
+                        label: const Text('Kendi Anlamını Ekle'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1160,5 +1235,174 @@ class _HighlightedSentenceText extends StatelessWidget {
     }
 
     return Text.rich(TextSpan(style: baseStyle, children: spans));
+  }
+}
+
+/// Kullanıcının aranan kelime için kendi özel anlamını ve türünü
+/// (noun, verb, adjective, adverb, phrase vb.) seçerek ekleyebildiği pencere.
+class _CustomMeaningDialog extends StatefulWidget {
+  const _CustomMeaningDialog({
+    required this.word,
+    required this.initialPartOfSpeech,
+  });
+
+  final String word;
+  final WordPartOfSpeech? initialPartOfSpeech;
+
+  @override
+  State<_CustomMeaningDialog> createState() => _CustomMeaningDialogState();
+}
+
+class _CustomMeaningDialogState extends State<_CustomMeaningDialog> {
+  final TextEditingController _meaningController = TextEditingController();
+  WordPartOfSpeech? _selectedPos;
+  String? _errorText;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedPos = widget.initialPartOfSpeech;
+  }
+
+  @override
+  void dispose() {
+    _meaningController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final trimmed = _meaningController.text.trim();
+    if (trimmed.isEmpty) {
+      setState(() => _errorText = 'Lütfen bir anlam yazın.');
+      return;
+    }
+
+    Navigator.of(context).pop(
+      MeaningEntry(
+        translation: trimmed,
+        partOfSpeech: _selectedPos,
+        isContextual: false,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final currentText = _meaningController.text.trim();
+    final preview = currentText.isNotEmpty
+        ? MeaningEntry(
+            translation: currentText,
+            partOfSpeech: _selectedPos,
+          ).baseFormatted
+        : null;
+
+    return AlertDialog(
+      title: Text(
+        '"${widget.word}" için anlam ekle',
+        style: theme.textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: _meaningController,
+              autofocus: true,
+              autocorrect: true,
+              enableSuggestions: true,
+              textInputAction: TextInputAction.done,
+              onChanged: (_) {
+                setState(() {
+                  if (_errorText != null) _errorText = null;
+                });
+              },
+              onSubmitted: (_) => _submit(),
+              decoration: InputDecoration(
+                labelText: 'Anlam',
+                hintText: 'Örn: koşmak, çalıştırmak, yürütmek',
+                errorText: _errorText,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'Kelime Türü',
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: WordPartOfSpeech.values.map((pos) {
+                final isSelected = _selectedPos == pos;
+                return ChoiceChip(
+                  label: Text(pos.label),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    setState(() {
+                      _selectedPos = selected ? pos : null;
+                    });
+                  },
+                  visualDensity: VisualDensity.compact,
+                );
+              }).toList(),
+            ),
+            if (preview != null) ...[
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer.withAlpha(150),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.visibility_outlined,
+                      size: 16,
+                      color: colorScheme.onPrimaryContainer,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        preview,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Vazgeç'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: const Text('Ekle'),
+        ),
+      ],
+    );
   }
 }

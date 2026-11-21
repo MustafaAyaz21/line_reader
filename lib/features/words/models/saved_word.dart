@@ -118,7 +118,7 @@ class SavedWord {
   static MeaningEntry _parseFallbackMeaning(String raw) {
     final trimmed = raw.trim();
     final match = RegExp(
-      r'^(.*?)\s*\((noun|verb|adjective|adverb)\)\s*$',
+      r'^(.*?)\s*\((noun|verb|adjective|adverb|phrase|idiom|preposition|conjunction)\)\s*$',
       caseSensitive: false,
     ).firstMatch(trimmed);
 

@@ -588,6 +588,11 @@ class ContextualFreeTranslationService implements WordTranslationService {
         if (word.endsWith('ly') && word.length > 4) {
           score += 6;
         }
+      case WordPartOfSpeech.phrase:
+      case WordPartOfSpeech.idiom:
+      case WordPartOfSpeech.preposition:
+      case WordPartOfSpeech.conjunction:
+        break;
     }
 
     return score;
