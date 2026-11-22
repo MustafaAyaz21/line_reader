@@ -1,0 +1,1515 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Line Reader — Makale Yönetim Paneli</title>
+  <style>
+    :root {
+      --bg: #f4f5f7;
+      --surface: #ffffff;
+      --surface-alt: #f8f9fb;
+      --border: #e2e6ee;
+      --text: #161922;
+      --text-muted: #5c6575;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --success: #15803d;
+      --danger: #dc2626;
+      --warning: #b45309;
+      --radius: 14px;
+      --shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Header */
+    .topbar {
+      height: 62px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-shrink: 0;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 16px;
+      letter-spacing: -0.2px;
+    }
+
+    .brand-badge {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #2563eb, #4f46e5);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      font-size: 15px;
+    }
+
+    .brand small {
+      display: block;
+      font-weight: 500;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .status-pill {
+      margin-left: 8px;
+      padding: 5px 11px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #ecfdf5;
+      color: #166534;
+      border: 1px solid #bbf7d0;
+    }
+
+    .status-pill.dirty {
+      background: #fffbeb;
+      color: #92400e;
+      border-color: #fde68a;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .topbar-spacer { flex: 1; }
+
+    .btn {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      padding: 9px 15px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      transition: 0.15s ease;
+    }
+
+    .btn:hover:not(:disabled) { background: var(--surface-alt); }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    .btn-primary {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--primary-hover);
+      border-color: var(--primary-hover);
+    }
+
+    .btn-success {
+      background: #16a34a;
+      border-color: #16a34a;
+      color: #fff;
+    }
+
+    .btn-success:hover:not(:disabled) {
+      background: #15803d;
+      border-color: #15803d;
+    }
+
+    .btn-danger-ghost {
+      color: var(--danger);
+      border-color: #fecaca;
+      background: #fef2f2;
+    }
+
+    .btn-danger-ghost:hover:not(:disabled) { background: #fee2e2; }
+
+    .btn-sm {
+      padding: 6px 10px;
+      font-size: 12px;
+      border-radius: 8px;
+    }
+
+    /* Main 3-column workspace */
+    .workspace {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 310px minmax(420px, 1fr) 390px;
+      min-height: 0;
+    }
+
+    /* Left Sidebar */
+    .sidebar {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .sidebar-top {
+      padding: 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 13px;
+      background: var(--surface-alt);
+      color: var(--text);
+      outline: none;
+    }
+
+    .search-input:focus {
+      border-color: var(--primary);
+      background: #fff;
+    }
+
+    .level-filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+
+    .filter-chip {
+      border: 1px solid var(--border);
+      background: var(--surface-alt);
+      color: var(--text-muted);
+      border-radius: 8px;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .filter-chip.active {
+      background: var(--text);
+      color: #fff;
+      border-color: var(--text);
+    }
+
+    .article-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .article-item {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 11px 12px;
+      background: var(--surface);
+      cursor: pointer;
+      transition: 0.14s ease;
+    }
+
+    .article-item:hover { border-color: #cbd5e1; background: var(--surface-alt); }
+    .article-item.selected {
+      border-color: var(--primary);
+      background: #eff6ff;
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+    }
+
+    .article-item-head {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 5px;
+    }
+
+    .lvl-tag {
+      font-size: 11px;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 6px;
+      color: #fff;
+    }
+
+    .article-item-time {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-left: auto;
+      font-weight: 600;
+    }
+
+    .article-item-title {
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.3;
+      margin-bottom: 3px;
+      word-break: break-word;
+    }
+
+    .article-item-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      line-height: 1.35;
+    }
+
+    .article-item-actions {
+      display: flex;
+      gap: 4px;
+      margin-top: 8px;
+      padding-top: 7px;
+      border-top: 1px dashed var(--border);
+    }
+
+    .mini-btn {
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text-muted);
+      border-radius: 6px;
+      padding: 3px 7px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .mini-btn:hover { background: var(--surface-alt); color: var(--text); }
+    .mini-btn.del:hover { background: #fee2e2; color: var(--danger); border-color: #fecaca; }
+
+    .empty-list {
+      text-align: center;
+      padding: 36px 18px;
+      color: var(--text-muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    /* Center Editor */
+    .editor-pane {
+      overflow-y: auto;
+      padding: 20px 24px 36px;
+      min-height: 0;
+    }
+
+    .editor-card {
+      max-width: 780px;
+      margin: 0 auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 22px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .empty-editor {
+      max-width: 520px;
+      margin: 64px auto;
+      text-align: center;
+      background: var(--surface);
+      border: 1px dashed #cbd5e1;
+      border-radius: 18px;
+      padding: 40px 28px;
+    }
+
+    .empty-editor h2 { margin: 0 0 8px; font-size: 20px; }
+    .empty-editor p { margin: 0 0 20px; color: var(--text-muted); font-size: 14px; line-height: 1.55; }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .field label {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .field input[type="text"],
+    .field textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-family: inherit;
+      font-size: 14px;
+      color: var(--text);
+      background: var(--surface-alt);
+      outline: none;
+      transition: 0.14s ease;
+    }
+
+    .field input[type="text"]:focus,
+    .field textarea:focus {
+      border-color: var(--primary);
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+
+    .field textarea.content-area {
+      min-height: 310px;
+      line-height: 1.65;
+      resize: vertical;
+      font-size: 15px;
+    }
+
+    .field textarea.content-area.drag-over {
+      border-color: var(--primary);
+      background: #eff6ff;
+      border-style: dashed;
+    }
+
+    .row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .row-3 {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr 1fr;
+      gap: 12px;
+    }
+
+    .level-picker {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 8px;
+    }
+
+    .level-btn {
+      border: 2px solid var(--border);
+      background: var(--surface-alt);
+      border-radius: 12px;
+      padding: 8px 4px;
+      cursor: pointer;
+      text-align: center;
+      transition: 0.14s ease;
+    }
+
+    .level-btn strong {
+      display: block;
+      font-size: 15px;
+    }
+
+    .level-btn span {
+      display: block;
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .level-btn.active {
+      color: #fff;
+      border-color: transparent;
+    }
+
+    .level-btn.active span { color: rgba(255, 255, 255, 0.9); }
+
+    .content-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .meta-stats {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-left: auto;
+    }
+
+    .inline-check {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-weight: 600;
+      font-size: 11px;
+      color: var(--primary);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    /* Right Preview Pane */
+    .preview-pane {
+      background: var(--surface-alt);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .preview-header {
+      padding: 12px 16px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .preview-header span {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-right: auto;
+    }
+
+    .tone-btn {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 4px 9px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .tone-btn.active {
+      outline: 2px solid var(--primary);
+      outline-offset: 1px;
+    }
+
+    .preview-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .preview-section-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+    }
+
+    .phone-card-preview {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 15px;
+      box-shadow: var(--shadow);
+    }
+
+    .phone-card-preview h4 {
+      margin: 0 0 6px;
+      font-size: 15px;
+      line-height: 1.3;
+    }
+
+    .phone-card-preview p {
+      margin: 0 0 12px;
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+
+    .reading-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .book-preview {
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      padding: 22px 20px;
+      min-height: 300px;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    .book-preview.tone-white {
+      background: #ffffff;
+      color: #1a1d21;
+      --p-sub: #5d6673;
+      --p-div: #e5e7eb;
+    }
+
+    .book-preview.tone-paper {
+      background: #f7f0e2;
+      color: #2b231a;
+      --p-sub: #6e6151;
+      --p-div: #dfd3bc;
+    }
+
+    .book-preview.tone-dark {
+      background: #14171d;
+      color: #e5e7eb;
+      --p-sub: #9ca3af;
+      --p-div: #2b313c;
+    }
+
+    .book-meta {
+      font-size: 12px;
+      color: var(--p-sub);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+
+    .book-title {
+      margin: 0 0 8px;
+      font-size: 21px;
+      line-height: 1.28;
+      font-weight: 700;
+    }
+
+    .book-desc {
+      margin: 0 0 14px;
+      font-size: 13.5px;
+      line-height: 1.5;
+      color: var(--p-sub);
+    }
+
+    .book-divider {
+      height: 1px;
+      background: var(--p-div);
+      margin: 14px 0 18px;
+    }
+
+    .book-body p {
+      margin: 0 0 15px;
+      line-height: 1.78;
+      letter-spacing: 0.15px;
+      word-break: break-word;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      right: 22px;
+      bottom: 22px;
+      padding: 12px 18px;
+      border-radius: 12px;
+      background: #111827;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+      opacity: 0;
+      transform: translateY(12px);
+      pointer-events: none;
+      transition: 0.22s ease;
+      max-width: 440px;
+      z-index: 100;
+    }
+
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.success { background: #166534; }
+    .toast.error { background: #b91c1c; }
+
+    @media (max-width: 1180px) {
+      .workspace { grid-template-columns: 270px 1fr; }
+      .preview-pane { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-badge">LR</div>
+      <div>
+        Line Reader Makale Paneli
+        <small id="repoInfo">content/articles.json • GitHub &amp; Cloudflare Pages uyumlu</small>
+      </div>
+    </div>
+
+    <div id="statusPill" class="status-pill">
+      <span class="status-dot"></span>
+      <span id="statusText">Yükleniyor...</span>
+    </div>
+
+    <div class="topbar-spacer"></div>
+
+    <button class="btn" id="saveDraftBtn" title="Yalnızca bilgisayardaki dosyaya kaydeder (Ctrl+S)">
+      Taslak Kaydet
+    </button>
+    <button class="btn btn-success" id="publishBtn" title="Kaydeder ve GitHub'a göndererek canlı yayınlar">
+      Kaydet ve Yayınla
+    </button>
+    <button class="btn btn-sm" id="shutdownBtn" title="Yerel sunucuyu kapatır">
+      Paneli Kapat
+    </button>
+  </header>
+
+  <main class="workspace">
+    <!-- Sol: Seviye Filtreleri ve Makale Listesi -->
+    <aside class="sidebar">
+      <div class="sidebar-top">
+        <button class="btn btn-primary" id="newArticleBtn" style="width:100%; justify-content:center;">
+          + Yeni Makale Ekle
+        </button>
+        <input
+          type="text"
+          id="searchInput"
+          class="search-input"
+          placeholder="Başlık veya açıklama ara..."
+        />
+        <div class="level-filters" id="levelFilters"></div>
+      </div>
+      <div class="article-list" id="articleList"></div>
+    </aside>
+
+    <!-- Orta: Makale Editörü -->
+    <section class="editor-pane" id="editorPane"></section>
+
+    <!-- Sağ: Canlı Önizleme -->
+    <aside class="preview-pane">
+      <div class="preview-header">
+        <span>Canlı Önizleme</span>
+        <button class="tone-btn" data-tone="white" style="background:#fff;color:#111;">Beyaz</button>
+        <button class="tone-btn active" data-tone="paper" style="background:#f7f0e2;color:#2b231a;">Kağıt</button>
+        <button class="tone-btn" data-tone="dark" style="background:#14171d;color:#eee;">Koyu</button>
+        <button class="mini-btn" id="prevFontDec">A-</button>
+        <button class="mini-btn" id="prevFontInc">A+</button>
+      </div>
+      <div class="preview-scroll" id="previewScroll"></div>
+    </aside>
+  </main>
+
+  <div id="toast" class="toast"></div>
+  <input type="file" id="hiddenFileInput" accept=".txt,.md,text/plain" style="display:none;" />
+
+  <script>
+    const LEVELS = [
+      { code: "A1", label: "Başlangıç", color: "#16A34A" },
+      { code: "A2", label: "Temel", color: "#0D9488" },
+      { code: "B1", label: "Orta", color: "#2563EB" },
+      { code: "B2", label: "Üst Orta", color: "#4F46E5" },
+      { code: "C1", label: "İleri", color: "#D97706" },
+      { code: "C2", label: "Uzman", color: "#BE185D" }
+    ];
+
+    const state = {
+      version: 1,
+      updatedAt: "",
+      articles: [],
+      selectedIndex: -1,
+      filterLevel: "ALL",
+      searchQuery: "",
+      dirty: false,
+      hasPendingPublish: false,
+      busy: false,
+      previewTone: "paper",
+      previewFontSize: 16
+    };
+
+    const el = {
+      statusPill: document.getElementById("statusPill"),
+      statusText: document.getElementById("statusText"),
+      repoInfo: document.getElementById("repoInfo"),
+      saveDraftBtn: document.getElementById("saveDraftBtn"),
+      publishBtn: document.getElementById("publishBtn"),
+      shutdownBtn: document.getElementById("shutdownBtn"),
+      newArticleBtn: document.getElementById("newArticleBtn"),
+      searchInput: document.getElementById("searchInput"),
+      levelFilters: document.getElementById("levelFilters"),
+      articleList: document.getElementById("articleList"),
+      editorPane: document.getElementById("editorPane"),
+      previewScroll: document.getElementById("previewScroll"),
+      toast: document.getElementById("toast"),
+      hiddenFileInput: document.getElementById("hiddenFileInput")
+    };
+
+    let toastTimer = null;
+    function showToast(msg, type = "") {
+      el.toast.textContent = msg;
+      el.toast.className = "toast show" + (type ? " " + type : "");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        el.toast.className = "toast";
+      }, 3800);
+    }
+
+    function levelMeta(code) {
+      return LEVELS.find(l => l.code === (code || "").toUpperCase()) || LEVELS[0];
+    }
+
+    function slugify(text) {
+      const map = { "ç":"c","ğ":"g","ı":"i","İ":"i","ö":"o","ş":"s","ü":"u","Ç":"c","Ğ":"g","Ö":"o","Ş":"s","Ü":"u" };
+      const clean = (text || "")
+        .replace(/[çğıİöşüÇĞÖŞÜ]/g, ch => map[ch] || ch)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 48);
+      return clean || "makale";
+    }
+
+    function uniqueIdFor(title, level, ignoreIdx = -1) {
+      const base = (level || "a1").toLowerCase() + "-" + slugify(title);
+      let candidate = base;
+      let n = 2;
+      while (state.articles.some((a, idx) => idx !== ignoreIdx && a.id === candidate)) {
+        candidate = base + "-" + n++;
+      }
+      return candidate;
+    }
+
+    function countWords(text) {
+      const trimmed = (text || "").trim();
+      if (!trimmed) return 0;
+      return trimmed.split(/\s+/).filter(Boolean).length;
+    }
+
+    function estimateReadingTime(text) {
+      const words = countWords(text);
+      if (words === 0) return "3 - 5 dk";
+      const low = Math.max(1, Math.min(60, Math.floor(words / 180)));
+      const high = Math.max(low + 1, Math.min(75, Math.ceil(words / 120)));
+      return `${low} - ${high} dk`;
+    }
+
+    function splitParagraphs(text) {
+      const normalized = (text || "").replace(/\r\n/g, "\n").trim();
+      if (!normalized) return [];
+      const parts = normalized.includes("\n\n")
+        ? normalized.split(/\n\s*\n+/)
+        : normalized.split("\n");
+      return parts.map(p => p.trim()).filter(Boolean);
+    }
+
+    function normalizeArticle(raw, idx) {
+      const level = levelMeta(raw.level || "A1").code;
+      const title = (raw.title || "").trim();
+      const description = (raw.description || raw.summary || "").trim();
+      const content = (raw.content || "").replace(/\r\n/g, "\n");
+      const readingTime = (raw.reading_time || raw.reading_time_label || "").trim() || estimateReadingTime(content);
+      return {
+        id: (raw.id || "").trim() || `article-${idx + 1}`,
+        level,
+        title,
+        description,
+        reading_time: readingTime,
+        category: (raw.category || "").trim(),
+        author: (raw.author || "").trim(),
+        language: (raw.language || "en").trim() || "en",
+        content,
+        published_at: raw.published_at || new Date().toISOString(),
+        _autoId: false,
+        _autoReadTime: !(raw.reading_time || raw.reading_time_label)
+      };
+    }
+
+    function buildExportPayload() {
+      const nowIso = new Date().toISOString();
+      const cleaned = state.articles.map((a, idx) => {
+        const words = countWords(a.content);
+        const avgMinutes = words > 0 ? Math.max(1, Math.round(words / 150)) : 4;
+        const obj = {
+          id: (a.id || "").trim() || uniqueIdFor(a.title || `makale-${idx + 1}`, a.level, idx),
+          level: levelMeta(a.level).code,
+          title: (a.title || "").trim(),
+          description: (a.description || "").trim(),
+          reading_time: (a.reading_time || "").trim() || estimateReadingTime(a.content),
+          reading_time_minutes: avgMinutes,
+          language: (a.language || "en").trim() || "en",
+          content: (a.content || "").replace(/\r\n/g, "\n").trim(),
+          published_at: a.published_at || nowIso
+        };
+        if ((a.category || "").trim()) obj.category = a.category.trim();
+        if ((a.author || "").trim()) obj.author = a.author.trim();
+        return obj;
+      });
+
+      return JSON.stringify({
+        version: state.version || 1,
+        updated_at: nowIso,
+        articles: cleaned
+      }, null, 2) + "\n";
+    }
+
+    function validateBeforeSave() {
+      for (let i = 0; i < state.articles.length; i++) {
+        const a = state.articles[i];
+        if (!(a.title || "").trim()) {
+          state.selectedIndex = i;
+          renderAll();
+          showToast(`#${i + 1} sıradaki makalenin başlığı boş bırakılamaz.`, "error");
+          return false;
+        }
+        if (!(a.content || "").trim()) {
+          state.selectedIndex = i;
+          renderAll();
+          showToast(`"${a.title}" makalesinin içeriği boş görünüyor.`, "error");
+          return false;
+        }
+      }
+      return true;
+    }
+
+    function updateStatusPill() {
+      if (state.busy) {
+        el.statusPill.className = "status-pill dirty";
+        el.statusText.textContent = "İşlem yapılıyor...";
+      } else if (state.dirty) {
+        el.statusPill.className = "status-pill dirty";
+        el.statusText.textContent = "Kaydedilmemiş değişiklik var";
+      } else if (state.hasPendingPublish) {
+        el.statusPill.className = "status-pill dirty";
+        el.statusText.textContent = "Yerel kayıt var • Yayınlanmayı bekliyor";
+      } else {
+        el.statusPill.className = "status-pill";
+        el.statusText.textContent = `Yayında (${state.articles.length} makale)`;
+      }
+      el.saveDraftBtn.disabled = state.busy;
+      el.publishBtn.disabled = state.busy;
+    }
+
+    function renderLevelFilters() {
+      const counts = { ALL: state.articles.length };
+      LEVELS.forEach(l => counts[l.code] = 0);
+      state.articles.forEach(a => {
+        const code = levelMeta(a.level).code;
+        counts[code] = (counts[code] || 0) + 1;
+      });
+
+      const chips = [
+        { code: "ALL", text: `Tümü (${counts.ALL})` },
+        ...LEVELS.map(l => ({ code: l.code, text: `${l.code} (${counts[l.code]})` }))
+      ];
+
+      el.levelFilters.innerHTML = chips.map(c => `
+        <button class="filter-chip ${state.filterLevel === c.code ? "active" : ""}" data-filter="${c.code}">
+          ${c.text}
+        </button>
+      `).join("");
+
+      el.levelFilters.querySelectorAll(".filter-chip").forEach(btn => {
+        btn.addEventListener("click", () => {
+          state.filterLevel = btn.dataset.filter;
+          renderLevelFilters();
+          renderArticleList();
+        });
+      });
+    }
+
+    function escapeHtml(str) {
+      return (str || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function renderArticleList() {
+      const q = state.searchQuery.trim().toLowerCase();
+      const filtered = state.articles
+        .map((article, index) => ({ article, index }))
+        .filter(({ article }) => {
+          if (state.filterLevel !== "ALL" && levelMeta(article.level).code !== state.filterLevel) {
+            return false;
+          }
+          if (!q) return true;
+          return (article.title || "").toLowerCase().includes(q) ||
+                 (article.description || "").toLowerCase().includes(q);
+        });
+
+      if (filtered.length === 0) {
+        el.articleList.innerHTML = `
+          <div class="empty-list">
+            ${state.articles.length === 0
+              ? "Henüz makale eklenmedi.<br/>Yukarıdaki <b>+ Yeni Makale Ekle</b> butonuyla başlayın."
+              : "Bu filtreye uygun makale bulunamadı."}
+          </div>
+        `;
+        return;
+      }
+
+      el.articleList.innerHTML = filtered.map(({ article, index }) => {
+        const meta = levelMeta(article.level);
+        const isSel = index === state.selectedIndex;
+        return `
+          <div class="article-item ${isSel ? "selected" : ""}" data-index="${index}">
+            <div class="article-item-head">
+              <span class="lvl-tag" style="background:${meta.color}">${meta.code}</span>
+              <span class="article-item-time">${escapeHtml(article.reading_time || estimateReadingTime(article.content))}</span>
+            </div>
+            <div class="article-item-title">${escapeHtml(article.title || "(Başlıksız Makale)")}</div>
+            <div class="article-item-desc">${escapeHtml(article.description || "Kısa açıklama yok")}</div>
+            <div class="article-item-actions">
+              <button class="mini-btn" data-act="up" data-index="${index}" ${index === 0 ? "disabled" : ""}>↑ Yukarı</button>
+              <button class="mini-btn" data-act="down" data-index="${index}" ${index === state.articles.length - 1 ? "disabled" : ""}>↓ Aşağı</button>
+              <button class="mini-btn del" data-act="delete" data-index="${index}" style="margin-left:auto;">Sil</button>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      el.articleList.querySelectorAll(".article-item").forEach(card => {
+        card.addEventListener("click", (e) => {
+          if (e.target.closest("button")) return;
+          state.selectedIndex = Number(card.dataset.index);
+          renderArticleList();
+          renderEditor();
+          renderPreview();
+        });
+      });
+
+      el.articleList.querySelectorAll("button[data-act]").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const idx = Number(btn.dataset.index);
+          const act = btn.dataset.act;
+          if (act === "up" && idx > 0) {
+            const tmp = state.articles[idx - 1];
+            state.articles[idx - 1] = state.articles[idx];
+            state.articles[idx] = tmp;
+            if (state.selectedIndex === idx) state.selectedIndex = idx - 1;
+            else if (state.selectedIndex === idx - 1) state.selectedIndex = idx;
+            state.dirty = true;
+            renderAll();
+          } else if (act === "down" && idx < state.articles.length - 1) {
+            const tmp = state.articles[idx + 1];
+            state.articles[idx + 1] = state.articles[idx];
+            state.articles[idx] = tmp;
+            if (state.selectedIndex === idx) state.selectedIndex = idx + 1;
+            else if (state.selectedIndex === idx + 1) state.selectedIndex = idx;
+            state.dirty = true;
+            renderAll();
+          } else if (act === "delete") {
+            const title = state.articles[idx].title || "Bu makale";
+            if (!confirm(`"${title}" makalesini listeden silmek istiyor musunuz?`)) return;
+            state.articles.splice(idx, 1);
+            if (state.selectedIndex >= state.articles.length) {
+              state.selectedIndex = state.articles.length - 1;
+            }
+            state.dirty = true;
+            renderAll();
+            showToast("Makale silindi. Yayınlamak için 'Kaydet ve Yayınla'ya basın.");
+          }
+        });
+      });
+    }
+
+    function renderEditor() {
+      const article = state.articles[state.selectedIndex];
+      if (!article) {
+        el.editorPane.innerHTML = `
+          <div class="empty-editor">
+            <h2>Line Reader Makale Stüdyosu</h2>
+            <p>
+              Buradan A1'den C2'ye kadar tüm seviyeler için makale ekleyip düzenleyebilir,
+              sağ tarafta kitap görünümünü canlı izleyebilir ve tek tıkla <b>Kaydet ve Yayınla</b>
+              diyerek telefondaki tüm uygulamalara gönderebilirsiniz.
+            </p>
+            <button class="btn btn-primary" id="emptyNewBtn">+ İlk Makaleni Oluştur</button>
+          </div>
+        `;
+        document.getElementById("emptyNewBtn").addEventListener("click", createNewArticle);
+        return;
+      }
+
+      const words = countWords(article.content);
+      const paragraphs = splitParagraphs(article.content).length;
+
+      el.editorPane.innerHTML = `
+        <div class="editor-card">
+          <div class="field">
+            <label>CEFR Seviyesi</label>
+            <div class="level-picker" id="levelPicker">
+              ${LEVELS.map(l => {
+                const active = levelMeta(article.level).code === l.code;
+                return `
+                  <button type="button" class="level-btn ${active ? "active" : ""}" data-level="${l.code}"
+                    style="${active ? `background:${l.color};border-color:${l.color};` : ""}">
+                    <strong>${l.code}</strong>
+                    <span>${l.label}</span>
+                  </button>
+                `;
+              }).join("")}
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Makale Başlığı *</label>
+            <input type="text" id="fieldTitle" value="${escapeHtml(article.title)}" placeholder="Örn: A Morning Walk in Kyoto" />
+          </div>
+
+          <div class="field">
+            <label>Kısa Açıklama (description)</label>
+            <textarea id="fieldDesc" rows="2" placeholder="Makale listesinde başlığın altında görünecek 1-2 cümlelik özet...">${escapeHtml(article.description)}</textarea>
+          </div>
+
+          <div class="row-3">
+            <div class="field">
+              <label>
+                <span>Ortalama Okuma Süresi</span>
+                <span class="inline-check">
+                  <input type="checkbox" id="autoReadTimeCheck" ${article._autoReadTime ? "checked" : ""} />
+                  Otomatik
+                </span>
+              </label>
+              <input type="text" id="fieldReadingTime" value="${escapeHtml(article.reading_time)}" placeholder="Örn: 5 - 8 dk" />
+            </div>
+
+            <div class="field">
+              <label>Kategori (Opsiyonel)</label>
+              <input type="text" id="fieldCategory" value="${escapeHtml(article.category)}" placeholder="Örn: Culture, Science" />
+            </div>
+
+            <div class="field">
+              <label>Yazar (Opsiyonel)</label>
+              <input type="text" id="fieldAuthor" value="${escapeHtml(article.author)}" placeholder="Örn: Line Reader Editorial" />
+            </div>
+          </div>
+
+          <div class="field">
+            <label>
+              <span>Makale İçeriği * (Paragrafları boş satırla ayırın)</span>
+              <span style="font-weight:500;color:#64748b;">.txt / .md sürükle-bırak destekli</span>
+            </label>
+            <div class="content-toolbar">
+              <button type="button" class="btn btn-sm" id="importTxtBtn">Dosyadan Yükle (.txt / .md)</button>
+              <button type="button" class="btn btn-sm" id="cleanParagraphsBtn">Paragrafları Düzenle</button>
+              <span class="meta-stats" id="contentStats">${words} kelime • ${paragraphs} paragraf</span>
+            </div>
+            <textarea id="fieldContent" class="content-area" placeholder="Makale metnini buraya yazın veya yapıştırın...">${escapeHtml(article.content)}</textarea>
+          </div>
+
+          <div class="row-2" style="align-items:end;">
+            <div class="field">
+              <label>Makale Kimliği (ID — alt çizgi kayıtları buna bağlanır)</label>
+              <input type="text" id="fieldId" value="${escapeHtml(article.id)}" />
+            </div>
+            <div style="display:flex; justify-content:flex-end;">
+              <button type="button" class="btn btn-danger-ghost btn-sm" id="deleteCurrentBtn">Bu Makaleyi Sil</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Bindings
+      el.editorPane.querySelectorAll(".level-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          article.level = btn.dataset.level;
+          if (article._autoId && article.title) {
+            article.id = uniqueIdFor(article.title, article.level, state.selectedIndex);
+          }
+          state.dirty = true;
+          renderAll();
+        });
+      });
+
+      const titleInput = document.getElementById("fieldTitle");
+      const descInput = document.getElementById("fieldDesc");
+      const readTimeInput = document.getElementById("fieldReadingTime");
+      const autoReadCheck = document.getElementById("autoReadTimeCheck");
+      const catInput = document.getElementById("fieldCategory");
+      const authorInput = document.getElementById("fieldAuthor");
+      const contentInput = document.getElementById("fieldContent");
+      const idInput = document.getElementById("fieldId");
+      const statsEl = document.getElementById("contentStats");
+
+      titleInput.addEventListener("input", () => {
+        article.title = titleInput.value;
+        if (article._autoId) {
+          article.id = uniqueIdFor(article.title, article.level, state.selectedIndex);
+          idInput.value = article.id;
+        }
+        state.dirty = true;
+        updateStatusPill();
+        renderArticleList();
+        renderPreview();
+      });
+
+      descInput.addEventListener("input", () => {
+        article.description = descInput.value;
+        state.dirty = true;
+        updateStatusPill();
+        renderArticleList();
+        renderPreview();
+      });
+
+      readTimeInput.addEventListener("input", () => {
+        article.reading_time = readTimeInput.value;
+        article._autoReadTime = false;
+        autoReadCheck.checked = false;
+        state.dirty = true;
+        updateStatusPill();
+        renderArticleList();
+        renderPreview();
+      });
+
+      autoReadCheck.addEventListener("change", () => {
+        article._autoReadTime = autoReadCheck.checked;
+        if (article._autoReadTime) {
+          article.reading_time = estimateReadingTime(article.content);
+          readTimeInput.value = article.reading_time;
+          renderArticleList();
+          renderPreview();
+        }
+        state.dirty = true;
+        updateStatusPill();
+      });
+
+      catInput.addEventListener("input", () => {
+        article.category = catInput.value;
+        state.dirty = true;
+        updateStatusPill();
+        renderPreview();
+      });
+
+      authorInput.addEventListener("input", () => {
+        article.author = authorInput.value;
+        state.dirty = true;
+        updateStatusPill();
+        renderPreview();
+      });
+
+      idInput.addEventListener("input", () => {
+        article.id = idInput.value;
+        article._autoId = false;
+        state.dirty = true;
+        updateStatusPill();
+      });
+
+      function onContentChanged() {
+        article.content = contentInput.value;
+        if (article._autoReadTime) {
+          article.reading_time = estimateReadingTime(article.content);
+          readTimeInput.value = article.reading_time;
+        }
+        const w = countWords(article.content);
+        const p = splitParagraphs(article.content).length;
+        statsEl.textContent = `${w} kelime • ${p} paragraf`;
+        state.dirty = true;
+        updateStatusPill();
+        renderArticleList();
+        renderPreview();
+      }
+
+      contentInput.addEventListener("input", onContentChanged);
+
+      // Drag & Drop .txt/.md
+      contentInput.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        contentInput.classList.add("drag-over");
+      });
+      contentInput.addEventListener("dragleave", () => {
+        contentInput.classList.remove("drag-over");
+      });
+      contentInput.addEventListener("drop", (e) => {
+        e.preventDefault();
+        contentInput.classList.remove("drag-over");
+        const file = e.dataTransfer.files && e.dataTransfer.files[0];
+        if (file) loadTextFileIntoArticle(file, contentInput, titleInput, onContentChanged);
+      });
+
+      document.getElementById("importTxtBtn").addEventListener("click", () => {
+        el.hiddenFileInput.value = "";
+        el.hiddenFileInput.onchange = () => {
+          const file = el.hiddenFileInput.files && el.hiddenFileInput.files[0];
+          if (file) loadTextFileIntoArticle(file, contentInput, titleInput, onContentChanged);
+        };
+        el.hiddenFileInput.click();
+      });
+
+      document.getElementById("cleanParagraphsBtn").addEventListener("click", () => {
+        const cleaned = splitParagraphs(contentInput.value)
+          .map(p => p.replace(/\s+/g, " ").trim())
+          .join("\n\n");
+        contentInput.value = cleaned;
+        onContentChanged();
+        showToast("Paragraf boşlukları düzenlendi.");
+      });
+
+      document.getElementById("deleteCurrentBtn").addEventListener("click", () => {
+        const title = article.title || "Bu makale";
+        if (!confirm(`"${title}" makalesini silmek istiyor musunuz?`)) return;
+        state.articles.splice(state.selectedIndex, 1);
+        if (state.selectedIndex >= state.articles.length) {
+          state.selectedIndex = state.articles.length - 1;
+        }
+        state.dirty = true;
+        renderAll();
+        showToast("Makale silindi.");
+      });
+    }
+
+    function loadTextFileIntoArticle(file, contentInput, titleInput, onContentChanged) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const text = String(reader.result || "").replace(/\r\n/g, "\n").trim();
+        contentInput.value = text;
+        if (!titleInput.value.trim()) {
+          const baseName = file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim();
+          titleInput.value = baseName;
+          titleInput.dispatchEvent(new Event("input"));
+        }
+        onContentChanged();
+        showToast(`"${file.name}" içe aktarıldı.`);
+      };
+      reader.readAsText(file, "UTF-8");
+    }
+
+    function renderPreview() {
+      const article = state.articles[state.selectedIndex];
+      if (!article) {
+        el.previewScroll.innerHTML = `
+          <div class="empty-list">Önizlemek için soldan bir makale seçin veya yeni makale oluşturun.</div>
+        `;
+        return;
+      }
+
+      const meta = levelMeta(article.level);
+      const readTime = (article.reading_time || "").trim() || estimateReadingTime(article.content);
+      const paragraphs = splitParagraphs(article.content);
+
+      el.previewScroll.innerHTML = `
+        <div class="preview-section-label">Seviye Listesi Kartı</div>
+        <div class="phone-card-preview">
+          <h4>${escapeHtml(article.title || "Makale Başlığı")}</h4>
+          <p>${escapeHtml(article.description || "Kısa açıklama burada görünecek.")}</p>
+          <span class="reading-pill" style="background:${meta.color}1c;color:${meta.color};">
+            ⏱ ${escapeHtml(readTime)}
+          </span>
+        </div>
+
+        <div class="preview-section-label">Kitap Okuma Ekranı</div>
+        <div class="book-preview tone-${state.previewTone}">
+          <div class="book-meta">
+            <span style="color:${meta.color};">${meta.code} • ${meta.label}</span>
+            ${article.category ? `<span>• ${escapeHtml(article.category)}</span>` : ""}
+            <span>• ${escapeHtml(readTime)}</span>
+          </div>
+          <h3 class="book-title">${escapeHtml(article.title || "Makale Başlığı")}</h3>
+          ${article.description ? `<p class="book-desc">${escapeHtml(article.description)}</p>` : ""}
+          ${article.author ? `<div class="book-meta" style="margin-bottom:0;">${escapeHtml(article.author)}</div>` : ""}
+          <div class="book-divider"></div>
+          <div class="book-body" style="font-size:${state.previewFontSize}px;">
+            ${paragraphs.length === 0
+              ? `<p style="color:var(--p-sub);">Makale metni yazdıkça burada kitap düzeninde görünecek...</p>`
+              : paragraphs.map(p => `<p>${escapeHtml(p)}</p>`).join("")}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderAll() {
+      updateStatusPill();
+      renderLevelFilters();
+      renderArticleList();
+      renderEditor();
+      renderPreview();
+    }
+
+    function createNewArticle() {
+      const defaultLevel = state.filterLevel !== "ALL" ? state.filterLevel : "A1";
+      const fresh = {
+        id: uniqueIdFor("yeni-makale", defaultLevel),
+        level: defaultLevel,
+        title: "",
+        description: "",
+        reading_time: "3 - 5 dk",
+        category: "",
+        author: "",
+        language: "en",
+        content: "",
+        published_at: new Date().toISOString(),
+        _autoId: true,
+        _autoReadTime: true
+      };
+      state.articles.unshift(fresh);
+      state.selectedIndex = 0;
+      state.dirty = true;
+      renderAll();
+      const titleInput = document.getElementById("fieldTitle");
+      if (titleInput) titleInput.focus();
+    }
+
+    async function saveDraft() {
+      if (state.busy || !validateBeforeSave()) return;
+      state.busy = true;
+      updateStatusPill();
+      try {
+        const res = await fetch("/api/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json; charset=utf-8" },
+          body: buildExportPayload()
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || "Kaydedilemedi.");
+        state.dirty = false;
+        await refreshRepoStatus();
+        showToast(data.message || "Taslak kaydedildi.", "success");
+      } catch (err) {
+        showToast(err.message || "Kayıt hatası.", "error");
+      } finally {
+        state.busy = false;
+        updateStatusPill();
+      }
+    }
+
+    async function publishArticles() {
+      if (state.busy || !validateBeforeSave()) return;
+      state.busy = true;
+      updateStatusPill();
+      try {
+        const res = await fetch("/api/publish", {
+          method: "POST",
+          headers: { "Content-Type": "application/json; charset=utf-8" },
+          body: buildExportPayload()
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || "Yayınlanamadı.");
+        state.dirty = false;
+        await refreshRepoStatus();
+        showToast(data.message || "GitHub'a yayınlandı!", "success");
+      } catch (err) {
+        await refreshRepoStatus();
+        showToast(err.message || "Yayınlama hatası.", "error");
+      } finally {
+        state.busy = false;
+        updateStatusPill();
+      }
+    }
+
+    async function refreshRepoStatus() {
+      try {
+        const res = await fetch("/api/status");
+        const data = await res.json();
+        if (data && data.ok) {
+          state.hasPendingPublish = Boolean(data.hasPendingPublish);
+          if (data.branch) {
+            el.repoInfo.textContent = `content/articles.json • dal: ${data.branch}`;
+          }
+        }
+      } catch (_) {}
+      updateStatusPill();
+    }
+
+    async function loadInitial() {
+      try {
+        const res = await fetch("/api/articles");
+        const data = await res.json();
+        state.version = data.version || 1;
+        state.updatedAt = data.updated_at || "";
+        const rawList = Array.isArray(data) ? data : (Array.isArray(data.articles) ? data.articles : []);
+        state.articles = rawList.map(normalizeArticle);
+        state.selectedIndex = state.articles.length > 0 ? 0 : -1;
+        state.dirty = false;
+        await refreshRepoStatus();
+        renderAll();
+      } catch (err) {
+        showToast("Makaleler yüklenemedi: " + err.message, "error");
+      }
+    }
+
+    // Event wiring
+    el.newArticleBtn.addEventListener("click", createNewArticle);
+    el.saveDraftBtn.addEventListener("click", saveDraft);
+    el.publishBtn.addEventListener("click", publishArticles);
+    el.searchInput.addEventListener("input", () => {
+      state.searchQuery = el.searchInput.value;
+      renderArticleList();
+    });
+
+    el.shutdownBtn.addEventListener("click", async () => {
+      if (state.dirty && !confirm("Kaydedilmemiş değişiklikler var. Yine de paneli kapatmak istiyor musunuz?")) {
+        return;
+      }
+      try {
+        await fetch("/api/shutdown", { method: "POST" });
+      } catch (_) {}
+      document.body.innerHTML = `
+        <div style="display:grid;place-items:center;height:100vh;text-align:center;color:#334155;">
+          <div>
+            <h2>Makale Yönetim Paneli Kapatıldı</h2>
+            <p>Bu sekmeyi kapatabilirsiniz.</p>
+          </div>
+        </div>
+      `;
+    });
+
+    document.querySelectorAll(".tone-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        state.previewTone = btn.dataset.tone;
+        document.querySelectorAll(".tone-btn").forEach(b => b.classList.toggle("active", b === btn));
+        renderPreview();
+      });
+    });
+
+    document.getElementById("prevFontDec").addEventListener("click", () => {
+      state.previewFontSize = Math.max(13, state.previewFontSize - 1);
+      renderPreview();
+    });
+
+    document.getElementById("prevFontInc").addEventListener("click", () => {
+      state.previewFontSize = Math.min(24, state.previewFontSize + 1);
+      renderPreview();
+    });
+
+    window.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        saveDraft();
+      }
+    });
+
+    window.addEventListener("beforeunload", (e) => {
+      if (state.dirty) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    });
+
+    loadInitial();
+  </script>
+</body>
+</html>
