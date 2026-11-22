@@ -103,15 +103,34 @@ class WordsController extends ChangeNotifier {
     required String name,
     required int colorValue,
   }) async {
+    final result = await createListWithResult(
+      name: name,
+      colorValue: colorValue,
+    );
+    return result.error;
+  }
+
+  /// Yeni özel kelime listesi oluşturur; oluşan [WordList] kaydını (veya hata
+  /// mesajını) döndürür ve bellek içi listeyi hemen yeniler.
+  Future<({WordList? list, String? error})> createListWithResult({
+    required String name,
+    required int colorValue,
+  }) async {
     try {
-      await _repository.createList(name: name, colorValue: colorValue);
+      final created = await _repository.createList(
+        name: name,
+        colorValue: colorValue,
+      );
       await loadLists();
-      return null;
+      return (list: created, error: null);
     } on FormatException catch (error) {
-      return error.message;
+      return (list: null, error: error.message);
     } catch (error) {
       debugPrint('[WordsController] Liste olusturulamadi: $error');
-      return 'Liste oluşturulurken bir sorun oluştu.';
+      return (
+        list: null,
+        error: 'Liste oluşturulurken bir sorun oluştu.',
+      );
     }
   }
 

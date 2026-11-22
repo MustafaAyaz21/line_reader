@@ -3,6 +3,7 @@ import 'dart:ui' show PathMetric;
 
 import 'package:flutter/material.dart';
 
+import '../../core/platform/process_text_channel.dart';
 import '../home/home_screen.dart';
 
 /// Hızlı, akıcı ve logosuz Line Apps açılış ekranı (~2.0 saniye).
@@ -42,7 +43,23 @@ class _SplashScreenState extends State<SplashScreen>
     );
 
     _controller.addStatusListener(_handleAnimationStatus);
-    _controller.forward();
+    ProcessTextChannel.ensureInitialized();
+    ProcessTextChannel.pendingTextNotifier
+        .addListener(_handleExternalProcessText);
+
+    if (ProcessTextChannel.hasPendingText) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _navigateToHome();
+      });
+    } else {
+      _controller.forward();
+    }
+  }
+
+  void _handleExternalProcessText() {
+    if (ProcessTextChannel.hasPendingText && mounted) {
+      _navigateToHome();
+    }
   }
 
   void _handleAnimationStatus(AnimationStatus status) {
@@ -76,6 +93,8 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   void dispose() {
+    ProcessTextChannel.pendingTextNotifier
+        .removeListener(_handleExternalProcessText);
     _controller.removeStatusListener(_handleAnimationStatus);
     _controller.dispose();
     super.dispose();

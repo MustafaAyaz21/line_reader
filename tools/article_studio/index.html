@@ -1032,6 +1032,10 @@
           <button type="button" class="btn btn-ai" id="aiGenerateBtn" title="Seçili seviyede ~350 kelimelik İngilizce makale + kelime anlamlarını otomatik üretir">
             ✨ Gemini ile Oluştur
           </button>
+          <label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer;user-select:none;" title="Makale üretildiğinde insan sesli Podcast AI sesini de otomatik oluşturur">
+            <input type="checkbox" id="aiAutoPodcastCheck" checked />
+            🎙 Podcast sesi
+          </label>
           <button type="button" class="btn btn-sm" id="newFromTemplateBtn" title="Seçili seviyede kendi yazacağınız makale için hazır şablon açar">
             📄 Şablon ile Ekle
           </button>
@@ -1302,6 +1306,36 @@
       return lines.join("\n");
     }
 
+    function parseSentenceTranslationsText(rawText) {
+      const map = {};
+      const lines = (rawText || "").replace(/\r\n/g, "\n").split("\n");
+      for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line) continue;
+        const sepIdx = line.indexOf("=>");
+        if (sepIdx <= 0) continue;
+        const en = line.slice(0, sepIdx).trim().replace(/\s+/g, " ");
+        const tr = line.slice(sepIdx + 2).trim().replace(/\s+/g, " ");
+        if (en && tr) {
+          map[en] = tr;
+        }
+      }
+      return { map, count: Object.keys(map).length };
+    }
+
+    function formatSentenceTranslationsMap(rawMap) {
+      if (!rawMap || typeof rawMap !== "object" || Array.isArray(rawMap)) return "";
+      const lines = [];
+      for (const [k, v] of Object.entries(rawMap)) {
+        const cleanK = String(k ?? "").trim().replace(/\s+/g, " ");
+        const cleanV = String(v ?? "").trim().replace(/\s+/g, " ");
+        if (cleanK && cleanV) {
+          lines.push(`${cleanK} => ${cleanV}`);
+        }
+      }
+      return lines.join("\n");
+    }
+
     function normalizeArticle(raw, idx) {
       const level = levelMeta(raw.level || "A1").code;
       const title = (raw.title || "").trim();
@@ -1309,6 +1343,20 @@
       const content = (raw.content || "").replace(/\r\n/g, "\n");
       const readingTime = (raw.reading_time || raw.reading_time_label || "").trim() || estimateReadingTime(content);
       const wordMeaningsRaw = formatWordMeaningsMap(raw.word_meanings);
+      const rawParaTr = Array.isArray(raw.paragraph_translations)
+        ? raw.paragraph_translations
+        : (Array.isArray(raw.paragraphTranslations) ? raw.paragraphTranslations : []);
+      const paragraphTranslationsText = rawParaTr
+        .map(p => String(p ?? "").trim())
+        .filter(Boolean)
+        .join("\n\n");
+      const sentenceTranslationsText = formatSentenceTranslationsMap(
+        raw.sentence_translations || raw.sentenceTranslations
+      );
+      const audioUrl = (raw.audio_url || raw.audioUrl || "").trim();
+      const audioSegments = Array.isArray(raw.audio_segments)
+        ? raw.audio_segments
+        : (Array.isArray(raw.audioSegments) ? raw.audioSegments : []);
       return {
         id: (raw.id || "").trim() || `article-${idx + 1}`,
         level,
@@ -1320,6 +1368,11 @@
         language: (raw.language || "en").trim() || "en",
         content,
         word_meanings_text: wordMeaningsRaw,
+        paragraph_translations_text: paragraphTranslationsText,
+        sentence_translations_text: sentenceTranslationsText,
+        audio_url: audioUrl,
+        audio_segments: audioSegments,
+        _local_audio_preview: audioUrl ? `/audio/${audioUrl.split("/").pop()}` : "",
         published_at: raw.published_at || new Date().toISOString(),
         _autoId: false,
         _autoReadTime: !(raw.reading_time || raw.reading_time_label)
@@ -1332,6 +1385,8 @@
         const words = countWords(a.content);
         const avgMinutes = words > 0 ? Math.max(1, Math.round(words / 150)) : 4;
         const parsedMeanings = parseWordMeaningsText(a.word_meanings_text || "");
+        const parsedParaTr = splitParagraphs(a.paragraph_translations_text || "");
+        const parsedSentTr = parseSentenceTranslationsText(a.sentence_translations_text || "");
         const obj = {
           id: (a.id || "").trim() || uniqueIdFor(a.title || `makale-${idx + 1}`, a.level, idx),
           level: levelMeta(a.level).code,
@@ -1346,6 +1401,12 @@
         if ((a.category || "").trim()) obj.category = a.category.trim();
         if ((a.author || "").trim()) obj.author = a.author.trim();
         if (parsedMeanings.count > 0) obj.word_meanings = parsedMeanings.map;
+        if (parsedParaTr.length > 0) obj.paragraph_translations = parsedParaTr;
+        if (parsedSentTr.count > 0) obj.sentence_translations = parsedSentTr.map;
+        if ((a.audio_url || "").trim()) obj.audio_url = a.audio_url.trim();
+        if (Array.isArray(a.audio_segments) && a.audio_segments.length > 0) {
+          obj.audio_segments = a.audio_segments;
+        }
         return obj;
       });
 
@@ -1463,6 +1524,7 @@
           <div class="article-item ${isSel ? "selected" : ""}" data-index="${index}">
             <div class="article-item-head">
               <span class="lvl-tag" style="background:${meta.color}">${meta.code}</span>
+              ${article.audio_url ? `<span title="Podcast AI sesi hazır" style="font-size:11px;font-weight:700;color:#2563eb;background:#eff6ff;padding:1px 6px;border-radius:6px;">🎙 Podcast</span>` : ""}
               <span class="article-item-time">${escapeHtml(article.reading_time || estimateReadingTime(article.content))}</span>
             </div>
             <div class="article-item-title">${escapeHtml(article.title || "(Başlıksız Makale)")}</div>
@@ -1543,6 +1605,8 @@
       const words = countWords(article.content);
       const paragraphs = splitParagraphs(article.content).length;
       const parsedWm = parseWordMeaningsText(article.word_meanings_text || "");
+      const parsedParaTrCount = splitParagraphs(article.paragraph_translations_text || "").length;
+      const parsedSentTr = parseSentenceTranslationsText(article.sentence_translations_text || "");
 
       el.editorPane.innerHTML = `
         <div class="editor-card">
@@ -1619,6 +1683,52 @@
               <span class="wm-stats-warn" id="wmSkippedBadge" style="${parsedWm.skippedCount > 0 ? "" : "display:none;"}">${parsedWm.skippedCount} geçersiz satır atlanacak</span>
             </div>
             <textarea id="fieldWordMeanings" class="meanings-area" placeholder="make: bu cümlede karar vermek anlamında&#10;look closer: yakından incelemek&#10;custom: gelenek, görenek">${escapeHtml(article.word_meanings_text || "")}</textarea>
+          </div>
+
+          <div class="field">
+            <label>
+              <span>Hazır Paragraf Çevirileri (paragraph_translations)</span>
+              <span style="font-weight:500;color:#64748b;">Boş satırla ayrılmış Türkçe paragraflar • <b id="paraTrCountBadge">${parsedParaTrCount} / ${paragraphs}</b></span>
+            </label>
+            <textarea id="fieldParagraphTranslations" class="meanings-area" style="min-height:110px;" placeholder="1. paragrafın Türkçe çevirisi...&#10;&#10;2. paragrafın Türkçe çevirisi...">${escapeHtml(article.paragraph_translations_text || "")}</textarea>
+          </div>
+
+          <div class="field">
+            <label>
+              <span>Hazır Cümle Çevirileri (sentence_translations)</span>
+              <span style="font-weight:500;color:#64748b;">Her satır: İngilizce cümle =&gt; Türkçe çevirisi • <b id="sentTrCountBadge">${parsedSentTr.count} cümle</b></span>
+            </label>
+            <textarea id="fieldSentenceTranslations" class="meanings-area" style="min-height:110px;" placeholder="Reading books brings calm. => Kitap okumak huzur verir.&#10;Quiet gardens inspire deep focus. => Sessiz bahçeler derin odaklanmaya ilham verir.">${escapeHtml(article.sentence_translations_text || "")}</textarea>
+          </div>
+
+          <div class="field">
+            <label>
+              <span>🎙 Podcast Sesli Okuma (AI İnsan Sesi)</span>
+              <span style="font-weight:500;color:#64748b;">Cümle-cümle zaman eşlemeli • Cloudflare Pages'te yayınlanır</span>
+            </label>
+            <div style="border:1px solid var(--border);border-radius:12px;padding:12px;background:var(--surface-alt);display:flex;flex-direction:column;gap:10px;">
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                <select id="podcastVoiceSelect" class="ai-select" style="font-size:12.5px;">
+                  <option value="Kore" ${(article._voiceName || "Kore") === "Kore" ? "selected" : ""}>Kore — Sıcak Kadın Anlatıcı</option>
+                  <option value="Aoede" ${article._voiceName === "Aoede" ? "selected" : ""}>Aoede — Doğal Podcast Sesi</option>
+                  <option value="Charon" ${article._voiceName === "Charon" ? "selected" : ""}>Charon — Derin Erkek Anlatıcı</option>
+                  <option value="Puck" ${article._voiceName === "Puck" ? "selected" : ""}>Puck — Canlı Erkek Anlatıcı</option>
+                  <option value="Fenrir" ${article._voiceName === "Fenrir" ? "selected" : ""}>Fenrir — Belgesel Tarzı</option>
+                </select>
+                <button type="button" class="btn btn-ai btn-sm" id="generateAudioBtn">
+                  ${article.audio_url ? "🎙 Podcast Sesini Yeniden Üret" : "🎙 Podcast Sesi Üret"}
+                </button>
+                ${article.audio_url ? `<button type="button" class="btn btn-danger-ghost btn-sm" id="removeAudioBtn">Sesi Kaldır</button>` : ""}
+                <span class="wm-stats-badge" id="audioStatusBadge" style="${article.audio_url ? "" : "background:#f1f5f9;color:#64748b;"}">
+                  ${article.audio_url
+                    ? `🎙 Hazır (${Array.isArray(article.audio_segments) ? article.audio_segments.length : 0} cümle eşleşti)`
+                    : "Henüz ses yok (uygulamada cihaz sesiyle okunur)"}
+                </span>
+              </div>
+              ${article.audio_url ? `
+                <audio controls preload="metadata" style="width:100%;height:38px;" src="${escapeHtml(article._local_audio_preview || article.audio_url)}${article._audioCacheBust ? `?v=${article._audioCacheBust}` : ""}"></audio>
+              ` : ""}
+            </div>
           </div>
 
           <div class="row-2" style="align-items:end;">
@@ -1755,6 +1865,31 @@
 
       wordMeaningsInput.addEventListener("input", onWordMeaningsChanged);
 
+      const paraTrInput = document.getElementById("fieldParagraphTranslations");
+      const paraTrBadge = document.getElementById("paraTrCountBadge");
+      if (paraTrInput) {
+        paraTrInput.addEventListener("input", () => {
+          article.paragraph_translations_text = paraTrInput.value;
+          const pTotal = splitParagraphs(article.content).length;
+          const pTrCount = splitParagraphs(paraTrInput.value).length;
+          if (paraTrBadge) paraTrBadge.textContent = `${pTrCount} / ${pTotal}`;
+          state.dirty = true;
+          updateStatusPill();
+        });
+      }
+
+      const sentTrInput = document.getElementById("fieldSentenceTranslations");
+      const sentTrBadge = document.getElementById("sentTrCountBadge");
+      if (sentTrInput) {
+        sentTrInput.addEventListener("input", () => {
+          article.sentence_translations_text = sentTrInput.value;
+          const parsedSent = parseSentenceTranslationsText(sentTrInput.value);
+          if (sentTrBadge) sentTrBadge.textContent = `${parsedSent.count} cümle`;
+          state.dirty = true;
+          updateStatusPill();
+        });
+      }
+
       document.getElementById("formatMeaningsBtn").addEventListener("click", () => {
         const parsed = parseWordMeaningsText(wordMeaningsInput.value);
         wordMeaningsInput.value = formatWordMeaningsMap(parsed.map);
@@ -1794,6 +1929,33 @@
         onContentChanged();
         showToast("Paragraf boşlukları düzenlendi.");
       });
+
+      const podcastVoiceSelect = document.getElementById("podcastVoiceSelect");
+      if (podcastVoiceSelect) {
+        podcastVoiceSelect.addEventListener("change", () => {
+          article._voiceName = podcastVoiceSelect.value;
+        });
+      }
+
+      const generateAudioBtn = document.getElementById("generateAudioBtn");
+      if (generateAudioBtn) {
+        generateAudioBtn.addEventListener("click", () => {
+          generatePodcastAudioForArticle(article, generateAudioBtn);
+        });
+      }
+
+      const removeAudioBtn = document.getElementById("removeAudioBtn");
+      if (removeAudioBtn) {
+        removeAudioBtn.addEventListener("click", () => {
+          if (!confirm("Bu makalenin Podcast AI ses dosyasını kaldırmak istiyor musunuz?")) return;
+          article.audio_url = "";
+          article.audio_segments = [];
+          article._local_audio_preview = "";
+          state.dirty = true;
+          renderAll();
+          showToast("Podcast sesi makaleden kaldırıldı (uygulamada cihaz sesi kullanılır).");
+        });
+      }
 
       document.getElementById("deleteCurrentBtn").addEventListener("click", () => {
         const title = article.title || "Bu makale";
@@ -2099,6 +2261,10 @@
 
         const gen = data.article;
         const wmText = formatWordMeaningsMap(gen.word_meanings || {});
+        const paraTrText = Array.isArray(gen.paragraph_translations)
+          ? gen.paragraph_translations.map(p => String(p ?? "").trim()).filter(Boolean).join("\n\n")
+          : "";
+        const sentTrText = formatSentenceTranslationsMap(gen.sentence_translations || {});
         const contentText = (gen.content || "").replace(/\r\n/g, "\n").trim();
         const fresh = {
           id: uniqueIdFor(gen.title || "article", chosenLevel),
@@ -2111,6 +2277,12 @@
           language: "en",
           content: contentText,
           word_meanings_text: wmText,
+          paragraph_translations_text: paraTrText,
+          sentence_translations_text: sentTrText,
+          audio_url: "",
+          audio_segments: [],
+          _local_audio_preview: "",
+          _voiceName: "Kore",
           published_at: new Date().toISOString(),
           _autoId: true,
           _autoReadTime: true
@@ -2127,13 +2299,83 @@
 
         const wc = countWords(fresh.content);
         const wmCount = parseWordMeaningsText(fresh.word_meanings_text).count;
-        showToast(`✨ ${chosenLevel} makale oluşturuldu (${wc} kelime • ${wmCount} kelime anlamı).`, "success");
+        const autoPodcast = Boolean(document.getElementById("aiAutoPodcastCheck")?.checked);
+        if (autoPodcast) {
+          aiEl.generateBtn.textContent = "🎙 Podcast sesi üretiliyor...";
+          const audioOk = await generatePodcastAudioForArticle(fresh, null, true);
+          if (audioOk) {
+            showToast(`✨ ${chosenLevel} makale + 🎙 Podcast sesi hazır (${wc} kelime • ${wmCount} anlam).`, "success");
+          } else {
+            showToast(`✨ ${chosenLevel} makale oluşturuldu (${wc} kelime). Podcast sesi daha sonra tekrar denenebilir.`, "success");
+          }
+        } else {
+          showToast(`✨ ${chosenLevel} makale oluşturuldu (${wc} kelime • ${wmCount} kelime anlamı).`, "success");
+        }
       } catch (err) {
         showToast(err.message || "Gemini makale oluşturma hatası.", "error");
       } finally {
         isGeneratingArticle = false;
         aiEl.generateBtn.disabled = false;
         aiEl.generateBtn.textContent = originalLabel;
+      }
+    }
+
+    async function generatePodcastAudioForArticle(article, triggerBtn = null, silentFail = false) {
+      if (!hasGeminiKey) {
+        aiEl.settingsDrawer.classList.add("open");
+        aiEl.apiKeyInput.focus();
+        showToast("Podcast sesi üretmek için önce Gemini API anahtarınızı kaydedin.", "error");
+        return false;
+      }
+      if (!(article.content || "").trim()) {
+        showToast("Ses üretmek için önce makale içeriği doldurun.", "error");
+        return false;
+      }
+
+      const prevBtnText = triggerBtn ? triggerBtn.textContent : "";
+      if (triggerBtn) {
+        triggerBtn.disabled = true;
+        triggerBtn.textContent = "⏳ Podcast sesi üretiliyor...";
+      }
+
+      try {
+        const res = await fetch("/api/ai/generate-audio", {
+          method: "POST",
+          headers: { "Content-Type": "application/json; charset=utf-8" },
+          body: JSON.stringify({
+            id: article.id || uniqueIdFor(article.title || "article", article.level),
+            level: levelMeta(article.level).code,
+            content: article.content,
+            voiceName: article._voiceName || "Kore"
+          })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          throw new Error((data && (data.message || data.error)) || "Podcast sesi üretilemedi.");
+        }
+
+        article.audio_url = data.audio_url || "";
+        article.audio_segments = Array.isArray(data.audio_segments) ? data.audio_segments : [];
+        article._local_audio_preview = data.local_preview_url || "";
+        article._audioCacheBust = Date.now();
+        state.dirty = true;
+        renderAll();
+
+        if (!silentFail) {
+          const secs = Math.round((data.duration_ms || 0) / 1000);
+          showToast(`🎙 Podcast AI sesi hazır (${secs} sn • ${data.size_kb || "?"} KB • ${article.audio_segments.length} cümle).`, "success");
+        }
+        return true;
+      } catch (err) {
+        if (!silentFail) {
+          showToast(err.message || "Podcast sesi oluşturulamadı.", "error");
+        }
+        return false;
+      } finally {
+        if (triggerBtn) {
+          triggerBtn.disabled = false;
+          triggerBtn.textContent = prevBtnText;
+        }
       }
     }
 

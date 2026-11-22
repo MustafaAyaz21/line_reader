@@ -28,6 +28,7 @@ class LevelArticlesScreen extends StatefulWidget {
     this.authController,
     this.onAddWord,
     this.loadWordLists,
+    this.onCreateWordList,
   });
 
   final ArticleLevel level;
@@ -38,6 +39,7 @@ class LevelArticlesScreen extends StatefulWidget {
   final AuthController? authController;
   final AddWordCallback? onAddWord;
   final Future<List<WordList>> Function()? loadWordLists;
+  final CreateWordListCallback? onCreateWordList;
 
   @override
   State<LevelArticlesScreen> createState() => _LevelArticlesScreenState();
@@ -95,6 +97,7 @@ class _LevelArticlesScreenState extends State<LevelArticlesScreen> {
           authController: widget.authController,
           onAddWord: widget.onAddWord,
           loadWordLists: widget.loadWordLists,
+          onCreateWordList: widget.onCreateWordList,
         ),
       ),
     );

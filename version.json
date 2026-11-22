@@ -1,7 +1,7 @@
 {
-    "latest_version":  "0.1.17",
-    "version_code":  18,
+    "latest_version":  "0.1.18",
+    "version_code":  19,
     "min_version_code":  0,
-    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.17/app-release.apk",
-    "release_notes":  "Makale yenileme deneyimi ve performans iyileştirmeleri."
+    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.18/app-release.apk",
+    "release_notes":  "Makale sesli okuma (Cihaz TTS + Podcast AI), sürükleyerek alt çizme ve fosforlu/üstü çizili vurgu stilleri, seçilen cümle/paragraf Türkçe çevirisi, Kelime Listeleri üst arama ve anında yeni liste oluşturma, uygulama dışı \u0027Line Reader ile arat\u0027 desteği."
 }

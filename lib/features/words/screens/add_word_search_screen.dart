@@ -11,6 +11,7 @@ import '../models/saved_word.dart';
 import '../models/word_list.dart';
 import '../models/word_search_detail.dart';
 import '../services/word_dictionary_search_service.dart';
+import '../widgets/word_list_editor_dialog.dart';
 
 enum _ExistingWordSaveAction {
   overwrite,
@@ -30,6 +31,7 @@ class AddWordSearchScreen extends StatefulWidget {
     this.editingWord,
     this.apiKeyController,
     this.ttsService,
+    this.searchService,
   });
 
   final int listId;
@@ -39,6 +41,7 @@ class AddWordSearchScreen extends StatefulWidget {
   final SavedWord? editingWord;
   final ApiKeyController? apiKeyController;
   final TtsService? ttsService;
+  final WordDictionarySearchService? searchService;
 
   @override
   State<AddWordSearchScreen> createState() => _AddWordSearchScreenState();
@@ -49,6 +52,8 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
   final FocusNode _searchFocusNode = FocusNode();
 
   late final WordDictionarySearchService _searchService;
+  late final bool _ownsSearchService;
+  late int _selectedListId;
   Timer? _debounceTimer;
   int _searchGeneration = 0;
 
@@ -65,12 +70,15 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedListId = widget.listId;
+    _ownsSearchService = widget.searchService == null;
     // Kelime listesine ekleme akışında gereksiz AI çağrısı yapılmaz;
     // doğrudan ücretsiz çoklu sözlük + hafif yerel sözlük/kök çözümleyici kullanılır.
-    _searchService = WordDictionarySearchService(
-      geminiApiKeyProvider: null,
-      shouldAttemptGeminiProvider: () => false,
-    );
+    _searchService = widget.searchService ??
+        WordDictionarySearchService(
+          geminiApiKeyProvider: null,
+          shouldAttemptGeminiProvider: () => false,
+        );
 
     if (_hasInitialWord) {
       final initial = widget.initialWord!.trim();
@@ -88,7 +96,9 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
     _debounceTimer?.cancel();
     _searchController.dispose();
     _searchFocusNode.dispose();
-    _searchService.dispose();
+    if (_ownsSearchService) {
+      _searchService.dispose();
+    }
     super.dispose();
   }
 
@@ -149,7 +159,7 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
       final results = await Future.wait<Object?>(<Future<Object?>>[
         _searchService.searchWord(query),
         widget.controller.findExistingWordsInList(
-          listId: widget.listId,
+          listId: _selectedListId,
           word: query,
         ),
       ]);
@@ -242,6 +252,51 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
             'Kelime aranırken bir sorun oluştu. İnternet bağlantınızı kontrol edip tekrar deneyin.';
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _handleTargetListChanged(int nextListId) async {
+    if (nextListId == _selectedListId) return;
+    setState(() => _selectedListId = nextListId);
+    final detail = _detail;
+    if (detail == null) return;
+
+    final existingList = await widget.controller.findExistingWordsInList(
+      listId: nextListId,
+      word: detail.word,
+    );
+    if (!mounted || _selectedListId != nextListId || _detail?.word != detail.word) {
+      return;
+    }
+
+    setState(() {
+      _matchedExistingWord =
+          existingList.isNotEmpty ? existingList.first : null;
+    });
+  }
+
+  Future<void> _handleCreateNewList() async {
+    WordList? createdList;
+    final created = await WordListEditorDialog.show(
+      context,
+      onSubmit: (name, colorValue) async {
+        final result = await widget.controller.createListWithResult(
+          name: name,
+          colorValue: colorValue,
+        );
+        if (result.error != null) {
+          return result.error;
+        }
+        createdList = result.list;
+        return null;
+      },
+    );
+
+    if (created != true || !mounted) return;
+    final newlyCreated = createdList;
+    if (newlyCreated != null) {
+      await _handleTargetListChanged(newlyCreated.id);
+      _showSnack('"${newlyCreated.name}" listesi oluşturuldu ve seçildi.');
     }
   }
 
@@ -486,12 +541,17 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
           word: detail.word,
           meaning: selectedMeanings.first.baseFormatted,
           meanings: selectedMeanings,
-          listId: widget.listId,
+          listId: _selectedListId,
           allowDuplicate: true,
         );
         if (!mounted) return;
         if (status == SaveWordStatus.saved) {
-          Navigator.of(context).pop('"${detail.word}" listeye eklendi.');
+          final targetListName =
+              widget.controller.findListById(_selectedListId)?.name;
+          final msg = targetListName != null && targetListName.isNotEmpty
+              ? '"${detail.word}" "$targetListName" listesine eklendi.'
+              : '"${detail.word}" listeye eklendi.';
+          Navigator.of(context).pop(msg);
           return;
         }
         setState(() => _isSaving = false);
@@ -523,7 +583,7 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
           word: detail.word,
           meaning: selectedMeanings.first.baseFormatted,
           meanings: selectedMeanings,
-          listId: widget.listId,
+          listId: _selectedListId,
           allowDuplicate: true,
         );
         if (!mounted) return;
@@ -576,7 +636,9 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final list = widget.wordList ?? widget.controller.findListById(widget.listId);
+    final allLists = widget.controller.lists;
+    final list = widget.controller.findListById(_selectedListId) ??
+        (_selectedListId == widget.listId ? widget.wordList : null);
     final selectedCount = _selectedIndices.length;
 
     return Scaffold(
@@ -655,7 +717,7 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
         children: [
           // Üst Arama Çubuğu
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
             child: Row(
               children: [
                 Expanded(
@@ -722,6 +784,81 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
               ],
             ),
           ),
+          if (widget.editingWord == null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+              child: Row(
+                children: [
+                  if (allLists.isNotEmpty) ...[
+                    Expanded(
+                      child: DropdownButtonFormField<int>(
+                        key: const ValueKey<String>('add_word_list_dropdown'),
+                        value: allLists.any((item) => item.id == _selectedListId)
+                            ? _selectedListId
+                            : allLists.first.id,
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          labelText: 'Hedef Liste',
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        items: allLists.map((item) {
+                          return DropdownMenuItem<int>(
+                            value: item.id,
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 6,
+                                  height: 15,
+                                  decoration: BoxDecoration(
+                                    color: item.color,
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    item.name,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          if (value != null) {
+                            _handleTargetListChanged(value);
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  OutlinedButton.icon(
+                    key: const ValueKey<String>('add_word_create_list_button'),
+                    onPressed: _handleCreateNewList,
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('Yeni Liste'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 11,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           Divider(height: 1, color: colorScheme.outlineVariant),
           // İçerik Alanı: Yükleniyor / Hata / Boş / İkiye Bölünmüş Düzen
           Expanded(

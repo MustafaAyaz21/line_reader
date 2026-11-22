@@ -31,6 +31,7 @@ class MainMenuScreen extends StatelessWidget {
     this.ttsService,
     this.onAddWord,
     this.loadWordLists,
+    this.onCreateWordList,
     this.onClearCache,
   });
 
@@ -44,6 +45,7 @@ class MainMenuScreen extends StatelessWidget {
   final TtsService? ttsService;
   final AddWordCallback? onAddWord;
   final Future<List<WordList>> Function()? loadWordLists;
+  final CreateWordListCallback? onCreateWordList;
   final Future<void> Function()? onClearCache;
 
   void _openArticles(BuildContext context) {
@@ -56,6 +58,7 @@ class MainMenuScreen extends StatelessWidget {
           authController: authController,
           onAddWord: onAddWord,
           loadWordLists: loadWordLists,
+          onCreateWordList: onCreateWordList,
         ),
       ),
     );

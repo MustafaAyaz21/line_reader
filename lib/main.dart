@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
 import 'core/localization/app_locale.dart';
+import 'core/platform/process_text_channel.dart';
 import 'core/theme/app_theme.dart';
 import 'features/splash/splash_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  ProcessTextChannel.ensureInitialized();
   runApp(const LineReaderApp());
 }
 

@@ -1,8 +1,11 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:linereader/features/articles/articles_screen.dart';
 import 'package:linereader/features/articles/controllers/articles_controller.dart';
@@ -12,6 +15,7 @@ import 'package:linereader/features/articles/models/article.dart';
 import 'package:linereader/features/articles/models/article_level.dart';
 import 'package:linereader/features/articles/models/article_reader_models.dart';
 import 'package:linereader/features/articles/screens/article_reader_screen.dart';
+import 'package:linereader/features/articles/services/article_passage_translation_service.dart';
 import 'package:linereader/features/articles/services/articles_remote_service.dart';
 import 'package:linereader/features/articles/services/articles_sync_service.dart';
 import 'package:linereader/features/articles/utils/article_text_parser.dart';
@@ -191,6 +195,43 @@ void main() {
       expect(underlines, hasLength(1));
       expect(underlines.first.startOffset, 0);
       expect(underlines.first.endOffset, 13);
+
+      // Çok kelimelik çizgiden tek kelime çıkarılınca kalan kelimeler korunmalı.
+      underlines = ArticleTextParser.addAndMergeUnderline(
+        existing: underlines,
+        incoming: const ArticleUnderline(
+          articleId: 'art-1',
+          paragraphIndex: 0,
+          startOffset: 14,
+          endOffset: 20,
+        ),
+        paragraphText: paragraph,
+      );
+      expect(underlines, hasLength(1));
+      expect(underlines.first.endOffset, 20); // "Daily reading builds"
+
+      final afterRemoveMiddle = ArticleTextParser.removeWordRangeFromUnderlines(
+        existing: underlines,
+        paragraphIndex: 0,
+        wordStart: 6,
+        wordEnd: 13, // "reading"
+        paragraphText: paragraph,
+      );
+      expect(afterRemoveMiddle, hasLength(2));
+      expect(
+        paragraph.substring(
+          afterRemoveMiddle[0].startOffset,
+          afterRemoveMiddle[0].endOffset,
+        ),
+        'Daily',
+      );
+      expect(
+        paragraph.substring(
+          afterRemoveMiddle[1].startOffset,
+          afterRemoveMiddle[1].endOffset,
+        ),
+        'builds',
+      );
     });
   });
 
@@ -363,6 +404,364 @@ void main() {
         expect(translationService.lastWord, 'reading');
         expect(translationService.lastSentence, 'Reading books brings calm.');
         expect(find.textContaining('okumak'), findsWidgets);
+      },
+    );
+
+    testWidgets(
+      'sürükleyerek alt çizme, tek tıkla tek kelime kaldırma, fosforlu/üstü çizili/renk değişimi ve sistem Kopyala/Tümünü Seç engeli çalışır',
+      (tester) async {
+        final readerStore = _InMemoryReaderStore();
+        final translationService = _FakeTranslationService();
+        const paragraphText =
+            'Reading books brings calm. Quiet gardens inspire deep focus.';
+        const sampleArticle = Article(
+          id: 'article-markup-test',
+          title: 'Markup & Gesture Test',
+          summary: 'Testing drag underline, styles, and no system copy menu.',
+          level: 'B1',
+          author: 'Line Reader',
+          content: paragraphText,
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: ArticleReaderScreen(
+              article: sampleArticle,
+              readerStore: readerStore,
+              translationService: translationService,
+              onAddWord: (_, __, ___, ____) async => SaveWordStatus.saved,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Sistem Kopyala / Tümünü Seç sağlayan SelectionArea / SelectableText olmamalı.
+        expect(find.byType(SelectionArea), findsNothing);
+        expect(find.byType(SelectableText), findsNothing);
+
+        final paragraphGestureFinder =
+            find.byKey(const ValueKey<String>('reader_paragraph_gesture_0'));
+        expect(paragraphGestureFinder, findsOneWidget);
+
+        // RenderParagraph üzerinden "Reading" ve "brings" kelimelerinin gerçek ekran koordinatlarını bul.
+        final richTextFinder = find.descendant(
+          of: paragraphGestureFinder,
+          matching: find.byType(RichText),
+        );
+        final renderParagraph =
+            tester.renderObject<RenderParagraph>(richTextFinder);
+
+        Offset centerOfChar(int offset) {
+          final box = renderParagraph
+              .getBoxesForSelection(
+                TextSelection(baseOffset: offset, extentOffset: offset + 1),
+              )
+              .first;
+          return renderParagraph.localToGlobal(box.toRect().center);
+        }
+
+        final readingCenter = centerOfChar(2); // "Reading"
+
+        // 1) Altını Çiz modu KAPALI iken "Reading" üzerine basılı tut:
+        //    tüm cümle seçilmemeli, sistem Kopyala/Tümünü Seç çıkmamalı,
+        //    yalnızca "Reading" seçilip "Anlamına Bak" çıkmalı.
+        final normalGesture = await tester.startGesture(readingCenter);
+        await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
+        await normalGesture.up();
+        await tester.pumpAndSettle();
+
+        expect(find.text('Kopyala'), findsNothing);
+        expect(find.text('Copy'), findsNothing);
+        expect(find.text('Tümünü Seç'), findsNothing);
+        expect(find.text('Select All'), findsNothing);
+        expect(find.text('Anlamına Bak'), findsOneWidget);
+
+        await tester.tap(find.text('Anlamına Bak'));
+        await tester.pumpAndSettle();
+        expect(translationService.lastWord, 'reading');
+
+        // WordPreviewSheet'i kapat
+        Navigator.of(tester.element(find.text('Kelimelerime Ekle'))).pop();
+        await tester.pumpAndSettle();
+
+        // 2) Altını Çiz modunu AÇ (AppBar alt şeridi açılınca paragraf konumu kayar;
+        //    güncel ekran koordinatlarını yeniden okuyup "Reading" -> "brings" boyunca sürükle).
+        await tester.tap(
+          find.byKey(const ValueKey<String>('reader_underline_pen_button')),
+        );
+        await tester.pumpAndSettle();
+
+        final dragStartCenter = centerOfChar(2); // "Reading"
+        final dragEndCenter = centerOfChar(16); // "brings"
+
+        final dragGesture = await tester.startGesture(dragStartCenter);
+        await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
+        await dragGesture.moveTo(dragEndCenter);
+        await tester.pump();
+        await dragGesture.up();
+        await tester.pumpAndSettle();
+
+        var underlines =
+            await readerStore.getUnderlinesForArticle('article-markup-test');
+        expect(underlines, hasLength(1));
+        expect(
+          paragraphText.substring(
+            underlines.first.startOffset,
+            underlines.first.endOffset,
+          ),
+          'Reading books brings',
+        );
+
+        // 3) Ortadaki altı çizili kelimeye ("books") TEK TIK -> yalnızca "books" kalkmalı,
+        //    "Reading" ve "brings" çizili kalmalı.
+        _tapFirstSpanMatching(tester, 'books');
+        await tester.pumpAndSettle();
+
+        underlines =
+            await readerStore.getUnderlinesForArticle('article-markup-test');
+        expect(underlines, hasLength(2));
+        expect(
+          paragraphText.substring(
+            underlines[0].startOffset,
+            underlines[0].endOffset,
+          ),
+          'Reading',
+        );
+        expect(
+          paragraphText.substring(
+            underlines[1].startOffset,
+            underlines[1].endOffset,
+          ),
+          'brings',
+        );
+
+        // 4) Sağ üst Görünüm (Aa) menüsünden Fosforlu Kalem + Mavi seç -> metinde anında yansımalı.
+        await tester.tap(
+          find.byKey(const ValueKey<String>('reader_appearance_button')),
+        );
+        await tester.pumpAndSettle();
+
+        final highlightBtn =
+            find.byKey(const ValueKey<String>('reader_mark_style_highlight'));
+        await tester.ensureVisible(highlightBtn);
+        await tester.tap(highlightBtn);
+        await tester.pumpAndSettle();
+
+        final blueColorBtn =
+            find.byKey(const ValueKey<String>('reader_mark_color_blue'));
+        await tester.ensureVisible(blueColorBtn);
+        await tester.tap(blueColorBtn);
+        await tester.pumpAndSettle();
+
+        expect(readerStore.preferences.markStyle, ArticleMarkStyle.highlight);
+        expect(readerStore.preferences.markColor, ArticleMarkColor.blue);
+
+        // Metindeki "Reading" span'ı anında Mavi Fosforlu Kalem rengine geçmiş olmalı.
+        TextSpan? findSpanStyle(String text) {
+          TextSpan? matched;
+          tester.widget<RichText>(richTextFinder).text.visitChildren((span) {
+            if (span is TextSpan && span.text == text) {
+              matched = span;
+              return false;
+            }
+            return true;
+          });
+          return matched;
+        }
+
+        final highlightedSpan = findSpanStyle('Reading');
+        expect(highlightedSpan, isNotNull);
+        expect(
+          highlightedSpan!.style?.backgroundColor,
+          ArticleMarkColor.blue.highlightFillForTone(readerStore.preferences.tone),
+        );
+        expect(highlightedSpan.style?.decoration, isNull);
+
+        // 5) Üstü Çizili + Pembe/Kırmızı seç -> metinde anında lineThrough + rose rengi görünmeli.
+        final strikeBtn = find.byKey(
+          const ValueKey<String>('reader_mark_style_strikethrough'),
+        );
+        await tester.ensureVisible(strikeBtn);
+        await tester.tap(strikeBtn);
+        await tester.pumpAndSettle();
+
+        final roseBtn =
+            find.byKey(const ValueKey<String>('reader_mark_color_rose'));
+        await tester.ensureVisible(roseBtn);
+        await tester.tap(roseBtn);
+        await tester.pumpAndSettle();
+
+        expect(
+          readerStore.preferences.markStyle,
+          ArticleMarkStyle.strikethrough,
+        );
+        expect(readerStore.preferences.markColor, ArticleMarkColor.rose);
+
+        final struckSpan = findSpanStyle('Reading');
+        expect(struckSpan, isNotNull);
+        expect(struckSpan!.style?.decoration, TextDecoration.lineThrough);
+        expect(
+          struckSpan.style?.decorationColor,
+          ArticleMarkColor.rose.accentForTone(readerStore.preferences.tone),
+        );
+      },
+    );
+
+    testWidgets(
+      'çizme kapalıyken seçilen cümle ve tam paragraf hazır çeviriden veya canlı yedekten hatasız çevrilir',
+      (tester) async {
+        // 1) JSON ve SQLite round-trip + hazır çeviri önceliği testi
+        final parsed = Article.tryFromJson(<String, Object?>{
+          'id': 'art-preset-tr',
+          'level': 'B1',
+          'title': 'Calm Reading',
+          'author': 'Line Reader',
+          'content':
+              'Reading books brings calm. Quiet gardens inspire deep focus.',
+          'sentence_translations': <String, Object?>{
+            'Reading books brings calm.': 'Kitap okumak huzur verir.',
+            'Quiet gardens inspire deep focus.':
+                'Sessiz bahçeler derin odaklanmaya ilham verir.',
+          },
+          'paragraph_translations': <String>[
+            'Kitap okumak huzur verir. Sessiz bahçeler derin odaklanmaya ilham verir.',
+          ],
+        });
+        expect(parsed, isNotNull);
+
+        final fromDb = Article.fromDbRow(
+          parsed!.toDbRow(cachedAtMillis: 99999),
+        );
+        expect(fromDb.sentenceTranslations, hasLength(2));
+        expect(fromDb.paragraphTranslations, hasLength(1));
+
+        var networkCalls = 0;
+        final mockClient = MockClient((_) async {
+          networkCalls++;
+          return http.Response.bytes(
+            utf8.encode(
+              jsonEncode(<Object?>[
+                <Object?>[
+                  <Object?>['Canlı çevrilen cümle.', 'Live translated sentence.'],
+                ],
+              ]),
+            ),
+            200,
+            headers: const <String, String>{
+              'content-type': 'application/json; charset=utf-8',
+            },
+          );
+        });
+        final passageService = ArticlePassageTranslationService(
+          httpClient: mockClient,
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: ArticleReaderScreen(
+              article: fromDb,
+              readerStore: _InMemoryReaderStore(),
+              translationService: _FakeTranslationService(),
+              passageTranslator: passageService,
+              onAddWord: (_, __, ___, ____) async => SaveWordStatus.saved,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final paragraphGestureFinder =
+            find.byKey(const ValueKey<String>('reader_paragraph_gesture_0'));
+        final richTextFinder = find.descendant(
+          of: paragraphGestureFinder,
+          matching: find.byType(RichText),
+        );
+        final renderParagraph =
+            tester.renderObject<RenderParagraph>(richTextFinder);
+
+        Offset centerOfChar(int offset) {
+          final box = renderParagraph
+              .getBoxesForSelection(
+                TextSelection(baseOffset: offset, extentOffset: offset + 1),
+              )
+              .first;
+          return renderParagraph.localToGlobal(box.toRect().center);
+        }
+
+        // A) "Reading books brings calm" cümlesini basılı tutup sürükleyerek seç -> "Çevir" butonuna bas.
+        final startPos = centerOfChar(2); // "Reading"
+        final endPos = centerOfChar(23); // "calm"
+        final sentenceDrag = await tester.startGesture(startPos);
+        await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
+        await sentenceDrag.moveTo(endPos);
+        await tester.pump();
+        await sentenceDrag.up();
+        await tester.pumpAndSettle();
+
+        final lookupBtn =
+            find.byKey(const ValueKey<String>('reader_selection_lookup_button'));
+        expect(lookupBtn, findsOneWidget);
+        await tester.tap(lookupBtn);
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey<String>('article_passage_translation_sheet')),
+          findsOneWidget,
+        );
+        expect(find.text('Kitap okumak huzur verir.'), findsOneWidget);
+        expect(find.text('Hazır Çeviri'), findsOneWidget);
+        // Hazır çeviri kullanıldığı için hiç ağ isteği atılmamalı!
+        expect(networkCalls, 0);
+
+        // Paneli kapat
+        Navigator.of(
+          tester.element(
+            find.byKey(
+              const ValueKey<String>('article_passage_translation_sheet'),
+            ),
+          ),
+        ).pop();
+        await tester.pumpAndSettle();
+
+        // B) Kelimeye basılı tut -> "Paragrafı Çevir" butonuna bas -> tüm paragraf çevirisi gelmeli.
+        final paraGesture = await tester.startGesture(startPos);
+        await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
+        await paraGesture.up();
+        await tester.pumpAndSettle();
+
+        final translateParaBtn = find.byKey(
+          const ValueKey<String>('reader_selection_translate_paragraph_button'),
+        );
+        expect(translateParaBtn, findsOneWidget);
+        await tester.tap(translateParaBtn);
+        await tester.pumpAndSettle();
+
+        expect(find.text('Paragraf Çevirisi'), findsOneWidget);
+        expect(
+          find.text(
+            'Kitap okumak huzur verir. Sessiz bahçeler derin odaklanmaya ilham verir.',
+          ),
+          findsOneWidget,
+        );
+        expect(networkCalls, 0);
+
+        // C) Hazır çevirisi olmayan makalede canlı yedek çeviri çalışmalı.
+        const noPresetArticle = Article(
+          id: 'art-no-preset',
+          level: 'B1',
+          title: 'Live Fallback',
+          content: 'Live translated sentence works cleanly here.',
+        );
+        final liveResult = await passageService.translate(
+          article: noPresetArticle,
+          selectedText: 'Live translated sentence works cleanly here.',
+          paragraphIndex: 0,
+          fullParagraphText: 'Live translated sentence works cleanly here.',
+        );
+        expect(liveResult.isFromArticlePreset, isFalse);
+        expect(liveResult.translatedText, 'Canlı çevrilen cümle.');
+        expect(networkCalls, 1);
+
+        passageService.dispose();
       },
     );
   });

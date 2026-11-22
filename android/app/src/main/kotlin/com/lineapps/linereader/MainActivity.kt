@@ -19,10 +19,14 @@ class MainActivity : FlutterActivity() {
             "com.lineapps.linereader/selection_mode"
         private const val APP_UPDATER_CHANNEL =
             "com.lineapps.linereader/app_updater"
+        private const val PROCESS_TEXT_CHANNEL =
+            "com.lineapps.linereader/process_text"
     }
 
     private var isPenModeActive: Boolean = true
     private var activeActionMode: ActionMode? = null
+    private var processTextChannel: MethodChannel? = null
+    private var pendingProcessText: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -31,6 +35,35 @@ class MainActivity : FlutterActivity() {
                 splashScreenView.remove()
             }
         }
+        extractProcessText(intent)?.let { text ->
+            pendingProcessText = text
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        extractProcessText(intent)?.let { text ->
+            val channel = processTextChannel
+            if (channel != null) {
+                pendingProcessText = null
+                channel.invokeMethod("onProcessText", text)
+            } else {
+                pendingProcessText = text
+            }
+        }
+    }
+
+    private fun extractProcessText(intent: Intent?): String? {
+        if (intent == null) return null
+        if (intent.action != Intent.ACTION_PROCESS_TEXT) return null
+        val raw = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString()
+        } else {
+            intent.getStringExtra("android.intent.extra.PROCESS_TEXT")
+        }
+        val cleaned = raw?.trim()
+        return if (cleaned.isNullOrEmpty()) null else cleaned
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -95,6 +128,22 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+
+        val ptChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            PROCESS_TEXT_CHANNEL
+        )
+        ptChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "consumeInitialProcessText" -> {
+                    val text = pendingProcessText
+                    pendingProcessText = null
+                    result.success(text)
+                }
+                else -> result.notImplemented()
+            }
+        }
+        processTextChannel = ptChannel
     }
 
     private fun installApkFile(apkFile: File) {

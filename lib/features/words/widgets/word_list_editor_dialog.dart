@@ -146,6 +146,7 @@ class _WordListEditorDialogState extends State<WordListEditorDialog> {
             ),
             const SizedBox(height: 16),
             TextField(
+              key: const ValueKey<String>('word_list_name_field'),
               controller: _nameController,
               enabled: !_isDefaultList && !_isSaving,
               autofocus: !_isEditing,
@@ -225,6 +226,7 @@ class _WordListEditorDialogState extends State<WordListEditorDialog> {
           child: const Text('İptal'),
         ),
         FilledButton(
+          key: const ValueKey<String>('word_list_save_button'),
           onPressed: _isSaving ? null : _handleSave,
           child: Text(_isEditing ? 'Kaydet' : 'Oluştur'),
         ),

@@ -11,6 +11,8 @@ $ProjectRoot = (Resolve-Path (Join-Path $StudioDir "..\..")).Path
 $ContentDir = Join-Path $ProjectRoot "content"
 $ContentArticlesPath = Join-Path $ContentDir "articles.json"
 $RootArticlesPath = Join-Path $ProjectRoot "articles.json"
+$ContentAudioDir = Join-Path $ContentDir "audio"
+$RootAudioDir = Join-Path $ProjectRoot "audio"
 $IndexHtmlPath = Join-Path $StudioDir "index.html"
 $AdminConfigPath = Join-Path $StudioDir "admin_config.local.json"
 $DefaultWorkerUrl = "https://linereader-ai.xreasayaz21.workers.dev"
@@ -140,7 +142,7 @@ function Invoke-GitInRepo([string[]]$Arguments) {
 function Get-RepoStatus {
     $branchRes = Invoke-GitInRepo @("rev-parse", "--abbrev-ref", "HEAD")
     $remoteRes = Invoke-GitInRepo @("remote", "get-url", "origin")
-    $diffRes = Invoke-GitInRepo @("status", "--porcelain", "--", "content/articles.json", "articles.json")
+    $diffRes = Invoke-GitInRepo @("status", "--porcelain", "--", "content/articles.json", "articles.json", "content/audio", "audio")
 
     return @{
         ok                = $true
@@ -152,23 +154,30 @@ function Get-RepoStatus {
 }
 
 function Publish-ArticlesToGitHub([int]$ArticleCount) {
-    $addRes = Invoke-GitInRepo @("add", "--", "content/articles.json", "articles.json")
+    $pathsToStage = @("content/articles.json", "articles.json")
+    if (Test-Path $ContentAudioDir) { $pathsToStage += "content/audio" }
+    if (Test-Path $RootAudioDir) { $pathsToStage += "audio" }
+
+    $addArgs = @("add", "--") + $pathsToStage
+    $addRes = Invoke-GitInRepo $addArgs
     if ($addRes.ExitCode -ne 0) {
         throw "git add başarısız: $($addRes.StdErr)"
     }
 
-    $stagedRes = Invoke-GitInRepo @("diff", "--cached", "--name-only", "--", "content/articles.json", "articles.json")
+    $stagedArgs = @("diff", "--cached", "--name-only", "--") + $pathsToStage
+    $stagedRes = Invoke-GitInRepo $stagedArgs
     if ([string]::IsNullOrWhiteSpace($stagedRes.StdOut)) {
         return @{
             ok           = $true
             published    = $false
             articleCount = $ArticleCount
-            message      = "Değişiklik yok; tüm makaleler zaten yayında."
+            message      = "Değişiklik yok; tüm makaleler ve ses dosyaları zaten yayında."
         }
     }
 
-    $commitMsg = "Update articles.json ($ArticleCount makale)"
-    $commitRes = Invoke-GitInRepo @("commit", "-m", $commitMsg, "--", "content/articles.json", "articles.json")
+    $commitMsg = "Update articles and audio ($ArticleCount makale)"
+    $commitArgs = @("commit", "-m", $commitMsg, "--") + $pathsToStage
+    $commitRes = Invoke-GitInRepo $commitArgs
     if ($commitRes.ExitCode -ne 0) {
         throw "git commit başarısız: $($commitRes.StdErr) $($commitRes.StdOut)"
     }
@@ -186,7 +195,7 @@ function Publish-ArticlesToGitHub([int]$ArticleCount) {
         published    = $true
         commit       = $commitHash
         articleCount = $ArticleCount
-        message      = "GitHub'a yayınlandı ($commitHash)! Uygulama ve Cloudflare Pages kısa sürede güncellenecek."
+        message      = "GitHub'a yayınlandı ($commitHash)! Makaleler ve podcast sesleri kısa sürede aktif olacak."
     }
 }
 
@@ -345,6 +354,13 @@ Create ONE original English reading article and return ONLY a valid JSON object 
   "content": "Full English article text with 4 to 5 well-structured paragraphs separated by double newlines (\n\n). Target length: approximately 350 words (strictly between 320 and 385 words).",
   "word_meanings": {
     "example_word": "contextual Turkish meaning (concise, 1-5 Turkish words)"
+  },
+  "paragraph_translations": [
+    "Natural, fluent Turkish translation of paragraph 1.",
+    "Natural, fluent Turkish translation of paragraph 2."
+  ],
+  "sentence_translations": {
+    "Exact English sentence from content.": "Natural contextual Turkish translation of that exact sentence."
   }
 }
 
@@ -355,7 +371,9 @@ Strict requirements:
 4. Title, description, category, and content MUST all be in natural, well-edited English.
 5. Word count of "content" MUST be close to 350 words (320-385 words), split into 4-5 clear paragraphs separated by \n\n. Do NOT include the title inside "content".
 6. "word_meanings" MUST contain 35 to 45 important English words or short phrases that ACTUALLY appear verbatim in "content", with lowercase keys and accurate, natural Turkish meanings suited to the exact context of the article (no English explanations, just concise Turkish equivalents).
-7. Output raw JSON only—no markdown fences, no commentary.
+7. "paragraph_translations" MUST be a JSON array with the exact same number of elements as the paragraphs in "content", providing fluent Turkish translations in order.
+8. "sentence_translations" MUST map every sentence of "content" (verbatim English sentence as key) to its fluent, contextual Turkish translation.
+9. Output raw JSON only—no markdown fences, no commentary.
 "@
 
     $requestObj = @{
@@ -476,19 +494,42 @@ Strict requirements:
                     }
                 }
 
+                $paraTrList = New-Object System.Collections.ArrayList
+                if ($null -ne $articleObj.PSObject.Properties["paragraph_translations"] -and $null -ne $articleObj.paragraph_translations) {
+                    foreach ($pt in @($articleObj.paragraph_translations)) {
+                        $cleanPt = ([string]$pt).Trim()
+                        if (-not [string]::IsNullOrWhiteSpace($cleanPt)) {
+                            [void]$paraTrList.Add($cleanPt)
+                        }
+                    }
+                }
+
+                $sentTrOrdered = [ordered]@{}
+                if ($null -ne $articleObj.PSObject.Properties["sentence_translations"] -and $null -ne $articleObj.sentence_translations) {
+                    foreach ($prop in $articleObj.sentence_translations.PSObject.Properties) {
+                        $sk = ([string]$prop.Name).Trim()
+                        $sv = ([string]$prop.Value).Trim()
+                        if (-not [string]::IsNullOrWhiteSpace($sk) -and -not [string]::IsNullOrWhiteSpace($sv)) {
+                            $sentTrOrdered[$sk] = $sv
+                        }
+                    }
+                }
+
                 Write-Host "[Gemini] Basarili: $modelName -> $genTitle" -ForegroundColor Green
                 $payload = @{
                     ok      = $true
                     model   = $modelName
                     article = @{
-                        level         = $level
-                        title         = $genTitle
-                        description   = $genDesc
-                        category      = $genCat
-                        author        = "Line Reader"
-                        language      = "en"
-                        content       = $genContent
-                        word_meanings = $wmOrdered
+                        level                  = $level
+                        title                  = $genTitle
+                        description            = $genDesc
+                        category               = $genCat
+                        author                 = "Line Reader"
+                        language               = "en"
+                        content                = $genContent
+                        word_meanings          = $wmOrdered
+                        paragraph_translations = @($paraTrList)
+                        sentence_translations  = $sentTrOrdered
                     }
                 }
                 return @{
@@ -547,6 +588,422 @@ Strict requirements:
 
     if ($lastStatus -eq 503) {
         $lastErrorMsg = "Google Gemini sunucuları şu an geçici olarak çok yoğun (HTTP 503). 5-10 saniye sonra tekrar deneyin veya Gemini Ayarı'ndan 'gemini-2.5-flash-lite' seçin."
+    }
+
+    return @{
+        StatusCode = $lastStatus
+        Body       = (@{ ok = $false; message = $lastErrorMsg } | ConvertTo-Json -Compress)
+    }
+}
+
+function Convert-PcmToWavBytes([byte[]]$PcmBytes, [int]$SampleRate = 24000) {
+    $ms = New-Object System.IO.MemoryStream
+    $bw = New-Object System.IO.BinaryWriter($ms)
+    try {
+        $pcmLen = $PcmBytes.Length
+        $bw.Write([System.Text.Encoding]::ASCII.GetBytes("RIFF"))
+        $bw.Write([int](36 + $pcmLen))
+        $bw.Write([System.Text.Encoding]::ASCII.GetBytes("WAVE"))
+        $bw.Write([System.Text.Encoding]::ASCII.GetBytes("fmt "))
+        $bw.Write([int]16)
+        $bw.Write([int16]1)
+        $bw.Write([int16]1)
+        $bw.Write([int]$SampleRate)
+        $bw.Write([int]($SampleRate * 2))
+        $bw.Write([int16]2)
+        $bw.Write([int16]16)
+        $bw.Write([System.Text.Encoding]::ASCII.GetBytes("data"))
+        $bw.Write([int]$pcmLen)
+        $bw.Write($PcmBytes)
+        $bw.Flush()
+        return $ms.ToArray()
+    }
+    finally {
+        $bw.Dispose()
+        $ms.Dispose()
+    }
+}
+
+function Convert-WavBytesToM4aBytes([byte[]]$WavBytes) {
+    Add-Type -AssemblyName System.Runtime.WindowsRuntime
+    $asTaskGeneric = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
+        $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`1'
+    })[0]
+    $asTaskProgress = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
+        $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncActionWithProgress`1'
+    })[0]
+
+    $null = [Windows.Storage.Streams.InMemoryRandomAccessStream, Windows.Storage.Streams, ContentType=WindowsRuntime]
+    $null = [Windows.Media.Transcoding.MediaTranscoder, Windows.Media.Transcoding, ContentType=WindowsRuntime]
+    $null = [Windows.Media.MediaProperties.MediaEncodingProfile, Windows.Media.MediaProperties, ContentType=WindowsRuntime]
+    $null = [Windows.Media.MediaProperties.AudioEncodingQuality, Windows.Media.MediaProperties, ContentType=WindowsRuntime]
+
+    $src = New-Object Windows.Storage.Streams.InMemoryRandomAccessStream
+    $dst = New-Object Windows.Storage.Streams.InMemoryRandomAccessStream
+    try {
+        $netSrc = [System.IO.WindowsRuntimeStreamExtensions]::AsStreamForWrite($src)
+        $netSrc.Write($WavBytes, 0, $WavBytes.Length)
+        $netSrc.Flush()
+        $src.Seek(0)
+
+        $profile = [Windows.Media.MediaProperties.MediaEncodingProfile]::CreateM4a([Windows.Media.MediaProperties.AudioEncodingQuality]::Low)
+        $transcoder = New-Object Windows.Media.Transcoding.MediaTranscoder
+        $prepTask = $asTaskGeneric.MakeGenericMethod([Windows.Media.Transcoding.PrepareTranscodeResult]).Invoke($null, @($transcoder.PrepareStreamTranscodeAsync($src, $dst, $profile)))
+        $prepTask.Wait() | Out-Null
+        $prep = $prepTask.Result
+        if (-not $prep.CanTranscode) {
+            throw "Windows AAC kodlayıcı başlatılamadı ($($prep.FailureReason))."
+        }
+
+        $runTask = $asTaskProgress.MakeGenericMethod([double]).Invoke($null, @($prep.TranscodeAsync()))
+        $runTask.Wait() | Out-Null
+
+        $dst.Seek(0)
+        $netDst = [System.IO.WindowsRuntimeStreamExtensions]::AsStreamForRead($dst)
+        $outMs = New-Object System.IO.MemoryStream
+        try {
+            $netDst.CopyTo($outMs)
+            return $outMs.ToArray()
+        }
+        finally {
+            $outMs.Dispose()
+            $netDst.Dispose()
+        }
+    }
+    finally {
+        $src.Dispose()
+        $dst.Dispose()
+    }
+}
+
+function Split-ContentIntoSentencesForAudio([string]$Content) {
+    $norm = ($Content -replace "`r`n", "`n").Trim()
+    if ([string]::IsNullOrWhiteSpace($norm)) { return @() }
+    $paragraphs = if ($norm.Contains("`n`n")) {
+        [regex]::Split($norm, '\n\s*\n+')
+    } else {
+        $norm.Split("`n")
+    }
+    $paragraphs = @($paragraphs | ForEach-Object { $_.Trim() } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+
+    $abbrevs = @("mr", "mrs", "ms", "dr", "prof", "sr", "jr", "st", "vs", "etc", "e.g", "i.e", "u.s", "u.k")
+    $sentences = New-Object System.Collections.ArrayList
+    $globalIdx = 0
+
+    for ($pIdx = 0; $pIdx -lt $paragraphs.Count; $pIdx++) {
+        $para = $paragraphs[$pIdx]
+        $segStart = 0
+        $i = 0
+        while ($i -lt $para.Length) {
+            $ch = $para[$i]
+            if ($ch -eq '.' -or $ch -eq '!' -or $ch -eq '?') {
+                $skipDot = $false
+                if ($ch -eq '.') {
+                    if ($i -gt 0 -and ($i + 1) -lt $para.Length -and [char]::IsDigit($para[$i - 1]) -and [char]::IsDigit($para[$i + 1])) {
+                        $skipDot = $true
+                    } else {
+                        $tokStart = $i - 1
+                        while ($tokStart -ge 0 -and -not [char]::IsWhiteSpace($para[$tokStart]) -and $para[$tokStart] -ne '(' -and $para[$tokStart] -ne '"') {
+                            $tokStart--
+                        }
+                        $tok = $para.Substring($tokStart + 1, $i - ($tokStart + 1)).ToLowerInvariant()
+                        if ($abbrevs -contains $tok -or ($tok.Length -eq 1 -and $tok -match '^[a-z]$')) {
+                            $skipDot = $true
+                        }
+                    }
+                }
+                if ($skipDot) { $i++; continue }
+
+                $end = $i + 1
+                $closingChars = @([char]'.', [char]'!', [char]'?', [char]'"', [char]"'", [char]')', [char]0x201D, [char]0x2019)
+                while ($end -lt $para.Length -and ($closingChars -contains $para[$end])) {
+                    $end++
+                }
+                if ($end -ge $para.Length -or [char]::IsWhiteSpace($para[$end])) {
+                    $piece = $para.Substring($segStart, $end - $segStart).Trim()
+                    if (-not [string]::IsNullOrWhiteSpace($piece)) {
+                        [void]$sentences.Add(@{ p = $pIdx; s = $globalIdx; text = $piece })
+                        $globalIdx++
+                    }
+                    $segStart = $end
+                    $i = $end
+                    continue
+                }
+            }
+            $i++
+        }
+        if ($segStart -lt $para.Length) {
+            $piece = $para.Substring($segStart).Trim()
+            if (-not [string]::IsNullOrWhiteSpace($piece)) {
+                [void]$sentences.Add(@{ p = $pIdx; s = $globalIdx; text = $piece })
+                $globalIdx++
+            }
+        }
+    }
+    return @($sentences)
+}
+
+function Compute-AudioSentenceSegments([string]$Content, [byte[]]$PcmBytes, [int]$SampleRate = 24000) {
+    $sentences = Split-ContentIntoSentencesForAudio $Content
+    if ($sentences.Count -eq 0 -or $PcmBytes.Length -lt 480) { return @() }
+
+    $totalSamples = [math]::Floor($PcmBytes.Length / 2)
+    $totalMs = [int][math]::Round(($totalSamples * 1000.0) / $SampleRate)
+    if ($totalMs -le 0) { return @() }
+
+    # 20ms'lik enerji çerçeveleri oluşturup cümle sınırlarını en yakın duraklamaya oturt.
+    $frameMs = 20
+    $samplesPerFrame = [int](($SampleRate * $frameMs) / 1000)
+    $frameCount = [math]::Floor($totalSamples / $samplesPerFrame)
+    $energies = New-Object double[] $frameCount
+    for ($f = 0; $f -lt $frameCount; $f++) {
+        $baseByte = $f * $samplesPerFrame * 2
+        $sum = 0.0
+        for ($k = 0; $k -lt $samplesPerFrame; $k += 4) {
+            $sample = [BitConverter]::ToInt16($PcmBytes, $baseByte + ($k * 2))
+            $sum += [math]::Abs($sample)
+        }
+        $energies[$f] = $sum
+    }
+
+    $totalWeight = 0.0
+    $weights = New-Object double[] $sentences.Count
+    for ($i = 0; $i -lt $sentences.Count; $i++) {
+        $w = [double]$sentences[$i].text.Length + 8.0
+        if ($i -gt 0 -and $sentences[$i].p -ne $sentences[$i - 1].p) {
+            $w += 14.0
+        }
+        $weights[$i] = $w
+        $totalWeight += $w
+    }
+
+    $segments = New-Object System.Collections.ArrayList
+    $accWeight = 0.0
+    $prevEndMs = 0
+
+    for ($i = 0; $i -lt $sentences.Count; $i++) {
+        $startMs = $prevEndMs
+        $accWeight += $weights[$i]
+        $endMs = if ($i -eq ($sentences.Count - 1)) {
+            $totalMs
+        } else {
+            $expectedMs = [int][math]::Round(($accWeight / $totalWeight) * $totalMs)
+            $centerFrame = [int][math]::Floor($expectedMs / $frameMs)
+            $winFrames = [int][math]::Floor(1300 / $frameMs)
+            $minF = [math]::Max([int][math]::Floor(($startMs + 250) / $frameMs), $centerFrame - $winFrames)
+            $maxF = [math]::Min($frameCount - 2, $centerFrame + $winFrames)
+            $bestFrame = $centerFrame
+            if ($maxF -gt $minF -and $minF -ge 0) {
+                $bestScore = [double]::MaxValue
+                for ($f = $minF; $f -le $maxF; $f++) {
+                    $distPenalty = 1.0 + ([math]::Abs($f - $centerFrame) / [double]($winFrames + 1)) * 0.45
+                    $score = ($energies[$f] + $energies[$f + 1]) * $distPenalty
+                    if ($score -lt $bestScore) {
+                        $bestScore = $score
+                        $bestFrame = $f
+                    }
+                }
+            }
+            [math]::Max($startMs + 200, [math]::Min($totalMs - 100, $bestFrame * $frameMs))
+        }
+
+        [void]$segments.Add([ordered]@{
+            p        = [int]$sentences[$i].p
+            s        = [int]$sentences[$i].s
+            start_ms = [int]$startMs
+            end_ms   = [int]$endMs
+        })
+        $prevEndMs = $endMs
+    }
+
+    return @($segments)
+}
+
+function Invoke-GeminiGenerateAudio([string]$RawJson) {
+    $cfg = Get-AdminConfig
+    if ([string]::IsNullOrWhiteSpace($cfg.geminiApiKey)) {
+        return @{
+            StatusCode = 400
+            Body       = (@{ ok = $false; needsKey = $true; message = "Önce Gemini API anahtarınızı girip kaydedin." } | ConvertTo-Json -Compress)
+        }
+    }
+
+    $reqData = $RawJson | ConvertFrom-Json
+    $rawId = if ($reqData.id) { ([string]$reqData.id).Trim() } else { "article-$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())" }
+    $safeId = [regex]::Replace($rawId.ToLowerInvariant(), '[^a-z0-9_-]+', '-').Trim('-')
+    if ([string]::IsNullOrWhiteSpace($safeId)) { $safeId = "article-audio" }
+
+    $level = if ($reqData.level) { ([string]$reqData.level).Trim().ToUpperInvariant() } else { "B1" }
+    $voiceName = if ($reqData.voiceName) { ([string]$reqData.voiceName).Trim() } else { "Kore" }
+    $content = if ($reqData.content) { ([string]$reqData.content).Replace("`r`n", "`n").Trim() } else { "" }
+
+    if ([string]::IsNullOrWhiteSpace($content)) {
+        return @{
+            StatusCode = 400
+            Body       = (@{ ok = $false; message = "Ses üretmek için önce makale içeriği yazın veya oluşturun." } | ConvertTo-Json -Compress)
+        }
+    }
+
+    $styleHint = if ($level -in @("A1", "A2")) {
+        "Read the following English learning article aloud in a warm, friendly, clear, unhurried podcast host voice suited for beginner learners. Pause briefly between sentences and slightly longer between paragraphs. Read ONLY the article text below, without adding any intro or outro:"
+    } else {
+        "Read the following English article aloud in a warm, natural, engaging human podcast narrator voice with clear articulation, natural rhythm, brief pauses between sentences, and slightly longer pauses between paragraphs. Read ONLY the article text below, without adding any intro or outro:"
+    }
+
+    $requestObj = @{
+        contents = @(
+            @{
+                role  = "user"
+                parts = @(
+                    @{ text = "$styleHint`n`n$content" }
+                )
+            }
+        )
+        generationConfig = @{
+            responseModalities = @("AUDIO")
+            speechConfig       = @{
+                voiceConfig = @{
+                    prebuiltVoiceConfig = @{
+                        voiceName = $voiceName
+                    }
+                }
+            }
+        }
+    }
+    $requestBody = $requestObj | ConvertTo-Json -Depth 10 -Compress
+
+    $ttsModels = @("gemini-2.5-flash-preview-tts", "gemini-2.5-pro-preview-tts")
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
+
+    $lastErrorMsg = "Gemini podcast sesi üretemedi."
+    $lastStatus = 502
+
+    foreach ($modelName in $ttsModels) {
+        Write-Host "[Podcast AI] Ses uretiliyor: $modelName ($voiceName) -> $safeId ..." -ForegroundColor Cyan
+        $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=$([System.Uri]::EscapeDataString($cfg.geminiApiKey))"
+        $webReq = [System.Net.HttpWebRequest]::Create($endpoint)
+        $webReq.Method = "POST"
+        $webReq.Timeout = 120000
+        $webReq.Accept = "application/json"
+        $webReq.ContentType = "application/json; charset=utf-8"
+
+        $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($requestBody)
+        $webReq.ContentLength = $bodyBytes.Length
+        $reqStream = $webReq.GetRequestStream()
+        try {
+            $reqStream.Write($bodyBytes, 0, $bodyBytes.Length)
+        }
+        finally {
+            $reqStream.Dispose()
+        }
+
+        try {
+            $webRes = $webReq.GetResponse()
+            $reader = New-Object System.IO.StreamReader($webRes.GetResponseStream(), [System.Text.Encoding]::UTF8)
+            try {
+                $resText = $reader.ReadToEnd()
+            }
+            finally {
+                $reader.Dispose()
+                $webRes.Close()
+            }
+
+            $parsedRes = $resText | ConvertFrom-Json
+            $base64Audio = ""
+            $mimeType = "audio/L16;codec=pcm;rate=24000"
+            if ($null -ne $parsedRes.candidates -and $parsedRes.candidates.Count -gt 0) {
+                $parts = $parsedRes.candidates[0].content.parts
+                foreach ($part in $parts) {
+                    if ($null -ne $part.PSObject.Properties["inlineData"] -and $null -ne $part.inlineData -and $part.inlineData.data) {
+                        $base64Audio = [string]$part.inlineData.data
+                        if ($part.inlineData.mimeType) { $mimeType = [string]$part.inlineData.mimeType }
+                        break
+                    }
+                }
+            }
+
+            if ([string]::IsNullOrWhiteSpace($base64Audio)) {
+                $lastErrorMsg = "Gemini ses verisi döndürmedi ($modelName)."
+                continue
+            }
+
+            $rawAudioBytes = [Convert]::FromBase64String($base64Audio)
+            $sampleRate = 24000
+            if ($mimeType -match 'rate=(\d+)') {
+                $sampleRate = [int]$Matches[1]
+            }
+
+            $isAlreadyWav = ($rawAudioBytes.Length -ge 12 -and $rawAudioBytes[0] -eq 82 -and $rawAudioBytes[1] -eq 73 -and $rawAudioBytes[2] -eq 70 -and $rawAudioBytes[3] -eq 70)
+            $pcmBytes = if ($isAlreadyWav -and $rawAudioBytes.Length -gt 44) {
+                $slice = New-Object byte[] ($rawAudioBytes.Length - 44)
+                [Array]::Copy($rawAudioBytes, 44, $slice, 0, $slice.Length)
+                $slice
+            } else {
+                $rawAudioBytes
+            }
+            $wavBytes = if ($isAlreadyWav) { $rawAudioBytes } else { Convert-PcmToWavBytes -PcmBytes $pcmBytes -SampleRate $sampleRate }
+
+            $m4aBytes = Convert-WavBytesToM4aBytes -WavBytes $wavBytes
+            $segments = Compute-AudioSentenceSegments -Content $content -PcmBytes $pcmBytes -SampleRate $sampleRate
+            $durationMs = [int][math]::Round((($pcmBytes.Length / 2.0) * 1000.0) / $sampleRate)
+
+            if (-not (Test-Path $ContentAudioDir)) { New-Item -ItemType Directory -Path $ContentAudioDir -Force | Out-Null }
+            if (-not (Test-Path $RootAudioDir)) { New-Item -ItemType Directory -Path $RootAudioDir -Force | Out-Null }
+
+            $fileName = "$safeId.m4a"
+            $contentAudioFile = Join-Path $ContentAudioDir $fileName
+            $rootAudioFile = Join-Path $RootAudioDir $fileName
+            [System.IO.File]::WriteAllBytes($contentAudioFile, $m4aBytes)
+            [System.IO.File]::WriteAllBytes($rootAudioFile, $m4aBytes)
+
+            $sizeKb = [math]::Round($m4aBytes.Length / 1024.0, 1)
+            Write-Host "[Podcast AI] Hazir: $fileName ($sizeKb KB, $([math]::Round($durationMs/1000.0, 1)) sn, $($segments.Count) cumle)" -ForegroundColor Green
+
+            $payload = @{
+                ok                = $true
+                model             = $modelName
+                voice             = $voiceName
+                file_name         = $fileName
+                audio_url         = "https://line-reader.pages.dev/audio/$fileName"
+                local_preview_url = "/audio/$fileName"
+                duration_ms       = $durationMs
+                size_kb           = $sizeKb
+                audio_segments    = $segments
+            }
+            return @{
+                StatusCode = 200
+                Body       = ($payload | ConvertTo-Json -Depth 8 -Compress)
+            }
+        }
+        catch [System.Net.WebException] {
+            $errRes = $_.Exception.Response
+            if ($null -ne $errRes) {
+                $code = [int]$errRes.StatusCode
+                $lastStatus = $code
+                $reader = New-Object System.IO.StreamReader($errRes.GetResponseStream(), [System.Text.Encoding]::UTF8)
+                try { $errBody = $reader.ReadToEnd() } finally { $reader.Dispose(); $errRes.Close() }
+                try {
+                    $errJson = $errBody | ConvertFrom-Json
+                    $lastErrorMsg = if ($errJson.error -and $errJson.error.message) {
+                        "Gemini TTS hatası ($modelName / HTTP $code): $($errJson.error.message)"
+                    } else {
+                        "Gemini TTS hatası ($modelName / HTTP $code)."
+                    }
+                } catch {
+                    $lastErrorMsg = "Gemini TTS hatası ($modelName / HTTP $code)."
+                }
+                Write-Host "[Podcast AI] $modelName -> HTTP $code" -ForegroundColor Yellow
+                if ($code -eq 400 -or $code -eq 401 -or $code -eq 403) { break }
+            } else {
+                $lastStatus = 502
+                $lastErrorMsg = "Gemini TTS sunucusuna bağlanılamadı: $($_.Exception.Message)"
+                break
+            }
+        }
+        catch {
+            $lastStatus = 500
+            $lastErrorMsg = "Podcast sesi oluşturulamadı: $($_.Exception.Message)"
+        }
     }
 
     return @{
@@ -750,6 +1207,30 @@ try {
                 $body = Read-RequestBody $req
                 $genRes = Invoke-GeminiGenerateArticle $body
                 Send-Response -Response $res -StatusCode $genRes.StatusCode -Body $genRes.Body -ContentType "application/json; charset=utf-8"
+            }
+            elseif ($method -eq "POST" -and $path -eq "/api/ai/generate-audio") {
+                $body = Read-RequestBody $req
+                $audioRes = Invoke-GeminiGenerateAudio $body
+                Send-Response -Response $res -StatusCode $audioRes.StatusCode -Body $audioRes.Body -ContentType "application/json; charset=utf-8"
+            }
+            elseif ($method -eq "GET" -and $path.StartsWith("/audio/")) {
+                $rawName = [System.IO.Path]::GetFileName($req.Url.AbsolutePath)
+                $safeName = [regex]::Replace($rawName, '[^a-zA-Z0-9._-]', '')
+                $targetPath = Join-Path $ContentAudioDir $safeName
+                if (-not (Test-Path $targetPath)) {
+                    $targetPath = Join-Path $RootAudioDir $safeName
+                }
+                if (-not [string]::IsNullOrWhiteSpace($safeName) -and (Test-Path $targetPath)) {
+                    $bytes = [System.IO.File]::ReadAllBytes($targetPath)
+                    $res.StatusCode = 200
+                    $res.ContentType = if ($safeName.EndsWith(".mp3")) { "audio/mpeg" } else { "audio/mp4" }
+                    $res.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+                    $res.ContentLength64 = $bytes.Length
+                    $res.OutputStream.Write($bytes, 0, $bytes.Length)
+                    $res.OutputStream.Close()
+                } else {
+                    Send-JsonObject -Response $res -StatusCode 404 -Payload @{ ok = $false; error = "Ses dosyası bulunamadı." }
+                }
             }
             elseif ($method -eq "POST" -and $path -eq "/api/shutdown") {
                 Send-JsonObject -Response $res -StatusCode 200 -Payload @{

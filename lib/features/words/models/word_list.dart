@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 
+/// Yeni kelime listesi oluşturup oluşan listeyi (veya doğrulama/hata mesajını)
+/// döndüren geri çağırma imzası.
+typedef CreateWordListCallback = Future<({WordList? list, String? error})>
+    Function(String name, int colorValue);
+
 /// Özel kelime listeleri için hazır renk paleti.
 abstract final class WordListColors {
   static const List<int> palette = <int>[

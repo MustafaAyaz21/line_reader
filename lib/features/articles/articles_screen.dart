@@ -34,6 +34,7 @@ class ArticlesScreen extends StatefulWidget {
     this.authController,
     this.onAddWord,
     this.loadWordLists,
+    this.onCreateWordList,
   });
 
   final ArticlesController? controller;
@@ -43,6 +44,7 @@ class ArticlesScreen extends StatefulWidget {
   final AuthController? authController;
   final AddWordCallback? onAddWord;
   final Future<List<WordList>> Function()? loadWordLists;
+  final CreateWordListCallback? onCreateWordList;
 
   @override
   State<ArticlesScreen> createState() => _ArticlesScreenState();
@@ -118,6 +120,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
           authController: widget.authController,
           onAddWord: widget.onAddWord,
           loadWordLists: widget.loadWordLists,
+          onCreateWordList: widget.onCreateWordList,
         ),
       ),
     );

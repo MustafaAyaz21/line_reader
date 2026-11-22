@@ -4,6 +4,7 @@ import '../../core/config/api_config.dart';
 import '../../core/database/app_database.dart';
 import '../../core/localization/app_locale.dart';
 import '../../core/localization/app_strings.dart';
+import '../../core/platform/process_text_channel.dart';
 import '../../core/settings/api_key_controller.dart';
 import '../../core/settings/settings_repository.dart';
 import '../../core/tts/tts_service.dart';
@@ -58,15 +59,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   AuthController? _authController;
   AppLocaleController? _fallbackLocaleController;
   BrowserBackController? _browserBackController;
+  WordsSearchTriggerController? _wordsSearchTriggerController;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _ensureInitialized();
+    ProcessTextChannel.ensureInitialized();
+    ProcessTextChannel.pendingTextNotifier
+        .addListener(_handleExternalProcessTextReady);
+    _authController?.addListener(_handleExternalProcessTextReady);
+    _updateController?.addListener(_handleExternalProcessTextReady);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkForAppUpdateSilently(force: true);
       _refreshArticlesSilently(force: true);
+      _handleExternalProcessTextReady();
     });
   }
 
@@ -166,6 +174,34 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _articlesController = controller;
     }
     _browserBackController ??= BrowserBackController();
+    _wordsSearchTriggerController ??= WordsSearchTriggerController();
+  }
+
+  void _handleExternalProcessTextReady() {
+    if (!mounted) return;
+    if (!ProcessTextChannel.hasPendingText) return;
+
+    _ensureInitialized();
+    final auth = _authController!;
+    final update = _updateController!;
+    // Zorunlu güncelleme, kimlik yüklemesi veya ilk açılış onboarding ekranı
+    // açıkken bekleyen metni sakla; kullanıcı içeri girdiğinde hemen çalıştır.
+    if (update.requiresMandatoryUpdate ||
+        auth.isLoading ||
+        auth.needsOnboarding) {
+      return;
+    }
+
+    final query = ProcessTextChannel.consumePendingText();
+    if (query == null || query.isEmpty) return;
+
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    setState(() {
+      _selectedIndex = _wordsTabIndex;
+      _isBrowserOpen = false;
+    });
+    _wordsController!.loadLists();
+    _wordsSearchTriggerController!.triggerSearch(query);
   }
 
   Future<void> _checkForAppUpdateSilently({bool force = false}) async {
@@ -189,6 +225,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    ProcessTextChannel.pendingTextNotifier
+        .removeListener(_handleExternalProcessTextReady);
+    _authController?.removeListener(_handleExternalProcessTextReady);
+    _updateController?.removeListener(_handleExternalProcessTextReady);
     _wordsController?.dispose();
     _apiKeyController?.dispose();
     _browserTranslationService?.dispose();
@@ -198,6 +238,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _articlesController?.dispose();
     _authController?.dispose();
     _fallbackLocaleController?.dispose();
+    _wordsSearchTriggerController?.dispose();
     super.dispose();
   }
 
@@ -219,6 +260,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<List<WordList>> _handleLoadWordLists() {
     _ensureInitialized();
     return _wordsController!.loadLists();
+  }
+
+  Future<({WordList? list, String? error})> _handleCreateWordList(
+    String name,
+    int colorValue,
+  ) {
+    _ensureInitialized();
+    return _wordsController!.createListWithResult(
+      name: name,
+      colorValue: colorValue,
+    );
   }
 
   Future<void> _handleClearTranslationCache() async {
@@ -349,6 +401,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ttsService: _ttsService,
                   onAddWord: _handleAddWord,
                   loadWordLists: _handleLoadWordLists,
+                  onCreateWordList: _handleCreateWordList,
                   onClearCache: _handleClearTranslationCache,
                 ),
                 if ((_hasOpenedBrowser ?? false) || _isBrowserOpen)
@@ -356,6 +409,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     key: const ValueKey<String>('browser_screen'),
                     onAddWord: _handleAddWord,
                     loadWordLists: _handleLoadWordLists,
+                    onCreateWordList: _handleCreateWordList,
                     translationService: _browserTranslationService!,
                     ttsService: _ttsService,
                     authController: authController,
@@ -373,6 +427,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   updateController: _updateController!,
                   ttsService: _ttsService,
                   onClearCache: _handleClearTranslationCache,
+                  searchTriggerController: _wordsSearchTriggerController,
                 ),
               ],
             ),

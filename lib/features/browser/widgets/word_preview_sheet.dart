@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/database/app_database.dart';
 import '../../../core/localization/app_strings.dart';
 import '../../../core/tts/tts_service.dart';
 import '../../auth/controllers/auth_controller.dart';
 import '../../auth/screens/auth_screen.dart';
 import '../../translation/models/word_meaning.dart';
 import '../../translation/services/word_translation_service.dart';
+import '../../words/data/word_repository.dart';
 import '../../words/models/saved_word.dart';
 import '../../words/models/word_list.dart';
+import '../../words/widgets/word_list_editor_dialog.dart';
 
 /// Seçilen kelimeyi, sesli dinleme (kelime ve bağlam cümlesi) kontrollerini,
 /// 1. sırada bağlamdaki anlam (`(cümledeki anlam)` etiketli) ve 2–4. sıralarda
@@ -20,6 +23,7 @@ class WordPreviewSheet extends StatefulWidget {
     required this.translationService,
     this.wordLists = const <WordList>[],
     this.loadWordLists,
+    this.onCreateWordList,
     required this.onAddWord,
     this.contextSentence,
     this.ttsService,
@@ -31,6 +35,7 @@ class WordPreviewSheet extends StatefulWidget {
   final WordTranslationService translationService;
   final List<WordList> wordLists;
   final Future<List<WordList>> Function()? loadWordLists;
+  final CreateWordListCallback? onCreateWordList;
   final TtsService? ttsService;
   final AuthController? authController;
   final void Function(
@@ -47,6 +52,7 @@ class WordPreviewSheet extends StatefulWidget {
     required WordTranslationService translationService,
     List<WordList> wordLists = const <WordList>[],
     Future<List<WordList>> Function()? loadWordLists,
+    CreateWordListCallback? onCreateWordList,
     required void Function(
       String word,
       String meaning,
@@ -71,6 +77,7 @@ class WordPreviewSheet extends StatefulWidget {
           translationService: translationService,
           wordLists: wordLists,
           loadWordLists: loadWordLists,
+          onCreateWordList: onCreateWordList,
           ttsService: ttsService,
           authController: authController,
           onAddWord: (
@@ -325,6 +332,93 @@ class _WordPreviewSheetState extends State<WordPreviewSheet> {
     );
   }
 
+  Future<({WordList? list, String? error})> _createListFallback(
+    String name,
+    int colorValue,
+  ) async {
+    try {
+      final created = await WordRepository(AppDatabase.instance).createList(
+        name: name,
+        colorValue: colorValue,
+      );
+      return (list: created, error: null);
+    } on FormatException catch (error) {
+      return (list: null, error: error.message);
+    } catch (_) {
+      return (
+        list: null,
+        error: context.l10n.t(
+          'Liste oluşturulurken bir sorun oluştu.',
+          'Could not create the word list.',
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleCreateNewList() async {
+    WordList? createdList;
+    final created = await WordListEditorDialog.show(
+      context,
+      onSubmit: (name, colorValue) async {
+        final callback = widget.onCreateWordList;
+        final result = callback != null
+            ? await callback(name, colorValue)
+            : await _createListFallback(name, colorValue);
+        if (result.error != null) {
+          return result.error;
+        }
+        createdList = result.list;
+        return null;
+      },
+    );
+
+    if (created != true || !mounted) return;
+
+    List<WordList> updatedLists = List<WordList>.from(_wordLists);
+    final loader = widget.loadWordLists;
+    if (loader != null) {
+      try {
+        final reloaded = await loader();
+        if (reloaded.isNotEmpty) {
+          updatedLists = List<WordList>.from(reloaded);
+        }
+      } catch (_) {}
+    }
+
+    final newlyCreated = createdList;
+    if (newlyCreated != null &&
+        !updatedLists.any((item) => item.id == newlyCreated.id)) {
+      updatedLists.add(newlyCreated);
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _wordLists = updatedLists;
+      if (newlyCreated != null) {
+        _selectedListId = newlyCreated.id;
+      } else if (_wordLists.isNotEmpty) {
+        _selectedListId = _wordLists.last.id;
+      }
+    });
+
+    if (newlyCreated != null) {
+      ScaffoldMessenger.maybeOf(context)
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              context.l10n.t(
+                '"${newlyCreated.name}" listesi oluşturuldu ve seçildi.',
+                '"${newlyCreated.name}" list created and selected.',
+              ),
+            ),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+    }
+  }
+
   void _handleAddPressed() {
     _resolveTtsService().stop();
     final meaningToSave =
@@ -416,10 +510,8 @@ class _WordPreviewSheetState extends State<WordPreviewSheet> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (_wordLists.isNotEmpty) ...[
-                        _buildListSelector(theme),
-                        const SizedBox(height: 10),
-                      ],
+                      _buildListSelectorRow(theme),
+                      const SizedBox(height: 10),
                       FilledButton.icon(
                         onPressed: _isLoading ? null : _handleAddPressed,
                         icon: const Icon(Icons.bookmark_add_outlined, size: 20),
@@ -601,9 +693,55 @@ class _WordPreviewSheetState extends State<WordPreviewSheet> {
     );
   }
 
+  Widget _buildListSelectorRow(ThemeData theme) {
+    final s = context.l10n;
+    if (_wordLists.isEmpty) {
+      return OutlinedButton.icon(
+        key: const ValueKey<String>('sheet_create_word_list_button'),
+        onPressed: _handleCreateNewList,
+        icon: const Icon(Icons.create_new_folder_outlined, size: 18),
+        label: Text(
+          s.t('Yeni Kelime Listesi Oluştur', 'Create New Word List'),
+        ),
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(child: _buildListSelector(theme)),
+        const SizedBox(width: 8),
+        OutlinedButton.icon(
+          key: const ValueKey<String>('sheet_create_word_list_button'),
+          onPressed: _handleCreateNewList,
+          icon: const Icon(Icons.add_rounded, size: 18),
+          label: Text(s.t('Yeni Liste', 'New List')),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildListSelector(ThemeData theme) {
+    final safeValue =
+        _wordLists.any((list) => list.id == _selectedListId)
+            ? _selectedListId
+            : (_wordLists.isNotEmpty ? _wordLists.first.id : null);
+
     return DropdownButtonFormField<int>(
-      value: _selectedListId,
+      key: const ValueKey<String>('sheet_word_list_dropdown'),
+      value: safeValue,
       isExpanded: true,
       decoration: InputDecoration(
         labelText: context.l10n.t('Liste Seç', 'Select List'),

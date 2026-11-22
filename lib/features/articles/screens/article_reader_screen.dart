@@ -18,12 +18,16 @@ import '../../translation/services/word_translation_service.dart';
 import '../../words/data/word_repository.dart';
 import '../../words/models/saved_word.dart';
 import '../../words/models/word_list.dart';
+import '../controllers/article_audio_controller.dart';
 import '../data/article_reader_repository.dart';
 import '../models/article.dart';
 import '../models/article_level.dart';
 import '../models/article_reader_models.dart';
+import '../services/article_passage_translation_service.dart';
 import '../services/article_word_translation_service.dart';
 import '../utils/article_text_parser.dart';
+import '../widgets/article_audio_player_bar.dart';
+import '../widgets/article_passage_translation_sheet.dart';
 
 /// WebView kullanmadan kitap / PDF belgesi temizliğinde yerel okuma deneyimi
 /// sunan ekran.
@@ -42,19 +46,25 @@ class ArticleReaderScreen extends StatefulWidget {
     required this.article,
     this.readerStore,
     this.translationService,
+    this.passageTranslator,
     this.ttsService,
+    this.audioController,
     this.authController,
     this.onAddWord,
     this.loadWordLists,
+    this.onCreateWordList,
   });
 
   final Article article;
   final ArticleReaderStore? readerStore;
   final WordTranslationService? translationService;
+  final ArticlePassageTranslator? passageTranslator;
   final TtsService? ttsService;
+  final ArticleAudioController? audioController;
   final AuthController? authController;
   final AddWordCallback? onAddWord;
   final Future<List<WordList>> Function()? loadWordLists;
+  final CreateWordListCallback? onCreateWordList;
 
   @override
   State<ArticleReaderScreen> createState() => _ArticleReaderScreenState();
@@ -65,17 +75,42 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
   late final WordTranslationService _baseTranslationService;
   late final WordTranslationService _translationService;
   late final bool _ownsTranslationService;
+  late final ArticlePassageTranslator _passageTranslator;
+  late final bool _ownsPassageTranslator;
   late final List<String> _paragraphs;
+  late final List<GlobalKey> _paragraphKeys;
+  late final ArticleAudioController _audioController;
+  late final bool _ownsAudioController;
 
+  int? _lastAutoScrolledParagraph;
   ArticleReaderPreferences _preferences = ArticleReaderPreferences.defaults;
   List<ArticleUnderline> _underlines = const <ArticleUnderline>[];
   bool _isUnderlineMode = false;
   bool _isWordSheetOpen = false;
 
-  // Paragraf bazlı aktif metin seçimi (çok kelimelik alt çizgi / anlam sorgusu)
+  // Uygulama içi özel metin seçimi (sistem Kopyala/Tümünü Seç kullanılmaz;
+  // yalnızca kullanıcının basılı tutup seçtiği kelime veya kısa aralık tutulur).
   int? _selectedParagraphIndex;
-  String _selectedPlainText = '';
-  int _selectionRevision = 0;
+  int? _selectedStartOffset;
+  int? _selectedEndOffset;
+
+  String get _selectedPlainText {
+    final pIdx = _selectedParagraphIndex;
+    final start = _selectedStartOffset;
+    final end = _selectedEndOffset;
+    if (pIdx == null ||
+        start == null ||
+        end == null ||
+        pIdx < 0 ||
+        pIdx >= _paragraphs.length) {
+      return '';
+    }
+    final paragraph = _paragraphs[pIdx];
+    final safeStart = start.clamp(0, paragraph.length);
+    final safeEnd = end.clamp(safeStart, paragraph.length);
+    if (safeEnd <= safeStart) return '';
+    return paragraph.substring(safeStart, safeEnd).trim();
+  }
 
   @override
   void initState() {
@@ -93,19 +128,64 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
       article: widget.article,
       fallbackService: _baseTranslationService,
     );
+    _ownsPassageTranslator = widget.passageTranslator == null;
+    _passageTranslator =
+        widget.passageTranslator ?? ArticlePassageTranslationService();
 
     final effectiveBody = widget.article.content.trim().isNotEmpty
         ? widget.article.content
         : widget.article.description;
     _paragraphs = ArticleTextParser.splitParagraphs(effectiveBody);
+    _paragraphKeys = List<GlobalKey>.generate(
+      _paragraphs.length,
+      (_) => GlobalKey(),
+      growable: false,
+    );
+    _ownsAudioController = widget.audioController == null;
+    _audioController = widget.audioController ??
+        ArticleAudioController(
+          article: widget.article,
+          paragraphs: _paragraphs,
+        );
+    _audioController.addListener(_handleAudioStateChanged);
 
     _loadInitialReaderData();
   }
 
+  void _handleAudioStateChanged() {
+    if (!mounted) return;
+    if (_audioController.isVisible && _audioController.isPlaying) {
+      final targetParagraph = _audioController.currentParagraphIndex;
+      if (targetParagraph != _lastAutoScrolledParagraph &&
+          targetParagraph >= 0 &&
+          targetParagraph < _paragraphKeys.length) {
+        _lastAutoScrolledParagraph = targetParagraph;
+        final ctx = _paragraphKeys[targetParagraph].currentContext;
+        if (ctx != null) {
+          Scrollable.ensureVisible(
+            ctx,
+            duration: const Duration(milliseconds: 360),
+            curve: Curves.easeOutCubic,
+            alignment: 0.25,
+          );
+        }
+      }
+    } else if (!_audioController.isVisible) {
+      _lastAutoScrolledParagraph = null;
+    }
+  }
+
   @override
   void dispose() {
+    _audioController.removeListener(_handleAudioStateChanged);
+    if (_ownsAudioController) {
+      _audioController.dispose();
+    }
     if (_ownsTranslationService) {
       _baseTranslationService.dispose();
+    }
+    if (_ownsPassageTranslator) {
+      _passageTranslator.dispose();
     }
     super.dispose();
   }
@@ -153,17 +233,21 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
     setState(() {
       _isUnderlineMode = !_isUnderlineMode;
       _selectedParagraphIndex = null;
-      _selectedPlainText = '';
-      _selectionRevision++;
+      _selectedStartOffset = null;
+      _selectedEndOffset = null;
     });
   }
 
   void _clearActiveSelection() {
-    if (_selectedPlainText.isEmpty && _selectedParagraphIndex == null) return;
+    if (_selectedParagraphIndex == null &&
+        _selectedStartOffset == null &&
+        _selectedEndOffset == null) {
+      return;
+    }
     setState(() {
       _selectedParagraphIndex = null;
-      _selectedPlainText = '';
-      _selectionRevision++;
+      _selectedStartOffset = null;
+      _selectedEndOffset = null;
     });
   }
 
@@ -178,19 +262,31 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
     required ArticleRenderSegment segment,
   }) async {
     if (_isUnderlineMode) {
-      // Çizili bir alana tekrar dokunulduysa o çizgiyi kaldır.
+      // Altı çizili bir kelimenin üzerine tek sefer tıklandığında yalnızca
+      // o kelimenin alt çizgisini kaldır; çok kelimelik çizginin diğer
+      // kelimeleri bozulmadan kalsın.
       final existingUnderline = segment.underline;
       if (existingUnderline != null) {
-        final next = _underlines
-            .where((item) => !(item.paragraphIndex == existingUnderline.paragraphIndex &&
-                item.startOffset == existingUnderline.startOffset &&
-                item.endOffset == existingUnderline.endOffset))
-            .toList(growable: false);
+        final paragraph = _paragraphs[paragraphIndex];
+        final next = segment.isWord
+            ? ArticleTextParser.removeWordRangeFromUnderlines(
+                existing: _underlines,
+                paragraphIndex: paragraphIndex,
+                wordStart: segment.start,
+                wordEnd: segment.end,
+                paragraphText: paragraph,
+              )
+            : _underlines
+                .where((item) =>
+                    !(item.paragraphIndex == existingUnderline.paragraphIndex &&
+                        item.startOffset == existingUnderline.startOffset &&
+                        item.endOffset == existingUnderline.endOffset))
+                .toList(growable: false);
         await _persistUnderlines(next);
         return;
       }
 
-      // Çizili olmayan bir kelimeye dokunulduysa altını çiz ve kaydet.
+      // Çizili olmayan bir kelimeye tek tıkla altını çiz ve kaydet.
       if (!segment.isWord) return;
       final paragraph = _paragraphs[paragraphIndex];
       final next = ArticleTextParser.addAndMergeUnderline(
@@ -208,7 +304,8 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
       return;
     }
 
-    // Kalem kapalıyken kelimeye dokununca anlam önizleme akışını aç.
+    // Kalem kapalıyken kelimeye tek dokunuşta seçimi temizleyip anlamı aç.
+    _clearActiveSelection();
     if (!segment.isWord) return;
     final cleanedWord = WordSanitizer.clean(segment.text);
     if (cleanedWord == null) return;
@@ -224,13 +321,62 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
     );
   }
 
+  /// "Altını Çiz" modu açıkken kelimeye basılı tutup sürüklenerek geçilen
+  /// kelime aralığını tek seferde kaydeder.
+  Future<void> _handleDragMarkCommitted({
+    required int paragraphIndex,
+    required int startOffset,
+    required int endOffset,
+  }) async {
+    if (paragraphIndex < 0 || paragraphIndex >= _paragraphs.length) return;
+    if (endOffset <= startOffset) return;
+
+    final paragraph = _paragraphs[paragraphIndex];
+    final next = ArticleTextParser.addAndMergeUnderline(
+      existing: _underlines,
+      incoming: ArticleUnderline(
+        articleId: widget.article.id,
+        paragraphIndex: paragraphIndex,
+        startOffset: startOffset,
+        endOffset: endOffset,
+        createdAt: DateTime.now(),
+      ),
+      paragraphText: paragraph,
+    );
+    await _persistUnderlines(next);
+  }
+
+  /// "Altını Çiz" modu kapalıyken basılı tutma/sürükleme ile seçilen yalnızca
+  /// ilgili kelime veya kısa ifade aralığını uygulama içi seçim çubuğuna bağlar
+  /// (tüm cümle otomatik seçilmez ve sistem Kopyala/Tümünü Seç menüsü açılmaz).
+  void _handleNormalSelectionCommitted({
+    required int paragraphIndex,
+    required int startOffset,
+    required int endOffset,
+  }) {
+    if (paragraphIndex < 0 || paragraphIndex >= _paragraphs.length) return;
+    if (endOffset <= startOffset) {
+      _clearActiveSelection();
+      return;
+    }
+    setState(() {
+      _selectedParagraphIndex = paragraphIndex;
+      _selectedStartOffset = startOffset;
+      _selectedEndOffset = endOffset;
+    });
+  }
+
   Future<void> _underlineSelection({
     required int paragraphIndex,
     required String selectedText,
   }) async {
     if (paragraphIndex < 0 || paragraphIndex >= _paragraphs.length) return;
     final paragraph = _paragraphs[paragraphIndex];
-    final range = ArticleTextParser.findSelectionRange(paragraph, selectedText);
+    final start = _selectedStartOffset;
+    final end = _selectedEndOffset;
+    final range = (start != null && end != null && end > start)
+        ? (start: start, end: end)
+        : ArticleTextParser.findSelectionRange(paragraph, selectedText);
     if (range == null) return;
 
     final next = ArticleTextParser.addAndMergeUnderline(
@@ -254,13 +400,20 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
   }) async {
     if (paragraphIndex < 0 || paragraphIndex >= _paragraphs.length) return;
     final paragraph = _paragraphs[paragraphIndex];
-    final range = ArticleTextParser.findSelectionRange(paragraph, selectedText);
+    final start = _selectedStartOffset;
+    final end = _selectedEndOffset;
+    final range = (start != null && end != null && end > start)
+        ? (start: start, end: end)
+        : ArticleTextParser.findSelectionRange(paragraph, selectedText);
     if (range == null) return;
 
-    final next = _underlines
-        .where((item) => !(item.paragraphIndex == paragraphIndex &&
-            item.overlaps(range.start, range.end)))
-        .toList(growable: false);
+    final next = ArticleTextParser.removeWordRangeFromUnderlines(
+      existing: _underlines,
+      paragraphIndex: paragraphIndex,
+      wordStart: range.start,
+      wordEnd: range.end,
+      paragraphText: paragraph,
+    );
     _clearActiveSelection();
     await _persistUnderlines(next);
   }
@@ -268,7 +421,11 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
   bool _selectionHasUnderline(int paragraphIndex, String selectedText) {
     if (paragraphIndex < 0 || paragraphIndex >= _paragraphs.length) return false;
     final paragraph = _paragraphs[paragraphIndex];
-    final range = ArticleTextParser.findSelectionRange(paragraph, selectedText);
+    final start = _selectedStartOffset;
+    final end = _selectedEndOffset;
+    final range = (start != null && end != null && end > start)
+        ? (start: start, end: end)
+        : ArticleTextParser.findSelectionRange(paragraph, selectedText);
     if (range == null) return false;
     return _underlines.any(
       (item) =>
@@ -277,32 +434,72 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
     );
   }
 
+  bool _isPassageOrSentenceSelection(String rawText) {
+    final trimmed = rawText.trim();
+    if (trimmed.isEmpty) return false;
+    final words = trimmed
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty)
+        .toList(growable: false);
+    if (words.length >= 4) return true;
+    if (RegExp(r'[.!?]').hasMatch(trimmed)) return true;
+    if (WordSanitizer.clean(trimmed) == null) return true;
+    if (widget.article.findSentenceTranslation(trimmed) != null) return true;
+    return false;
+  }
+
   Future<void> _lookupSelectedText({
     required int paragraphIndex,
     required String selectedText,
   }) async {
-    final cleaned = WordSanitizer.clean(selectedText);
+    final trimmed = selectedText.trim();
+    if (trimmed.isEmpty) return;
+
+    final fullParagraph =
+        (paragraphIndex >= 0 && paragraphIndex < _paragraphs.length)
+            ? _paragraphs[paragraphIndex]
+            : null;
+
+    // Seçim bir cümle, çok kelimeli ifade veya paragraf ise tek-kelime sınırına
+    // takılmadan doğrudan cümle/paragraf Türkçe çeviri panelini aç.
+    if (_isPassageOrSentenceSelection(trimmed)) {
+      final normSel = Article.normalizeTranslationKey(trimmed);
+      final normPara = fullParagraph != null
+          ? Article.normalizeTranslationKey(fullParagraph)
+          : '';
+      final isFullParagraph = normPara.isNotEmpty &&
+          normSel.length >= (normPara.length * 0.90).round();
+
+      _clearActiveSelection();
+      await _openPassageTranslationSheet(
+        selectedText: trimmed,
+        paragraphIndex: paragraphIndex,
+        fullParagraphText: fullParagraph,
+        isFullParagraph: isFullParagraph,
+      );
+      return;
+    }
+
+    final cleaned = WordSanitizer.clean(trimmed);
     if (cleaned == null) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text('Anlam görmek için bir kelime veya kısa ifade seçin.'),
-            behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 2),
-          ),
-        );
+      _clearActiveSelection();
+      await _openPassageTranslationSheet(
+        selectedText: trimmed,
+        paragraphIndex: paragraphIndex,
+        fullParagraphText: fullParagraph,
+        isFullParagraph: false,
+      );
       return;
     }
 
     String? contextSentence;
-    if (paragraphIndex >= 0 && paragraphIndex < _paragraphs.length) {
-      final paragraph = _paragraphs[paragraphIndex];
-      final range = ArticleTextParser.findSelectionRange(paragraph, selectedText);
+    if (fullParagraph != null) {
+      final anchorOffset = _selectedStartOffset ??
+          ArticleTextParser.findSelectionRange(fullParagraph, trimmed)?.start ??
+          0;
       contextSentence = ArticleTextParser.extractContextSentence(
-        paragraph,
-        range?.start ?? 0,
+        fullParagraph,
+        anchorOffset,
       );
     }
 
@@ -313,12 +510,67 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
     );
   }
 
+  Future<void> _translateWholeParagraph(int paragraphIndex) async {
+    if (paragraphIndex < 0 || paragraphIndex >= _paragraphs.length) return;
+    final fullParagraph = _paragraphs[paragraphIndex].trim();
+    if (fullParagraph.isEmpty) return;
+
+    _clearActiveSelection();
+    await _openPassageTranslationSheet(
+      selectedText: fullParagraph,
+      paragraphIndex: paragraphIndex,
+      fullParagraphText: fullParagraph,
+      isFullParagraph: true,
+    );
+  }
+
+  Future<void> _openPassageTranslationSheet({
+    required String selectedText,
+    required int paragraphIndex,
+    required String? fullParagraphText,
+    required bool isFullParagraph,
+  }) async {
+    if (_isWordSheetOpen || !mounted) return;
+    _isWordSheetOpen = true;
+
+    if (_audioController.isPlaying) {
+      await _audioController.pause();
+      if (!mounted) {
+        _isWordSheetOpen = false;
+        return;
+      }
+    }
+
+    try {
+      await ArticlePassageTranslationSheet.show(
+        context,
+        article: widget.article,
+        selectedText: selectedText,
+        translator: _passageTranslator,
+        isFullParagraph: isFullParagraph,
+        paragraphIndex: paragraphIndex,
+        fullParagraphText: fullParagraphText,
+        ttsService: widget.ttsService,
+      );
+    } finally {
+      _isWordSheetOpen = false;
+    }
+  }
+
   Future<void> _openWordMeaningSheet({
     required String word,
     String? contextSentence,
   }) async {
     if (_isWordSheetOpen || !mounted) return;
     _isWordSheetOpen = true;
+
+    if (_audioController.isPlaying) {
+      await _audioController.pause();
+      if (!mounted) {
+        _isWordSheetOpen = false;
+        return;
+      }
+    }
 
     try {
       final auth = widget.authController;
@@ -337,6 +589,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
         ttsService: widget.ttsService,
         authController: widget.authController,
         loadWordLists: widget.loadWordLists,
+        onCreateWordList: widget.onCreateWordList,
         onAddWord: _handleAddWord,
       );
     } finally {
@@ -396,12 +649,14 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
     showModalBottomSheet<void>(
       context: context,
       useSafeArea: true,
+      isScrollControlled: true,
       showDragHandle: true,
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (context, setModalState) {
             final theme = Theme.of(context);
             final colorScheme = theme.colorScheme;
+            final s = context.l10n;
             final currentPrefs = _preferences;
 
             Future<void> applyPrefs(ArticleReaderPreferences next) async {
@@ -411,21 +666,21 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
               }
             }
 
-            return Padding(
+            return SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
-                    context.l10n.readerAppearanceTitle,
+                    s.readerAppearanceTitle,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    context.l10n.backgroundToneLabel,
+                    s.backgroundToneLabel,
                     style: theme.textTheme.labelLarge?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
@@ -450,11 +705,11 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                       );
                     }).toList(growable: false),
                   ),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 20),
                   Row(
                     children: <Widget>[
                       Text(
-                        context.l10n.fontSizeLabel,
+                        s.fontSizeLabel,
                         style: theme.textTheme.labelLarge?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),
@@ -528,6 +783,156 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 20),
+                  // İşaretleme Stili: Altı Çizili / Fosforlu Kalem / Üstü Çizili
+                  Text(
+                    s.markStyleLabel,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: ArticleMarkStyle.values.map((styleOption) {
+                      final isSelected = currentPrefs.markStyle == styleOption;
+                      final accent = currentPrefs.effectiveMarkAccent;
+                      final icon = switch (styleOption) {
+                        ArticleMarkStyle.underline =>
+                          Icons.format_underlined_rounded,
+                        ArticleMarkStyle.highlight => Icons.highlight_rounded,
+                        ArticleMarkStyle.strikethrough =>
+                          Icons.format_strikethrough_rounded,
+                      };
+                      final label = switch (styleOption) {
+                        ArticleMarkStyle.underline => s.markStyleUnderline,
+                        ArticleMarkStyle.highlight => s.markStyleHighlight,
+                        ArticleMarkStyle.strikethrough =>
+                          s.markStyleStrikethrough,
+                      };
+                      return Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(
+                            right: styleOption == ArticleMarkStyle.values.last
+                                ? 0
+                                : 8,
+                          ),
+                          child: Material(
+                            color: isSelected
+                                ? accent.withAlpha(28)
+                                : colorScheme.surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(12),
+                            clipBehavior: Clip.antiAlias,
+                            child: InkWell(
+                              key: ValueKey<String>(
+                                'reader_mark_style_${styleOption.storageKey}',
+                              ),
+                              onTap: () => applyPrefs(
+                                currentPrefs.copyWith(markStyle: styleOption),
+                              ),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? accent
+                                        : colorScheme.outlineVariant,
+                                    width: isSelected ? 2 : 1,
+                                  ),
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: <Widget>[
+                                    Icon(
+                                      icon,
+                                      size: 20,
+                                      color: isSelected
+                                          ? accent
+                                          : colorScheme.onSurfaceVariant,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      label,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: isSelected
+                                            ? FontWeight.w700
+                                            : FontWeight.w500,
+                                        color: isSelected
+                                            ? accent
+                                            : colorScheme.onSurface,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(growable: false),
+                  ),
+                  const SizedBox(height: 20),
+                  // İşaretleme Rengi: 5 hazır renk seçeneği
+                  Text(
+                    s.markColorLabel,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: ArticleMarkColor.values.map((colorOption) {
+                      final isSelected = currentPrefs.markColor == colorOption;
+                      return GestureDetector(
+                        key: ValueKey<String>(
+                          'reader_mark_color_${colorOption.storageKey}',
+                        ),
+                        onTap: () => applyPrefs(
+                          currentPrefs.copyWith(markColor: colorOption),
+                        ),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 160),
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: colorOption.swatchColor,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: isSelected
+                                  ? colorScheme.onSurface
+                                  : Colors.transparent,
+                              width: 2.8,
+                            ),
+                            boxShadow: isSelected
+                                ? <BoxShadow>[
+                                    BoxShadow(
+                                      color: colorOption.swatchColor
+                                          .withAlpha(110),
+                                      blurRadius: 8,
+                                      spreadRadius: 1,
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          child: isSelected
+                              ? const Icon(
+                                  Icons.check_rounded,
+                                  color: Colors.white,
+                                  size: 20,
+                                )
+                              : null,
+                        ),
+                      );
+                    }).toList(growable: false),
+                  ),
                 ],
               ),
             );
@@ -550,53 +955,75 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: overlayStyle,
-      child: Scaffold(
-        backgroundColor: tone.backgroundColor,
-        appBar: AppBar(
-          backgroundColor: tone.backgroundColor,
-          foregroundColor: tone.textColor,
-          surfaceTintColor: Colors.transparent,
-          elevation: 0,
-          scrolledUnderElevation: 0.5,
-          titleSpacing: 4,
-          title: Row(
-            children: <Widget>[
-              if (parsedLevel != null) ...<Widget>[
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: parsedLevel.accentColor.withAlpha(32),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    parsedLevel.code,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: parsedLevel.accentColor,
+      child: ListenableBuilder(
+        listenable: _audioController,
+        builder: (context, _) {
+          final isAudioVisible = _audioController.isVisible;
+          final activeSentence = _audioController.activeSentence;
+
+          return Scaffold(
+            backgroundColor: tone.backgroundColor,
+            appBar: AppBar(
+              backgroundColor: tone.backgroundColor,
+              foregroundColor: tone.textColor,
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              scrolledUnderElevation: 0.5,
+              titleSpacing: 4,
+              title: Row(
+                children: <Widget>[
+                  if (parsedLevel != null) ...<Widget>[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: parsedLevel.accentColor.withAlpha(32),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        parsedLevel.code,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: parsedLevel.accentColor,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  Expanded(
+                    child: Text(
+                      widget.article.formattedReadingTime,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: tone.secondaryTextColor,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-              ],
-              Expanded(
-                child: Text(
-                  widget.article.formattedReadingTime,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: tone.secondaryTextColor,
-                  ),
-                ),
+                ],
               ),
-            ],
-          ),
-          actions: <Widget>[
-            // Altını çizme kalemi aç/kapa butonu
+              actions: <Widget>[
+                // Makaleyi sesli dinleme (Podcast AI / Cihaz Sesi) butonu
+                if (_audioController.hasPlayableContent)
+                  IconButton(
+                    key: const ValueKey<String>('reader_audio_listen_button'),
+                    tooltip: context.l10n.listenArticleTooltip,
+                    onPressed: _audioController.togglePlayerVisibility,
+                    icon: Icon(
+                      isAudioVisible
+                          ? Icons.graphic_eq_rounded
+                          : Icons.headphones_rounded,
+                      size: 22,
+                      color: isAudioVisible
+                          ? tone.underlineColor
+                          : tone.textColor,
+                    ),
+                  ),
+                // Altını çizme kalemi aç/kapa butonu
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Tooltip(
@@ -605,7 +1032,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                     : context.l10n.underlinePenTooltip,
                 child: Material(
                   color: _isUnderlineMode
-                      ? tone.underlineColor.withAlpha(38)
+                      ? _preferences.effectiveMarkAccent.withAlpha(38)
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                   child: InkWell(
@@ -621,7 +1048,8 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                         borderRadius: BorderRadius.circular(12),
                         border: _isUnderlineMode
                             ? Border.all(
-                                color: tone.underlineColor.withAlpha(170),
+                                color: _preferences.effectiveMarkAccent
+                                    .withAlpha(170),
                                 width: 1.2,
                               )
                             : null,
@@ -630,10 +1058,17 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
                           Icon(
-                            Icons.border_color_rounded,
+                            switch (_preferences.markStyle) {
+                              ArticleMarkStyle.underline =>
+                                Icons.border_color_rounded,
+                              ArticleMarkStyle.highlight =>
+                                Icons.highlight_rounded,
+                              ArticleMarkStyle.strikethrough =>
+                                Icons.format_strikethrough_rounded,
+                            },
                             size: 20,
                             color: _isUnderlineMode
-                                ? tone.underlineColor
+                                ? _preferences.effectiveMarkAccent
                                 : tone.textColor,
                           ),
                           if (_isUnderlineMode) ...<Widget>[
@@ -643,7 +1078,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
-                                color: tone.underlineColor,
+                                color: _preferences.effectiveMarkAccent,
                               ),
                             ),
                           ],
@@ -690,7 +1125,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                         Icon(
                           Icons.edit_rounded,
                           size: 15,
-                          color: tone.underlineColor,
+                          color: _preferences.effectiveMarkAccent,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -744,53 +1179,55 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                           )
                         else
                           for (var i = 0; i < _paragraphs.length; i++) ...<Widget>[
-                            _ReaderParagraphView(
-                              key: ValueKey<String>(
-                                'paragraph_${i}_$_selectionRevision',
-                              ),
-                              paragraphIndex: i,
-                              paragraphText: _paragraphs[i],
-                              underlines: _underlinesForParagraph(i),
-                              tone: tone,
-                              fontSize: _preferences.fontSize,
-                              isUnderlineMode: _isUnderlineMode,
-                              onSegmentTap: (segment) => _handleSegmentTap(
+                            KeyedSubtree(
+                              key: _paragraphKeys[i],
+                              child: _ReaderParagraphView(
+                                key: ValueKey<String>('paragraph_$i'),
                                 paragraphIndex: i,
-                                segment: segment,
+                                paragraphText: _paragraphs[i],
+                                underlines: _underlinesForParagraph(i),
+                                highlightStartOffset:
+                                    activeSentence != null &&
+                                            activeSentence.paragraphIndex == i
+                                        ? activeSentence.startOffset
+                                        : null,
+                                highlightEndOffset:
+                                    activeSentence != null &&
+                                            activeSentence.paragraphIndex == i
+                                        ? activeSentence.endOffset
+                                        : null,
+                                selectedStartOffset:
+                                    _selectedParagraphIndex == i
+                                        ? _selectedStartOffset
+                                        : null,
+                                selectedEndOffset: _selectedParagraphIndex == i
+                                    ? _selectedEndOffset
+                                    : null,
+                                tone: tone,
+                                fontSize: _preferences.fontSize,
+                                markStyle: _preferences.markStyle,
+                                markAccentColor:
+                                    _preferences.effectiveMarkAccent,
+                                markHighlightFillColor:
+                                    _preferences.effectiveHighlightFill,
+                                isUnderlineMode: _isUnderlineMode,
+                                onSegmentTap: (segment) => _handleSegmentTap(
+                                  paragraphIndex: i,
+                                  segment: segment,
+                                ),
+                                onDragMarkCommitted: (start, end) =>
+                                    _handleDragMarkCommitted(
+                                  paragraphIndex: i,
+                                  startOffset: start,
+                                  endOffset: end,
+                                ),
+                                onNormalSelectionCommitted: (start, end) =>
+                                    _handleNormalSelectionCommitted(
+                                  paragraphIndex: i,
+                                  startOffset: start,
+                                  endOffset: end,
+                                ),
                               ),
-                              onSelectionChanged: (selectedText) {
-                                final cleaned = selectedText.trim();
-                                if (cleaned.isEmpty) {
-                                  if (_selectedParagraphIndex == i) {
-                                    setState(() {
-                                      _selectedParagraphIndex = null;
-                                      _selectedPlainText = '';
-                                    });
-                                  }
-                                } else {
-                                  setState(() {
-                                    _selectedParagraphIndex = i;
-                                    _selectedPlainText = cleaned;
-                                  });
-                                }
-                              },
-                              onUnderlineSelection: (selectedText) =>
-                                  _underlineSelection(
-                                paragraphIndex: i,
-                                selectedText: selectedText,
-                              ),
-                              onRemoveSelectionUnderline: (selectedText) =>
-                                  _removeUnderlineInSelection(
-                                paragraphIndex: i,
-                                selectedText: selectedText,
-                              ),
-                              onLookupSelection: (selectedText) =>
-                                  _lookupSelectedText(
-                                paragraphIndex: i,
-                                selectedText: selectedText,
-                              ),
-                              hasUnderlineInSelection: (selectedText) =>
-                                  _selectionHasUnderline(i, selectedText),
                             ),
                             if (i < _paragraphs.length - 1)
                               SizedBox(height: _preferences.fontSize * 0.95),
@@ -812,6 +1249,8 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                     child: _SelectionFloatingBar(
                       tone: tone,
                       isUnderlineMode: _isUnderlineMode,
+                      isPassageSelection:
+                          _isPassageOrSentenceSelection(_selectedPlainText),
                       hasExistingUnderline: _selectionHasUnderline(
                         _selectedParagraphIndex!,
                         _selectedPlainText,
@@ -828,6 +1267,8 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                         paragraphIndex: _selectedParagraphIndex!,
                         selectedText: _selectedPlainText,
                       ),
+                      onTranslateParagraph: () =>
+                          _translateWholeParagraph(_selectedParagraphIndex!),
                       onDismiss: _clearActiveSelection,
                     ),
                   ),
@@ -835,6 +1276,14 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
               ),
           ],
         ),
+        bottomNavigationBar: isAudioVisible
+            ? ArticleAudioPlayerBar(
+                controller: _audioController,
+                tone: tone,
+              )
+            : null,
+      );
+        },
       ),
     );
   }
@@ -912,6 +1361,36 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                   ),
                 ],
               ),
+              if (article.hasPodcastAudio)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: tone.underlineColor.withAlpha(28),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Icon(
+                        Icons.podcasts_rounded,
+                        size: 13,
+                        color: tone.underlineColor,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        context.l10n.podcastAiLabel,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: tone.underlineColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 12),
@@ -993,46 +1472,69 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
   }
 }
 
-/// Tek bir paragrafı kitap tipografisiyle işler; her kelimeye dokunma
-/// (`TapGestureRecognizer`) ile çok kelimeli metin seçimini (`SelectionArea`)
-/// bellek sızıntısı olmadan birlikte yönetir.
+/// Tek bir paragrafı kitap tipografisiyle işler.
+///
+/// Sistem `SelectionArea` / `SelectableText` bileşenini bilerek kullanmaz;
+/// böylece Android/iOS'un "Kopyala", "Tümünü Seç", "Paylaş" menüleri asla
+/// açılmaz ve yalnızca Line Reader'a özel şu etkileşimler çalışır:
+/// - **Altını Çiz modu açıkken:** Kelimeye basılı tutup parmağı sürükledikçe
+///   geçilen tüm kelimeler canlı olarak çizilir/vurgulanır; çizili kelimeye tek
+///   tıklandığında yalnızca o kelimenin çizgisi kaldırılır.
+/// - **Altını Çiz modu kapalıyken:** Kelimeye tek dokunuşta anlam penceresi
+///   açılır; basılı tutup sürüklenince tüm cümle değil yalnızca parmağın
+///   geçtiği kelime/kısa ifade seçilir.
 class _ReaderParagraphView extends StatefulWidget {
   const _ReaderParagraphView({
     super.key,
     required this.paragraphIndex,
     required this.paragraphText,
     required this.underlines,
+    this.highlightStartOffset,
+    this.highlightEndOffset,
+    this.selectedStartOffset,
+    this.selectedEndOffset,
     required this.tone,
     required this.fontSize,
+    required this.markStyle,
+    required this.markAccentColor,
+    required this.markHighlightFillColor,
     required this.isUnderlineMode,
     required this.onSegmentTap,
-    required this.onSelectionChanged,
-    required this.onUnderlineSelection,
-    required this.onRemoveSelectionUnderline,
-    required this.onLookupSelection,
-    required this.hasUnderlineInSelection,
+    required this.onDragMarkCommitted,
+    required this.onNormalSelectionCommitted,
   });
 
   final int paragraphIndex;
   final String paragraphText;
   final List<ArticleUnderline> underlines;
+  final int? highlightStartOffset;
+  final int? highlightEndOffset;
+  final int? selectedStartOffset;
+  final int? selectedEndOffset;
   final ArticleReaderTone tone;
   final double fontSize;
+  final ArticleMarkStyle markStyle;
+  final Color markAccentColor;
+  final Color markHighlightFillColor;
   final bool isUnderlineMode;
   final void Function(ArticleRenderSegment segment) onSegmentTap;
-  final void Function(String selectedText) onSelectionChanged;
-  final void Function(String selectedText) onUnderlineSelection;
-  final void Function(String selectedText) onRemoveSelectionUnderline;
-  final void Function(String selectedText) onLookupSelection;
-  final bool Function(String selectedText) hasUnderlineInSelection;
+  final void Function(int startOffset, int endOffset) onDragMarkCommitted;
+  final void Function(int startOffset, int endOffset)
+      onNormalSelectionCommitted;
 
   @override
   State<_ReaderParagraphView> createState() => _ReaderParagraphViewState();
 }
 
 class _ReaderParagraphViewState extends State<_ReaderParagraphView> {
+  final GlobalKey _richTextKey = GlobalKey();
   final List<TapGestureRecognizer> _recognizers = <TapGestureRecognizer>[];
-  String _localSelectedText = '';
+
+  // Basılı tutup sürükleme sırasındaki canlı kelime aralığı
+  int? _dragAnchorStart;
+  int? _dragAnchorEnd;
+  int? _dragRangeStart;
+  int? _dragRangeEnd;
 
   void _disposeRecognizers() {
     for (final recognizer in _recognizers) {
@@ -1045,6 +1547,105 @@ class _ReaderParagraphViewState extends State<_ReaderParagraphView> {
   void dispose() {
     _disposeRecognizers();
     super.dispose();
+  }
+
+  ({int start, int end, String text})? _hitTestWordAtGlobal(
+    Offset globalPosition,
+  ) {
+    final renderObject = _richTextKey.currentContext?.findRenderObject();
+    if (renderObject is! RenderParagraph) return null;
+    final localOffset = renderObject.globalToLocal(globalPosition);
+    final textPos = renderObject.getPositionForOffset(localOffset);
+    return ArticleTextParser.findWordBoundsAtOffset(
+      widget.paragraphText,
+      textPos.offset,
+    );
+  }
+
+  void _handleLongPressStart(LongPressStartDetails details) {
+    final word = _hitTestWordAtGlobal(details.globalPosition);
+    if (word == null) return;
+    HapticFeedback.selectionClick();
+    setState(() {
+      _dragAnchorStart = word.start;
+      _dragAnchorEnd = word.end;
+      _dragRangeStart = word.start;
+      _dragRangeEnd = word.end;
+    });
+  }
+
+  void _handleLongPressMove(LongPressMoveUpdateDetails details) {
+    final anchorStart = _dragAnchorStart;
+    final anchorEnd = _dragAnchorEnd;
+    if (anchorStart == null || anchorEnd == null) return;
+
+    final word = _hitTestWordAtGlobal(details.globalPosition);
+    if (word == null) return;
+
+    final nextStart = word.start < anchorStart ? word.start : anchorStart;
+    final nextEnd = word.end > anchorEnd ? word.end : anchorEnd;
+    if (nextStart != _dragRangeStart || nextEnd != _dragRangeEnd) {
+      setState(() {
+        _dragRangeStart = nextStart;
+        _dragRangeEnd = nextEnd;
+      });
+    }
+  }
+
+  void _handleLongPressEnd(LongPressEndDetails _) {
+    final start = _dragRangeStart;
+    final end = _dragRangeEnd;
+    setState(() {
+      _dragAnchorStart = null;
+      _dragAnchorEnd = null;
+      _dragRangeStart = null;
+      _dragRangeEnd = null;
+    });
+
+    if (start == null || end == null || end <= start) return;
+    if (widget.isUnderlineMode) {
+      widget.onDragMarkCommitted(start, end);
+    } else {
+      widget.onNormalSelectionCommitted(start, end);
+    }
+  }
+
+  void _handleLongPressCancel() {
+    if (_dragAnchorStart == null && _dragRangeStart == null) return;
+    setState(() {
+      _dragAnchorStart = null;
+      _dragAnchorEnd = null;
+      _dragRangeStart = null;
+      _dragRangeEnd = null;
+    });
+  }
+
+  TextStyle _buildMarkedStyle({
+    required TextStyle baseStyle,
+    required bool isInSpokenSentence,
+    required Color sentenceHighlightColor,
+  }) {
+    return switch (widget.markStyle) {
+      ArticleMarkStyle.underline => baseStyle.copyWith(
+          decoration: TextDecoration.underline,
+          decorationColor: widget.markAccentColor,
+          decorationThickness: 2.3,
+          backgroundColor: isInSpokenSentence
+              ? sentenceHighlightColor
+              : widget.markAccentColor.withAlpha(24),
+        ),
+      ArticleMarkStyle.highlight => baseStyle.copyWith(
+          backgroundColor: widget.markHighlightFillColor,
+        ),
+      ArticleMarkStyle.strikethrough => baseStyle.copyWith(
+          decoration: TextDecoration.lineThrough,
+          decorationColor: widget.markAccentColor,
+          decorationThickness: 2.3,
+          backgroundColor: isInSpokenSentence
+              ? sentenceHighlightColor
+              : widget.markAccentColor.withAlpha(18),
+        ),
+    };
   }
 
   @override
@@ -1063,6 +1664,29 @@ class _ReaderParagraphViewState extends State<_ReaderParagraphView> {
       color: widget.tone.textColor,
     );
 
+    final hlStart = widget.highlightStartOffset;
+    final hlEnd = widget.highlightEndOffset;
+    final hasSentenceHighlight =
+        hlStart != null && hlEnd != null && hlEnd > hlStart;
+    final sentenceHighlightColor = widget.tone.brightness == Brightness.dark
+        ? widget.tone.underlineColor.withAlpha(64)
+        : widget.tone.underlineColor.withAlpha(34);
+
+    final dragStart = _dragRangeStart;
+    final dragEnd = _dragRangeEnd;
+    final hasLiveDrag =
+        dragStart != null && dragEnd != null && dragEnd > dragStart;
+
+    final selStart = !widget.isUnderlineMode && hasLiveDrag
+        ? dragStart
+        : widget.selectedStartOffset;
+    final selEnd = !widget.isUnderlineMode && hasLiveDrag
+        ? dragEnd
+        : widget.selectedEndOffset;
+    final hasNormalSelection =
+        selStart != null && selEnd != null && selEnd > selStart;
+    final selectionFillColor = widget.markAccentColor.withAlpha(56);
+
     final spans = <InlineSpan>[];
     for (final segment in segments) {
       final isInteractive = segment.isWord ||
@@ -1075,14 +1699,42 @@ class _ReaderParagraphViewState extends State<_ReaderParagraphView> {
         _recognizers.add(recognizer);
       }
 
-      final style = segment.isUnderlined
-          ? baseStyle.copyWith(
-              decoration: TextDecoration.underline,
-              decorationColor: widget.tone.underlineColor,
-              decorationThickness: 2.2,
-              backgroundColor: widget.tone.underlineFillColor,
-            )
-          : baseStyle;
+      final isInSpokenSentence = hasSentenceHighlight &&
+          segment.start < hlEnd &&
+          segment.end > hlStart;
+      final isInLiveDragMark = widget.isUnderlineMode &&
+          hasLiveDrag &&
+          segment.start < dragEnd &&
+          segment.end > dragStart;
+      final isMarked = segment.isUnderlined || isInLiveDragMark;
+      final isInNormalSelection = !widget.isUnderlineMode &&
+          hasNormalSelection &&
+          segment.start < selEnd &&
+          segment.end > selStart;
+
+      TextStyle style;
+      if (isInNormalSelection) {
+        style = (isMarked
+                ? _buildMarkedStyle(
+                    baseStyle: baseStyle,
+                    isInSpokenSentence: false,
+                    sentenceHighlightColor: sentenceHighlightColor,
+                  )
+                : baseStyle)
+            .copyWith(backgroundColor: selectionFillColor);
+      } else if (isMarked) {
+        style = _buildMarkedStyle(
+          baseStyle: baseStyle,
+          isInSpokenSentence: isInSpokenSentence,
+          sentenceHighlightColor: sentenceHighlightColor,
+        );
+      } else if (isInSpokenSentence) {
+        style = baseStyle.copyWith(
+          backgroundColor: sentenceHighlightColor,
+        );
+      } else {
+        style = baseStyle;
+      }
 
       spans.add(
         TextSpan(
@@ -1093,61 +1745,19 @@ class _ReaderParagraphViewState extends State<_ReaderParagraphView> {
       );
     }
 
-    return SelectionArea(
-      onSelectionChanged: (SelectedContent? content) {
-        final plain = content?.plainText ?? '';
-        _localSelectedText = plain;
-        widget.onSelectionChanged(plain);
-      },
-      contextMenuBuilder: (context, selectableRegionState) {
-        final selected = _localSelectedText.trim();
-        final items = <ContextMenuButtonItem>[];
-
-        if (selected.isNotEmpty) {
-          final s = context.l10n;
-          if (widget.isUnderlineMode) {
-            items.add(
-              ContextMenuButtonItem(
-                label: s.underlineAction,
-                onPressed: () {
-                  selectableRegionState.hideToolbar();
-                  widget.onUnderlineSelection(selected);
-                },
-              ),
-            );
-            if (widget.hasUnderlineInSelection(selected)) {
-              items.add(
-                ContextMenuButtonItem(
-                  label: s.removeUnderlineAction,
-                  onPressed: () {
-                    selectableRegionState.hideToolbar();
-                    widget.onRemoveSelectionUnderline(selected);
-                  },
-                ),
-              );
-            }
-          } else {
-            items.add(
-              ContextMenuButtonItem(
-                label: s.lookupMeaningAction,
-                onPressed: () {
-                  selectableRegionState.hideToolbar();
-                  widget.onLookupSelection(selected);
-                },
-              ),
-            );
-          }
-        }
-
-        items.addAll(selectableRegionState.contextMenuButtonItems);
-        return AdaptiveTextSelectionToolbar.buttonItems(
-          anchors: selectableRegionState.contextMenuAnchors,
-          buttonItems: items,
-        );
-      },
-      child: Text.rich(
-        TextSpan(children: spans),
+    return GestureDetector(
+      key: ValueKey<String>('reader_paragraph_gesture_${widget.paragraphIndex}'),
+      behavior: HitTestBehavior.translucent,
+      onLongPressStart: _handleLongPressStart,
+      onLongPressMoveUpdate: _handleLongPressMove,
+      onLongPressEnd: _handleLongPressEnd,
+      onLongPressCancel: _handleLongPressCancel,
+      child: RichText(
+        key: _richTextKey,
+        text: TextSpan(children: spans),
         textAlign: TextAlign.start,
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
       ),
     );
   }
@@ -1224,19 +1834,23 @@ class _SelectionFloatingBar extends StatelessWidget {
   const _SelectionFloatingBar({
     required this.tone,
     required this.isUnderlineMode,
+    required this.isPassageSelection,
     required this.hasExistingUnderline,
     required this.onUnderline,
     required this.onRemoveUnderline,
     required this.onLookupMeaning,
+    required this.onTranslateParagraph,
     required this.onDismiss,
   });
 
   final ArticleReaderTone tone;
   final bool isUnderlineMode;
+  final bool isPassageSelection;
   final bool hasExistingUnderline;
   final VoidCallback onUnderline;
   final VoidCallback onRemoveUnderline;
   final VoidCallback onLookupMeaning;
+  final VoidCallback onTranslateParagraph;
   final VoidCallback onDismiss;
 
   @override
@@ -1284,22 +1898,57 @@ class _SelectionFloatingBar extends StatelessWidget {
                     style: TextStyle(color: tone.secondaryTextColor),
                   ),
                 ),
-            ] else
+            ] else ...<Widget>[
               TextButton.icon(
+                key: const ValueKey<String>('reader_selection_lookup_button'),
                 onPressed: onLookupMeaning,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  minimumSize: const Size(0, 36),
+                ),
                 icon: Icon(
                   Icons.translate_rounded,
                   size: 18,
                   color: tone.underlineColor,
                 ),
                 label: Text(
-                  s.lookupMeaningAction,
+                  isPassageSelection
+                      ? s.translateSelectionAction
+                      : s.lookupMeaningAction,
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
                     color: tone.textColor,
                   ),
                 ),
               ),
+              Container(
+                width: 1,
+                height: 20,
+                color: tone.dividerColor,
+              ),
+              TextButton.icon(
+                key: const ValueKey<String>(
+                  'reader_selection_translate_paragraph_button',
+                ),
+                onPressed: onTranslateParagraph,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  minimumSize: const Size(0, 36),
+                ),
+                icon: Icon(
+                  Icons.notes_rounded,
+                  size: 18,
+                  color: tone.secondaryTextColor,
+                ),
+                label: Text(
+                  s.translateParagraphAction,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: tone.textColor,
+                  ),
+                ),
+              ),
+            ],
             IconButton(
               visualDensity: VisualDensity.compact,
               onPressed: onDismiss,

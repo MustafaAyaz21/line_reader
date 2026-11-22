@@ -102,14 +102,19 @@ class AppStrings {
       t('Altını Çizme Kalemi Açık', 'Underline Pen On');
   String get underlinePenShort => t('Çiz', 'Pen');
   String get underlineBannerHint => t(
-        'Çizmek için kelimeye dokunun veya seçin; kaldırmak için çizili alana tekrar dokunun.',
-        'Tap or select text to underline; tap an underlined area again to remove it.',
+        'Basılı tutup sürükleyerek kelimeleri çizin; çizili kelimeye tek tıkla çizgiyi kaldırın.',
+        'Press and drag across words to mark; tap a marked word once to remove it.',
       );
   String get readerAppearanceTooltip =>
-      t('Arka Plan Tonu ve Yazı Boyutu', 'Background Tone & Font Size');
+      t('Görünüm, Yazı Boyutu ve İşaretleme', 'Appearance, Font & Markup');
   String get readerAppearanceTitle => t('Okuma Görünümü', 'Reading Appearance');
   String get backgroundToneLabel => t('Arka Plan Tonu', 'Background Tone');
   String get fontSizeLabel => t('Yazı Boyutu', 'Font Size');
+  String get markStyleLabel => t('İşaretleme Stili', 'Markup Style');
+  String get markColorLabel => t('İşaretleme Rengi', 'Markup Color');
+  String get markStyleUnderline => t('Altı Çizili', 'Underline');
+  String get markStyleHighlight => t('Fosforlu Kalem', 'Highlighter');
+  String get markStyleStrikethrough => t('Üstü Çizili', 'Strikethrough');
   String get toneWhite => t('Beyaz', 'White');
   String get tonePaper => t('Kağıt Tonu', 'Paper');
   String get toneDark => t('Koyu', 'Dark');
@@ -117,6 +122,27 @@ class AppStrings {
   String get removeUnderlineAction => t('Çizgiyi Kaldır', 'Remove Underline');
   String get removeShort => t('Kaldır', 'Remove');
   String get lookupMeaningAction => t('Anlamına Bak', 'Look Up');
+  String get translateSelectionAction => t('Çevir', 'Translate');
+  String get translateParagraphAction =>
+      t('Paragrafı Çevir', 'Translate Paragraph');
+  String get sentenceTranslationTitle =>
+      t('Cümle Çevirisi', 'Sentence Translation');
+  String get paragraphTranslationTitle =>
+      t('Paragraf Çevirisi', 'Paragraph Translation');
+  String get presetTranslationBadge => t('Hazır Çeviri', 'Prepared');
+  String get liveTranslationBadge => t('Çeviri', 'Translation');
+  String get listenArticleTooltip => t('Makaleyi Sesli Dinle', 'Listen to Article');
+  String get podcastAiLabel => t('Podcast AI', 'Podcast AI');
+  String get deviceVoiceLabel => t('Cihaz Sesi', 'Device Voice');
+  String get previousSentenceTooltip => t('Önceki Cümle', 'Previous Sentence');
+  String get nextSentenceTooltip => t('Sonraki Cümle', 'Next Sentence');
+  String get previousParagraphTooltip => t('Önceki Paragraf', 'Previous Paragraph');
+  String get nextParagraphTooltip => t('Sonraki Paragraf', 'Next Paragraph');
+  String audioPositionLabel(int paragraph, int totalParagraphs, int sentence, int totalSentences) =>
+      t(
+        'Paragraf $paragraph/$totalParagraphs • Cümle $sentence/$totalSentences',
+        'Paragraph $paragraph/$totalParagraphs • Sentence $sentence/$totalSentences',
+      );
 
   // Misafir, Hesap, Kod ve Zorunlu Güncelleme
   String get guestModeTitle => t('Misafir Modu', 'Guest Mode');

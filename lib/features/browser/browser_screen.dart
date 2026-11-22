@@ -72,6 +72,7 @@ class BrowserScreen extends StatefulWidget {
     super.key,
     this.onAddWord,
     this.loadWordLists,
+    this.onCreateWordList,
     this.translationService,
     this.ttsService,
     this.authController,
@@ -81,6 +82,7 @@ class BrowserScreen extends StatefulWidget {
 
   final AddWordCallback? onAddWord;
   final Future<List<WordList>> Function()? loadWordLists;
+  final CreateWordListCallback? onCreateWordList;
   final WordTranslationService? translationService;
   final TtsService? ttsService;
   final AuthController? authController;
@@ -670,6 +672,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
         translationService: _translationService,
         loadWordLists: widget.loadWordLists ??
             () => WordRepository(AppDatabase.instance).getAllLists(),
+        onCreateWordList: widget.onCreateWordList,
         ttsService: widget.ttsService,
         authController: widget.authController,
         onAddWord: _handleAddWord,

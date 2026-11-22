@@ -18,13 +18,15 @@ abstract class ArticleReaderStore {
   );
 }
 
-/// Okuma ekranı arka plan tonu, font boyutu ve makale bazlı alt çizgi
-/// kayıtlarını yerel SQLite veri tabanında saklayan depo.
+/// Okuma ekranı arka plan tonu, font boyutu, işaretleme stili/rengi ve
+/// makale bazlı alt çizgi kayıtlarını yerel SQLite veri tabanında saklayan depo.
 class ArticleReaderRepository implements ArticleReaderStore {
   ArticleReaderRepository(this._appDatabase);
 
   static const String _toneSettingKey = 'article_reader_tone';
   static const String _fontSizeSettingKey = 'article_reader_font_size';
+  static const String _markStyleSettingKey = 'article_reader_mark_style';
+  static const String _markColorSettingKey = 'article_reader_mark_color';
 
   final AppDatabase _appDatabase;
 
@@ -40,12 +42,19 @@ class ArticleReaderRepository implements ArticleReaderStore {
     final db = await _getReadyDatabase();
     final rows = await db.query(
       AppDatabase.settingsTable,
-      where: '"key" IN (?, ?)',
-      whereArgs: const <Object>[_toneSettingKey, _fontSizeSettingKey],
+      where: '"key" IN (?, ?, ?, ?)',
+      whereArgs: const <Object>[
+        _toneSettingKey,
+        _fontSizeSettingKey,
+        _markStyleSettingKey,
+        _markColorSettingKey,
+      ],
     );
 
     String? rawTone;
     String? rawFontSize;
+    String? rawMarkStyle;
+    String? rawMarkColor;
     for (final row in rows) {
       final key = row['key'] as String?;
       final value = row['value'] as String?;
@@ -53,6 +62,10 @@ class ArticleReaderRepository implements ArticleReaderStore {
         rawTone = value;
       } else if (key == _fontSizeSettingKey) {
         rawFontSize = value;
+      } else if (key == _markStyleSettingKey) {
+        rawMarkStyle = value;
+      } else if (key == _markColorSettingKey) {
+        rawMarkColor = value;
       }
     }
 
@@ -66,8 +79,15 @@ class ArticleReaderRepository implements ArticleReaderStore {
             )
             .toDouble()
         : ArticleReaderPreferences.defaultFontSize;
+    final markStyle = ArticleMarkStyle.fromStorageKey(rawMarkStyle);
+    final markColor = ArticleMarkColor.fromStorageKey(rawMarkColor);
 
-    return ArticleReaderPreferences(tone: tone, fontSize: fontSize);
+    return ArticleReaderPreferences(
+      tone: tone,
+      fontSize: fontSize,
+      markStyle: markStyle,
+      markColor: markColor,
+    );
   }
 
   @override
@@ -94,6 +114,22 @@ class ArticleReaderRepository implements ArticleReaderStore {
         <String, Object?>{
           'key': _fontSizeSettingKey,
           'value': clampedSize.toStringAsFixed(1),
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+      await txn.insert(
+        AppDatabase.settingsTable,
+        <String, Object?>{
+          'key': _markStyleSettingKey,
+          'value': preferences.markStyle.storageKey,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+      await txn.insert(
+        AppDatabase.settingsTable,
+        <String, Object?>{
+          'key': _markColorSettingKey,
+          'value': preferences.markColor.storageKey,
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
