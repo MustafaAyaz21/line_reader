@@ -1,6 +1,6 @@
 {
-  "latest_version": "0.1.9",
-  "version_code": 10,
-  "apk_url": "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.9/app-release.apk",
-  "release_notes": "Kelime arama ekranına 'Kendi Anlamını Ekle' butonu eklendi; kullanıcılar özel anlam yazıp kelime türünü (noun, verb, adjective, adverb, phrase, idiom, preposition, conjunction) seçerek parantez içinde biçimlendirilmiş halde tikli olarak kaydedebilir."
+    "latest_version":  "0.1.10",
+    "version_code":  11,
+    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.10/app-release.apk",
+    "release_notes":  "Makaleler alanı için uzak articles.json kaynağından canlı makale yenileme, SQLite yerel önbellek katmanı, otomatik eşitleme, aşağı çekerek yenileme ve çevrimdışı düşüş altyapısı eklendi."
 }

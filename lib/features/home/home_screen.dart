@@ -4,6 +4,9 @@ import '../../core/database/app_database.dart';
 import '../../core/settings/api_key_controller.dart';
 import '../../core/settings/settings_repository.dart';
 import '../../core/tts/tts_service.dart';
+import '../articles/controllers/articles_controller.dart';
+import '../articles/data/articles_cache_repository.dart';
+import '../articles/services/articles_sync_service.dart';
 import '../browser/browser_screen.dart';
 import '../translation/data/translation_cache_repository.dart';
 import '../translation/models/word_meaning.dart';
@@ -43,6 +46,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   CachedTranslationService? _translationService;
   TtsService? _ttsService;
   AppUpdateController? _updateController;
+  ArticlesController? _articlesController;
   BrowserBackController? _browserBackController;
 
   @override
@@ -52,6 +56,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _ensureInitialized();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkForAppUpdateSilently(force: true);
+      _refreshArticlesSilently(force: true);
     });
   }
 
@@ -59,6 +64,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _checkForAppUpdateSilently();
+      _refreshArticlesSilently();
     }
   }
 
@@ -98,6 +104,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
 
     _updateController ??= AppUpdateController();
+    if (_articlesController == null) {
+      final controller = ArticlesController(
+        ArticlesSyncService(
+          cacheStore: ArticlesCacheRepository(AppDatabase.instance),
+        ),
+      );
+      controller.loadCache();
+      _articlesController = controller;
+    }
     _browserBackController ??= BrowserBackController();
   }
 
@@ -110,6 +125,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await _updateController!.checkSilently(force: force);
   }
 
+  Future<void> _refreshArticlesSilently({bool force = false}) async {
+    if (!mounted) return;
+
+    _ensureInitialized();
+    // Uygulama açıldığında veya ön plana dönüldüğünde uzak makale kaynağını
+    // sessizce kontrol eder; ağ kapalıysa mevcut yerel önbelleği korur.
+    await _articlesController!.refreshSilently(force: force);
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -118,6 +142,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _translationService?.dispose();
     _ttsService?.dispose();
     _updateController?.dispose();
+    _articlesController?.dispose();
     super.dispose();
   }
 
@@ -224,6 +249,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               onOpenBrowser: _openBrowser,
               apiKeyController: _apiKeyController!,
               updateController: _updateController!,
+              articlesController: _articlesController!,
               onClearCache: _handleClearTranslationCache,
             ),
             if ((_hasOpenedBrowser ?? false) || _isBrowserOpen)

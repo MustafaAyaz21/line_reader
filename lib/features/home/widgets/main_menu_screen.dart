@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/settings/api_key_controller.dart';
 import '../../articles/articles_screen.dart';
+import '../../articles/controllers/articles_controller.dart';
 import '../../settings/widgets/api_key_dialog.dart';
 import '../../update/controllers/app_update_controller.dart';
 import '../../update/widgets/update_action_button.dart';
@@ -15,18 +16,20 @@ class MainMenuScreen extends StatelessWidget {
     required this.onOpenBrowser,
     required this.apiKeyController,
     this.updateController,
+    this.articlesController,
     this.onClearCache,
   });
 
   final VoidCallback onOpenBrowser;
   final ApiKeyController apiKeyController;
   final AppUpdateController? updateController;
+  final ArticlesController? articlesController;
   final Future<void> Function()? onClearCache;
 
   void _openArticles(BuildContext context) {
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => const ArticlesScreen(),
+        builder: (_) => ArticlesScreen(controller: articlesController),
       ),
     );
   }

@@ -36,5 +36,10 @@ abstract final class ApiConfig {
   static const String myMemoryBaseUrl =
       'https://api.mymemory.translated.net/get';
 
+  /// Makaleler için varsayılan uzak JSON veri kaynağı (raw GitHub URL).
+  /// İleride makale kaynağını değiştirmek için bu tek sabit güncellenebilir.
+  static const String articlesJsonUrl =
+      'https://raw.githubusercontent.com/MustafaAyaz21/line_reader/main/articles.json';
+
   static const Duration requestTimeout = Duration(seconds: 12);
 }

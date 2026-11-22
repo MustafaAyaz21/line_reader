@@ -8,13 +8,14 @@ class AppDatabase {
   static final AppDatabase instance = AppDatabase._();
 
   static const String _databaseName = 'linereader.db';
-  static const int _databaseVersion = 8;
+  static const int _databaseVersion = 9;
 
   static const String wordsTable = 'words';
   static const String wordListsTable = 'word_lists';
   static const String translationCacheTable = 'translation_cache';
   static const String settingsTable = 'app_settings';
   static const String favoriteSitesTable = 'favorite_sites';
+  static const String articlesCacheTable = 'articles_cache';
 
   static const String defaultFavoritesName = 'Favoriler';
   static const int defaultFavoritesColorValue = 0xFFF59E0B;
@@ -80,6 +81,9 @@ class AppDatabase {
     if (oldVersion < 8) {
       await ensureWordListsAndWordsSchema(db);
     }
+    if (oldVersion < 9) {
+      await ensureArticlesCacheTable(db);
+    }
   }
 
   Future<void> _onOpen(Database db) async {
@@ -91,6 +95,7 @@ class AppDatabase {
     await ensureTranslationCacheTable(db);
     await ensureSettingsTable(db);
     await ensureFavoriteSitesTable(db);
+    await ensureArticlesCacheTable(db);
   }
 
   /// `word_lists` tablosunu, varsayılan "Favoriler" listesini ve `words`
@@ -297,6 +302,36 @@ class AppDatabase {
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_favorite_sites_created_at
       ON $favoriteSitesTable (created_at DESC)
+    ''');
+  }
+
+  Future<void> ensureArticlesCacheTable([Database? existingDb]) async {
+    final db = existingDb ?? await database;
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $articlesCacheTable (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        summary TEXT NOT NULL DEFAULT '',
+        content TEXT NOT NULL DEFAULT '',
+        category TEXT NOT NULL DEFAULT '',
+        level TEXT NOT NULL DEFAULT '',
+        language TEXT NOT NULL DEFAULT 'en',
+        author TEXT NOT NULL DEFAULT '',
+        image_url TEXT,
+        source_url TEXT,
+        reading_time_minutes INTEGER NOT NULL DEFAULT 0,
+        tags_json TEXT NOT NULL DEFAULT '[]',
+        published_at INTEGER,
+        updated_at INTEGER,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        raw_json TEXT NOT NULL DEFAULT '{}',
+        cached_at INTEGER NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_articles_cache_sort_order
+      ON $articlesCacheTable (sort_order ASC, published_at DESC)
     ''');
   }
 
