@@ -1,6 +1,6 @@
 {
-    "latest_version":  "0.1.10",
-    "version_code":  11,
-    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.10/app-release.apk",
-    "release_notes":  "Makaleler alanı için uzak articles.json kaynağından canlı makale yenileme, SQLite yerel önbellek katmanı, otomatik eşitleme, aşağı çekerek yenileme ve çevrimdışı düşüş altyapısı eklendi."
+    "latest_version":  "0.1.11",
+    "version_code":  12,
+    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.11/app-release.apk",
+    "release_notes":  "Makaleler bölümü A1-C2 sıralı seviye ekranı, başlık/açıklama/okuma süresi içeren seviye makale listesi ve kitap/kağıt tonu, yazı boyutu ayarı, kalıcı altını çizme kalemi ile kelime anlamı destekli yerel (native) okuma ekranıyla güncellendi."
 }

@@ -1,26 +1,43 @@
 import 'package:flutter/material.dart';
 
 import '../../core/database/app_database.dart';
+import '../../core/tts/tts_service.dart';
+import '../browser/browser_screen.dart';
+import '../translation/services/word_translation_service.dart';
+import '../words/models/word_list.dart';
 import 'controllers/articles_controller.dart';
+import 'data/article_reader_repository.dart';
 import 'data/articles_cache_repository.dart';
-import 'models/article.dart';
+import 'models/article_level.dart';
+import 'screens/level_articles_screen.dart';
 import 'services/articles_sync_service.dart';
 
-/// Ana Menü'deki "Makaleler" kısayolundan açılan ekran.
+/// Ana Menü'deki "Makaleler" kartından açılan A1–C2 seviye seçim ekranı.
 ///
-/// - Girişte yerel SQLite önbelleğini anında gösterir ve uzak `articles.json`
+/// - Alt alta düzenli kartlar halinde sırasıyla A1, A2, B1, B2, C1, C2
+///   seviyelerini, kısa etiketlerini ve her seviyedeki canlı makale sayısını
+///   gösterir.
+/// - Girişte yerel SQLite önbelleğini anında yükler ve uzak `articles.json`
 ///   kaynağından güncel makaleleri sessizce kontrol eder.
-/// - Aşağı çekerek yenileme (`RefreshIndicator`) destekler.
-/// - Ağ bağlantısı olmadığında veya istek başarısız olduğunda mevcut
-///   önbellekteki verileri bozmadan korumaya devam eder.
-/// - Uzak kaynakta henüz makale yoksa sade "Yakında..." görünümünü korur.
+/// - Aşağı çekerek yenileme (`RefreshIndicator`) ve çevrimdışı önbellek
+///   koruması ile tam uyumlu çalışır.
 class ArticlesScreen extends StatefulWidget {
   const ArticlesScreen({
     super.key,
     this.controller,
+    this.readerStore,
+    this.translationService,
+    this.ttsService,
+    this.onAddWord,
+    this.loadWordLists,
   });
 
   final ArticlesController? controller;
+  final ArticleReaderStore? readerStore;
+  final WordTranslationService? translationService;
+  final TtsService? ttsService;
+  final AddWordCallback? onAddWord;
+  final Future<List<WordList>> Function()? loadWordLists;
 
   @override
   State<ArticlesScreen> createState() => _ArticlesScreenState();
@@ -75,89 +92,19 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
     }
   }
 
-  void _openArticlePreview(Article article) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final bodyText = article.content.isNotEmpty
-        ? article.content
-        : (article.summary.isNotEmpty
-            ? article.summary
-            : 'Bu makalenin içeriği yakında eklenecek.');
-
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (sheetContext) {
-        return DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.72,
-          minChildSize: 0.45,
-          maxChildSize: 0.94,
-          builder: (_, scrollController) {
-            return ListView(
-              controller: scrollController,
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
-              children: <Widget>[
-                if (article.category.isNotEmpty || article.level.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: <Widget>[
-                        if (article.level.isNotEmpty)
-                          _MetaBadge(
-                            label: article.level,
-                            backgroundColor: colorScheme.primaryContainer,
-                            textColor: colorScheme.onPrimaryContainer,
-                          ),
-                        if (article.category.isNotEmpty)
-                          _MetaBadge(
-                            label: article.category,
-                            backgroundColor: colorScheme.secondaryContainer,
-                            textColor: colorScheme.onSecondaryContainer,
-                          ),
-                        if (article.readingTimeMinutes > 0)
-                          _MetaBadge(
-                            label: '${article.readingTimeMinutes} dk',
-                            backgroundColor:
-                                colorScheme.surfaceContainerHighest,
-                            textColor: colorScheme.onSurfaceVariant,
-                          ),
-                      ],
-                    ),
-                  ),
-                Text(
-                  article.title,
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: colorScheme.onSurface,
-                  ),
-                ),
-                if (article.author.isNotEmpty) ...<Widget>[
-                  const SizedBox(height: 6),
-                  Text(
-                    article.author,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 16),
-                SelectableText(
-                  bodyText,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    height: 1.65,
-                    color: colorScheme.onSurface,
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
+  void _openLevel(ArticleLevel level) {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => LevelArticlesScreen(
+          level: level,
+          controller: _controller,
+          readerStore: widget.readerStore,
+          translationService: widget.translationService,
+          ttsService: widget.ttsService,
+          onAddWord: widget.onAddWord,
+          loadWordLists: widget.loadWordLists,
+        ),
+      ),
     );
   }
 
@@ -169,6 +116,16 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
         final articles = _controller.articles;
         final isRefreshing = _controller.isRefreshing;
 
+        final countsByLevel = <ArticleLevel, int>{
+          for (final level in ArticleLevel.values) level: 0,
+        };
+        for (final article in articles) {
+          final parsed = article.parsedLevel;
+          if (parsed != null) {
+            countsByLevel[parsed] = (countsByLevel[parsed] ?? 0) + 1;
+          }
+        }
+
         return Scaffold(
           appBar: AppBar(
             title: const Text('Makaleler'),
@@ -177,9 +134,21 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
             children: <Widget>[
               RefreshIndicator(
                 onRefresh: _handlePullToRefresh,
-                child: articles.isEmpty
-                    ? _buildComingSoonView(context)
-                    : _buildArticlesListView(context, articles),
+                child: ListView.separated(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+                  itemCount: ArticleLevel.values.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final level = ArticleLevel.values[index];
+                    final count = countsByLevel[level] ?? 0;
+                    return _ArticleLevelCard(
+                      level: level,
+                      articleCount: count,
+                      onTap: () => _openLevel(level),
+                    );
+                  },
+                ),
               ),
               if (isRefreshing)
                 const Positioned(
@@ -194,91 +163,17 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
       },
     );
   }
-
-  Widget _buildComingSoonView(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: constraints.maxHeight),
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 340),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      Container(
-                        padding: const EdgeInsets.all(22),
-                        decoration: BoxDecoration(
-                          color: colorScheme.secondaryContainer,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.menu_book_rounded,
-                          size: 40,
-                          color: colorScheme.onSecondaryContainer,
-                        ),
-                      ),
-                      const SizedBox(height: 22),
-                      Text(
-                        'Yakında...',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.2,
-                          color: colorScheme.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        'İnternet olmadan okuyup kelime çalışabileceğiniz özenle seçilmiş makaleler çok yakında burada yer alacak.',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                          height: 1.45,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildArticlesListView(BuildContext context, List<Article> articles) {
-    return ListView.separated(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-      itemCount: articles.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final article = articles[index];
-        return _ArticleCard(
-          article: article,
-          onTap: () => _openArticlePreview(article),
-        );
-      },
-    );
-  }
 }
 
-class _ArticleCard extends StatelessWidget {
-  const _ArticleCard({
-    required this.article,
+class _ArticleLevelCard extends StatelessWidget {
+  const _ArticleLevelCard({
+    required this.level,
+    required this.articleCount,
     required this.onTap,
   });
 
-  final Article article;
+  final ArticleLevel level;
+  final int articleCount;
   final VoidCallback onTap;
 
   @override
@@ -290,94 +185,79 @@ class _ArticleCard extends StatelessWidget {
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
+        key: ValueKey<String>('article_level_card_${level.code}'),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: Row(
             children: <Widget>[
-              if (article.level.isNotEmpty ||
-                  article.category.isNotEmpty ||
-                  article.readingTimeMinutes > 0)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: <Widget>[
-                      if (article.level.isNotEmpty)
-                        _MetaBadge(
-                          label: article.level,
-                          backgroundColor: colorScheme.primaryContainer,
-                          textColor: colorScheme.onPrimaryContainer,
-                        ),
-                      if (article.category.isNotEmpty)
-                        _MetaBadge(
-                          label: article.category,
-                          backgroundColor: colorScheme.secondaryContainer,
-                          textColor: colorScheme.onSecondaryContainer,
-                        ),
-                      if (article.readingTimeMinutes > 0)
-                        _MetaBadge(
-                          label: '${article.readingTimeMinutes} dk',
-                          backgroundColor: colorScheme.surfaceContainerHighest,
-                          textColor: colorScheme.onSurfaceVariant,
-                        ),
-                    ],
-                  ),
+              Container(
+                width: 54,
+                height: 54,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: level.accentColor.withAlpha(28),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-              Text(
-                article.title,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: colorScheme.onSurface,
+                child: Text(
+                  level.code,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.4,
+                    color: level.accentColor,
+                  ),
                 ),
               ),
-              if (article.summary.isNotEmpty) ...<Widget>[
-                const SizedBox(height: 6),
-                Text(
-                  article.summary,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyMedium?.copyWith(
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      level.label,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      level.subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '$articleCount makale',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
                     color: colorScheme.onSurfaceVariant,
-                    height: 1.4,
                   ),
                 ),
-              ],
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: colorScheme.onSurfaceVariant,
+              ),
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _MetaBadge extends StatelessWidget {
-  const _MetaBadge({
-    required this.label,
-    required this.backgroundColor,
-    required this.textColor,
-  });
-
-  final String label;
-  final Color backgroundColor;
-  final Color textColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: textColor,
-              fontWeight: FontWeight.w600,
-            ),
       ),
     );
   }

@@ -8,7 +8,7 @@ class AppDatabase {
   static final AppDatabase instance = AppDatabase._();
 
   static const String _databaseName = 'linereader.db';
-  static const int _databaseVersion = 9;
+  static const int _databaseVersion = 10;
 
   static const String wordsTable = 'words';
   static const String wordListsTable = 'word_lists';
@@ -16,6 +16,7 @@ class AppDatabase {
   static const String settingsTable = 'app_settings';
   static const String favoriteSitesTable = 'favorite_sites';
   static const String articlesCacheTable = 'articles_cache';
+  static const String articleUnderlinesTable = 'article_underlines';
 
   static const String defaultFavoritesName = 'Favoriler';
   static const int defaultFavoritesColorValue = 0xFFF59E0B;
@@ -84,6 +85,10 @@ class AppDatabase {
     if (oldVersion < 9) {
       await ensureArticlesCacheTable(db);
     }
+    if (oldVersion < 10) {
+      await ensureArticlesCacheTable(db);
+      await ensureArticleUnderlinesTable(db);
+    }
   }
 
   Future<void> _onOpen(Database db) async {
@@ -96,6 +101,7 @@ class AppDatabase {
     await ensureSettingsTable(db);
     await ensureFavoriteSitesTable(db);
     await ensureArticlesCacheTable(db);
+    await ensureArticleUnderlinesTable(db);
   }
 
   /// `word_lists` tablosunu, varsayılan "Favoriler" listesini ve `words`
@@ -320,6 +326,7 @@ class AppDatabase {
         image_url TEXT,
         source_url TEXT,
         reading_time_minutes INTEGER NOT NULL DEFAULT 0,
+        reading_time_label TEXT NOT NULL DEFAULT '',
         tags_json TEXT NOT NULL DEFAULT '[]',
         published_at INTEGER,
         updated_at INTEGER,
@@ -329,9 +336,37 @@ class AppDatabase {
       )
     ''');
 
+    final columns = await db.rawQuery('PRAGMA table_info($articlesCacheTable)');
+    final hasReadingTimeLabel =
+        columns.any((col) => col['name'] == 'reading_time_label');
+    if (!hasReadingTimeLabel) {
+      await db.execute(
+        "ALTER TABLE $articlesCacheTable ADD COLUMN reading_time_label TEXT NOT NULL DEFAULT ''",
+      );
+    }
+
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_articles_cache_sort_order
       ON $articlesCacheTable (sort_order ASC, published_at DESC)
+    ''');
+  }
+
+  Future<void> ensureArticleUnderlinesTable([Database? existingDb]) async {
+    final db = existingDb ?? await database;
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $articleUnderlinesTable (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        article_id TEXT NOT NULL,
+        paragraph_index INTEGER NOT NULL,
+        start_offset INTEGER NOT NULL,
+        end_offset INTEGER NOT NULL,
+        created_at INTEGER NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_article_underlines_article
+      ON $articleUnderlinesTable (article_id, paragraph_index, start_offset)
     ''');
   }
 

@@ -250,6 +250,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               apiKeyController: _apiKeyController!,
               updateController: _updateController!,
               articlesController: _articlesController!,
+              translationService: _translationService!,
+              ttsService: _ttsService,
+              onAddWord: _handleAddWord,
+              loadWordLists: _handleLoadWordLists,
               onClearCache: _handleClearTranslationCache,
             ),
             if ((_hasOpenedBrowser ?? false) || _isBrowserOpen)

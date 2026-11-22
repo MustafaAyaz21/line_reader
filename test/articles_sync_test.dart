@@ -268,7 +268,7 @@ void main() {
   });
 
   group('ArticlesScreen Widget', () {
-    testWidgets('boş listede Yakında görünümünü korur ve çevrimdışı bozulmaz',
+    testWidgets('boş listede A1-C2 seviye kartlarını gösterir ve çevrimdışı bozulmaz',
         (tester) async {
       final cacheStore = _InMemoryArticlesCacheStore();
       final offlineClient = MockClient((_) async {
@@ -293,13 +293,16 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Makaleler'), findsOneWidget);
-      expect(find.text('Yakında...'), findsOneWidget);
+      for (final code in const <String>['A1', 'A2', 'B1', 'B2', 'C1', 'C2']) {
+        expect(find.text(code), findsOneWidget);
+      }
+      expect(find.text('0 makale'), findsNWidgets(6));
       expect(find.byType(RefreshIndicator), findsOneWidget);
 
       controller.dispose();
     });
 
-    testWidgets('önbellekte makale varsa çevrimdışı durumda da göstermeye devam eder',
+    testWidgets('önbellekte makale varsa çevrimdışı durumda da seviyede gösterir',
         (tester) async {
       final cacheStore = _InMemoryArticlesCacheStore()
         ..seed(const <Article>[
@@ -309,7 +312,7 @@ void main() {
             summary: 'A short reading passage for B1 learners.',
             level: 'B1',
             category: 'Travel',
-            readingTimeMinutes: 3,
+            readingTimeLabel: '4 - 6 dk',
           ),
         ]);
 
@@ -334,9 +337,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      expect(find.text('1 makale'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey<String>('article_level_card_B1')));
+      await tester.pumpAndSettle();
+
       expect(find.text('Exploring London'), findsOneWidget);
-      expect(find.text('B1'), findsOneWidget);
-      expect(find.text('Travel'), findsOneWidget);
+      expect(find.text('A short reading passage for B1 learners.'), findsOneWidget);
+      expect(find.text('4 - 6 dk'), findsOneWidget);
 
       controller.dispose();
     });

@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'article_level.dart';
+
 /// Uzak `articles.json` kaynağından çekilen ve yerel SQLite önbelleğinde
 /// saklanan makale veri modeli.
 class Article {
@@ -15,6 +17,7 @@ class Article {
     this.imageUrl,
     this.sourceUrl,
     this.readingTimeMinutes = 0,
+    this.readingTimeLabel = '',
     this.tags = const <String>[],
     this.publishedAt,
     this.updatedAt,
@@ -33,6 +36,7 @@ class Article {
   final String? imageUrl;
   final String? sourceUrl;
   final int readingTimeMinutes;
+  final String readingTimeLabel;
   final List<String> tags;
   final DateTime? publishedAt;
   final DateTime? updatedAt;
@@ -41,6 +45,49 @@ class Article {
   /// Gelecekte JSON kaynağına eklenecek ek alanların önbellekte kaybolmaması
   /// için ham JSON kaydı saklanır.
   final String rawJson;
+
+  /// Kısa makale açıklaması (`description` / `summary` alanı).
+  String get description => summary;
+
+  /// CEFR seviye kodu (A1–C2) eşleşmesi.
+  ArticleLevel? get parsedLevel => ArticleLevel.tryParse(level);
+
+  /// Kart ve okuma ekranında gösterilecek okuma süresi metni
+  /// (örneğin `"5 - 8 dk"` veya `"4 - 6 dk"`).
+  String get formattedReadingTime {
+    final explicit = readingTimeLabel.trim();
+    if (explicit.isNotEmpty) {
+      final hasUnit = RegExp(
+        r'(dk|dakika|min|minute)',
+        caseSensitive: false,
+      ).hasMatch(explicit);
+      return hasUnit ? explicit : '$explicit dk';
+    }
+
+    if (readingTimeMinutes > 0) {
+      if (readingTimeMinutes <= 2) {
+        return '1 - 3 dk';
+      }
+      final minMinutes = readingTimeMinutes - 1;
+      final maxMinutes = readingTimeMinutes + 1;
+      return '$minMinutes - $maxMinutes dk';
+    }
+
+    final trimmedContent = content.trim();
+    if (trimmedContent.isNotEmpty) {
+      final wordCount = trimmedContent
+          .split(RegExp(r'\s+'))
+          .where((word) => word.isNotEmpty)
+          .length;
+      if (wordCount > 0) {
+        final low = (wordCount / 180).floor().clamp(1, 60);
+        final rawHigh = (wordCount / 120).ceil().clamp(low + 1, 75);
+        return '$low - $rawHigh dk';
+      }
+    }
+
+    return '3 - 5 dk';
+  }
 
   /// Esnek JSON ayrıştırıcı (`snake_case` ve `camelCase` alan adlarını destekler).
   /// Başlığı tamamen boş olan geçersiz kayıtlar için `null` döner.
@@ -56,7 +103,7 @@ class Article {
 
     final summary = _readString(
       json,
-      const <String>['summary', 'subtitle', 'excerpt', 'description'],
+      const <String>['description', 'summary', 'subtitle', 'excerpt'],
     );
     final content = _readContent(json);
     final category = _readString(json, const <String>['category', 'topic']);
@@ -77,6 +124,7 @@ class Article {
       const <String>['source_url', 'sourceUrl', 'url', 'link'],
     );
 
+    final readingTimeLabel = _readReadingTimeLabel(json);
     final readingTimeMinutes = _readInt(
       json,
       const <String>[
@@ -84,6 +132,8 @@ class Article {
         'readingTimeMinutes',
         'read_time',
         'readTime',
+        'reading_time',
+        'readingTime',
       ],
     );
 
@@ -116,6 +166,7 @@ class Article {
       imageUrl: imageUrl,
       sourceUrl: sourceUrl,
       readingTimeMinutes: readingTimeMinutes < 0 ? 0 : readingTimeMinutes,
+      readingTimeLabel: readingTimeLabel,
       tags: List<String>.unmodifiable(tags),
       publishedAt: publishedAt,
       updatedAt: updatedAt,
@@ -140,6 +191,7 @@ class Article {
       imageUrl: _trimOrNull(row['image_url'] as String?),
       sourceUrl: _trimOrNull(row['source_url'] as String?),
       readingTimeMinutes: (row['reading_time_minutes'] as int?) ?? 0,
+      readingTimeLabel: (row['reading_time_label'] as String? ?? '').trim(),
       tags: List<String>.unmodifiable(
         _decodeTagsJson(row['tags_json'] as String?),
       ),
@@ -167,6 +219,7 @@ class Article {
       'image_url': imageUrl,
       'source_url': sourceUrl,
       'reading_time_minutes': readingTimeMinutes,
+      'reading_time_label': readingTimeLabel,
       'tags_json': jsonEncode(tags),
       'published_at': publishedAt?.millisecondsSinceEpoch,
       'updated_at': updatedAt?.millisecondsSinceEpoch,
@@ -180,6 +233,7 @@ class Article {
     return <String, Object?>{
       'id': id,
       'title': title,
+      'description': summary,
       'summary': summary,
       'content': content,
       'category': category,
@@ -189,10 +243,36 @@ class Article {
       if (imageUrl != null) 'image_url': imageUrl,
       if (sourceUrl != null) 'source_url': sourceUrl,
       'reading_time_minutes': readingTimeMinutes,
+      if (readingTimeLabel.isNotEmpty) 'reading_time': readingTimeLabel,
       'tags': tags,
       if (publishedAt != null) 'published_at': publishedAt!.toIso8601String(),
       if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
     };
+  }
+
+  static String _readReadingTimeLabel(Map<String, Object?> json) {
+    for (final key in const <String>[
+      'reading_time_label',
+      'readingTimeLabel',
+      'estimated_read_time',
+      'estimatedReadTime',
+      'reading_time',
+      'readingTime',
+      'read_time_text',
+      'readTimeText',
+      'duration',
+    ]) {
+      final value = json[key];
+      if (value is String) {
+        final trimmed = value.trim();
+        // Yalnızca düz tam sayı ise ("5") onu readingTimeMinutes'a bırak;
+        // aralık veya birimli metin ise ("5 - 8 dk", "4-6 min") doğrudan koru.
+        if (trimmed.isNotEmpty && int.tryParse(trimmed) == null) {
+          return trimmed;
+        }
+      }
+    }
+    return '';
   }
 
   static String _readString(Map<String, Object?> json, List<String> keys) {
