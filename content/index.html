@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Line Reader — İçerik Sunucusu</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: #f7f0e2;
+      color: #2b231a;
+      padding: 24px;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid #dfd3bc;
+      border-radius: 18px;
+      padding: 28px 32px;
+      max-width: 420px;
+      text-align: center;
+      box-shadow: 0 8px 24px rgba(43, 35, 26, 0.08);
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 999px;
+      background: #dcfce7;
+      color: #166534;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+    h1 { margin: 0 0 8px; font-size: 20px; }
+    p { margin: 0 0 18px; color: #6e6151; font-size: 14px; line-height: 1.5; }
+    a {
+      display: inline-block;
+      padding: 10px 16px;
+      border-radius: 10px;
+      background: #2563eb;
+      color: #fff;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">CDN Aktif</div>
+    <h1>Line Reader İçerik Sunucusu</h1>
+    <p>Makale verileri Cloudflare Pages üzerinden canlı olarak dağıtılıyor.</p>
+    <a href="/articles.json">articles.json dosyasını görüntüle</a>
+  </div>
+</body>
+</html>

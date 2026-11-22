@@ -1,6 +1,6 @@
 {
-    "latest_version":  "0.1.11",
-    "version_code":  12,
-    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.11/app-release.apk",
-    "release_notes":  "Makaleler bölümü A1-C2 sıralı seviye ekranı, başlık/açıklama/okuma süresi içeren seviye makale listesi ve kitap/kağıt tonu, yazı boyutu ayarı, kalıcı altını çizme kalemi ile kelime anlamı destekli yerel (native) okuma ekranıyla güncellendi."
+    "latest_version":  "0.1.12",
+    "version_code":  13,
+    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.12/app-release.apk",
+    "release_notes":  "Makale canlı yenileme kaynağı Cloudflare Pages CDN (https://line-reader.pages.dev/articles.json) üzerine bağlandı; birincil CDN erişilemez olursa otomatik GitHub raw yedeği devreye girer."
 }

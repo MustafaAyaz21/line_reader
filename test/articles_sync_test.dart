@@ -265,6 +265,46 @@ void main() {
 
       controller.dispose();
     });
+
+    test('birincil CDN başarısız olursa yedek raw URL kaynağından veri çeker', () async {
+      final cacheStore = _InMemoryArticlesCacheStore();
+      final client = MockClient((request) async {
+        if (request.url.host == 'line-reader.pages.dev') {
+          return http.Response('Service Unavailable', 503);
+        }
+        expect(request.url.host, 'raw.githubusercontent.com');
+        return http.Response(
+          jsonEncode(<String, Object?>{
+            'version': 1,
+            'articles': <Map<String, Object?>>[
+              <String, Object?>{
+                'id': 'backup-1',
+                'level': 'A1',
+                'title': 'Fallback Article',
+              },
+            ],
+          }),
+          200,
+        );
+      });
+
+      final syncService = ArticlesSyncService(
+        cacheStore: cacheStore,
+        remoteService: ArticlesRemoteService(
+          httpClient: client,
+          remoteUrl: 'https://line-reader.pages.dev/articles.json',
+          fallbackUrl:
+              'https://raw.githubusercontent.com/MustafaAyaz21/line_reader/main/articles.json',
+        ),
+      );
+
+      final result = await syncService.syncArticles();
+      expect(result.status, ArticleSyncStatus.updated);
+      expect(result.articles, hasLength(1));
+      expect(result.articles.first.title, 'Fallback Article');
+
+      syncService.dispose();
+    });
   });
 
   group('ArticlesScreen Widget', () {

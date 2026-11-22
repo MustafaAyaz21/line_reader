@@ -20,18 +20,23 @@ class ArticlesRemoteException implements Exception {
       : 'ArticlesRemoteException: $message';
 }
 
-/// Yapılandırılabilir tek bir uzak JSON kaynağından (`ApiConfig.articlesJsonUrl`)
-/// güncel makale listesini çeken servis.
+/// Yapılandırılabilir uzak JSON kaynağından (`ApiConfig.articlesJsonUrl`)
+/// güncel makale listesini çeken servis (birincil adres başarısız olursa
+/// isteğe bağlı yedek adresi dener).
 class ArticlesRemoteService {
   ArticlesRemoteService({
     http.Client? httpClient,
     String? remoteUrl,
+    String? fallbackUrl,
     Duration? timeout,
   })  : _httpClient = httpClient ?? http.Client(),
         _ownsClient = httpClient == null,
         remoteUrl = (remoteUrl != null && remoteUrl.trim().isNotEmpty)
             ? remoteUrl.trim()
             : ApiConfig.articlesJsonUrl,
+        fallbackUrl = fallbackUrl != null
+            ? (fallbackUrl.trim().isEmpty ? null : fallbackUrl.trim())
+            : (remoteUrl == null ? ApiConfig.articlesFallbackJsonUrl : null),
         _timeout = timeout ?? ApiConfig.requestTimeout;
 
   static const Map<String, String> _baseHeaders = <String, String>{
@@ -44,6 +49,7 @@ class ArticlesRemoteService {
   final http.Client _httpClient;
   final bool _ownsClient;
   final String remoteUrl;
+  final String? fallbackUrl;
   final Duration _timeout;
 
   /// Uzak `articles.json` kaynağını sorgular.
@@ -52,14 +58,43 @@ class ArticlesRemoteService {
   ///   döndürürse [ArticleFeedPayload.notModified] döner.
   /// - Hem üst düzey JSON dizisini (`[...]`) hem de sarmalanmış nesneyi
   ///   (`{"version": 1, "articles": [...]}`) destekler.
-  /// - Ağ hatası, zaman aşımı, 200/304 dışı durum kodu veya bozuk JSON
-  ///   durumunda [ArticlesRemoteException] fırlatır; böylece yerel önbellek
-  ///   asla bozuk veriyle ezilmez.
+  /// - Birincil adres başarısız olursa varsa [fallbackUrl] denenir.
+  /// - Tüm kaynaklar başarısız olursa [ArticlesRemoteException] fırlatır;
+  ///   böylece yerel önbellek asla bozuk veriyle ezilmez.
   Future<ArticleFeedPayload> fetchArticles({
     String? etag,
     bool bypassCdnCache = true,
   }) async {
-    final parsedUri = Uri.tryParse(remoteUrl);
+    try {
+      return await _fetchFromUrl(
+        remoteUrl,
+        etag: etag,
+        bypassCdnCache: bypassCdnCache,
+      );
+    } on ArticlesRemoteException catch (primaryError) {
+      final backup = fallbackUrl;
+      if (backup == null || backup == remoteUrl) {
+        rethrow;
+      }
+      try {
+        // Yedek uç nokta farklı ETag üretir; temiz yanıt almak için ETag gönderme.
+        return await _fetchFromUrl(
+          backup,
+          etag: null,
+          bypassCdnCache: bypassCdnCache,
+        );
+      } on ArticlesRemoteException {
+        throw primaryError;
+      }
+    }
+  }
+
+  Future<ArticleFeedPayload> _fetchFromUrl(
+    String targetUrl, {
+    String? etag,
+    required bool bypassCdnCache,
+  }) async {
+    final parsedUri = Uri.tryParse(targetUrl);
     if (parsedUri == null || !parsedUri.hasScheme) {
       throw const ArticlesRemoteException(
         'Geçersiz makale veri kaynağı adresi.',
