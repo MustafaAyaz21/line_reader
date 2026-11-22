@@ -5,6 +5,7 @@ import '../models/word_meaning.dart';
 import 'contextual_free_translation_service.dart';
 import 'free_dictionary_translation_service.dart';
 import 'gemini_translation_service.dart';
+import 'local_dictionary_service.dart';
 import 'word_translation_service.dart';
 
 /// Yerel SQLite önbelleğini, isteğe bağlı doğrulanmış Gemini API anahtarını ve
@@ -26,6 +27,7 @@ class CachedTranslationService implements WordTranslationService {
     WordTranslationService? geminiService,
     WordTranslationService? primaryFreeService,
     WordTranslationService? fallbackFreeService,
+    LocalDictionaryService? localDictionary,
   })  : _cacheRepository = cacheRepository,
         _geminiApiKeyProvider = geminiApiKeyProvider,
         _shouldAttemptGeminiProvider = shouldAttemptGeminiProvider,
@@ -40,6 +42,7 @@ class CachedTranslationService implements WordTranslationService {
             primaryFreeService ?? ContextualFreeTranslationService(),
         _fallbackFreeService =
             fallbackFreeService ?? FreeDictionaryTranslationService(),
+        _localDictionary = localDictionary ?? LocalDictionaryService(),
         _ownsGeminiService =
             geminiService == null && geminiApiKeyProvider != null,
         _ownsPrimaryFreeService = primaryFreeService == null,
@@ -54,15 +57,17 @@ class CachedTranslationService implements WordTranslationService {
   final WordTranslationService? _geminiService;
   final WordTranslationService _primaryFreeService;
   final WordTranslationService _fallbackFreeService;
+  final LocalDictionaryService _localDictionary;
   final bool _ownsGeminiService;
   final bool _ownsPrimaryFreeService;
   final bool _ownsFallbackFreeService;
 
   bool get _canAttemptGemini {
-    final key = _geminiApiKeyProvider?.call()?.trim();
-    if (key == null || key.isEmpty) return false;
-    final allowed = _shouldAttemptGeminiProvider?.call() ?? true;
-    return allowed && _geminiService != null;
+    final allowed = _shouldAttemptGeminiProvider?.call() ?? false;
+    if (!allowed || _geminiService == null) return false;
+    if (_geminiApiKeyProvider == null) return true;
+    final key = _geminiApiKeyProvider.call()?.trim() ?? '';
+    return key.isNotEmpty || !_ownsGeminiService;
   }
 
   /// Eski veya farklı kaynaktan kalmış çeviri önbelleğini temizler.
@@ -137,11 +142,8 @@ class CachedTranslationService implements WordTranslationService {
           _onGeminiUnauthorized?.call(error.message);
         }
 
-        if (error.type == TranslationErrorType.network) {
-          if (cached != null) return cached.meaning;
-          rethrow;
-        }
-        // Yetki/kota/yanıt hatasında hatayı logladıktan sonra ücretsiz servise geç.
+        // AI kota aşımı (429), yetki, zaman aşımı veya ağ hatasında kesintisiz olarak
+        // ücretsiz bağlamsal sözlük + yerel sözlük yedeğine düş.
       } catch (error) {
         debugPrint(
           '[CachedTranslationService] Gemini beklenmeyen hata: $error',
@@ -167,6 +169,11 @@ class CachedTranslationService implements WordTranslationService {
       );
       if (error.type == TranslationErrorType.network) {
         if (cached != null) return cached.meaning;
+        final localFallback = await _localDictionary.lookup(
+          word,
+          contextSentence: contextSentence,
+        );
+        if (localFallback != null) return localFallback.meaning;
         rethrow;
       }
     }
@@ -188,6 +195,11 @@ class CachedTranslationService implements WordTranslationService {
         '(${error.type}): ${error.message}',
       );
       if (cached != null) return cached.meaning;
+      final localFallback = await _localDictionary.lookup(
+        word,
+        contextSentence: contextSentence,
+      );
+      if (localFallback != null) return localFallback.meaning;
       rethrow;
     }
   }

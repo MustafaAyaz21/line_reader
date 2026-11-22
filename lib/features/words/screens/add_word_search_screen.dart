@@ -65,10 +65,11 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
   @override
   void initState() {
     super.initState();
+    // Kelime listesine ekleme akışında gereksiz AI çağrısı yapılmaz;
+    // doğrudan ücretsiz çoklu sözlük + hafif yerel sözlük/kök çözümleyici kullanılır.
     _searchService = WordDictionarySearchService(
-      geminiApiKeyProvider: () => widget.apiKeyController?.apiKey,
-      shouldAttemptGeminiProvider: () =>
-          widget.apiKeyController?.shouldAttemptGemini ?? false,
+      geminiApiKeyProvider: null,
+      shouldAttemptGeminiProvider: () => false,
     );
 
     if (_hasInitialWord) {

@@ -1,6 +1,7 @@
 import '../../../core/settings/settings_repository.dart';
 
-/// Yerel misafir oturumu ve günlük çeviri kotasını saklayan soyut depo.
+/// Yerel misafir oturumu, günlük çeviri kotası ve önbellekli yetki durumunu
+/// saklayan soyut depo.
 abstract class AuthLocalStore {
   Future<bool> isGuestModeEnabled();
 
@@ -12,16 +13,25 @@ abstract class AuthLocalStore {
     required String dateKey,
     required int usedCount,
   });
+
+  Future<({bool isUnlimited, String? codeUsed})> loadCachedEntitlement();
+
+  Future<void> saveCachedEntitlement({
+    required bool isUnlimited,
+    String? codeUsed,
+  });
 }
 
-/// Misafir oturum tercihini ve günlük 40 kelime çeviri sayacını SQLite
-/// `app_settings` tablosunda kalıcı olarak saklar.
+/// Misafir oturum tercihini, günlük çeviri sayacını ve son doğrulanmış yetki
+/// bilgisini SQLite `app_settings` tablosunda kalıcı olarak saklar.
 class AuthLocalRepository implements AuthLocalStore {
   AuthLocalRepository(this._settingsRepository);
 
   static const String _guestModeKey = 'auth_guest_mode_enabled';
   static const String _guestQuotaDateKey = 'auth_guest_quota_date';
   static const String _guestQuotaUsedKey = 'auth_guest_quota_used';
+  static const String _entitlementUnlimitedKey = 'auth_entitlement_unlimited';
+  static const String _entitlementCodeKey = 'auth_entitlement_code';
 
   final SettingsRepository _settingsRepository;
 
@@ -58,5 +68,32 @@ class AuthLocalRepository implements AuthLocalStore {
       _guestQuotaUsedKey,
       (usedCount < 0 ? 0 : usedCount).toString(),
     );
+  }
+
+  @override
+  Future<({bool isUnlimited, String? codeUsed})> loadCachedEntitlement() async {
+    final rawUnlimited =
+        await _settingsRepository.getString(_entitlementUnlimitedKey);
+    final codeUsed = await _settingsRepository.getString(_entitlementCodeKey);
+    return (isUnlimited: rawUnlimited == 'true', codeUsed: codeUsed);
+  }
+
+  @override
+  Future<void> saveCachedEntitlement({
+    required bool isUnlimited,
+    String? codeUsed,
+  }) async {
+    await _settingsRepository.saveString(
+      _entitlementUnlimitedKey,
+      isUnlimited ? 'true' : 'false',
+    );
+    if (isUnlimited && codeUsed != null && codeUsed.trim().isNotEmpty) {
+      await _settingsRepository.saveString(
+        _entitlementCodeKey,
+        codeUsed.trim(),
+      );
+    } else {
+      await _settingsRepository.deleteKey(_entitlementCodeKey);
+    }
   }
 }

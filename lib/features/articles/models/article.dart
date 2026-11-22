@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../../translation/utils/english_morphology_resolver.dart';
 import 'article_level.dart';
 
 /// Uzak `articles.json` kaynağından çekilen ve yerel SQLite önbelleğinde
@@ -19,6 +20,7 @@ class Article {
     this.readingTimeMinutes = 0,
     this.readingTimeLabel = '',
     this.tags = const <String>[],
+    this.wordMeanings = const <String, String>{},
     this.publishedAt,
     this.updatedAt,
     this.sortOrder = 0,
@@ -38,6 +40,10 @@ class Article {
   final int readingTimeMinutes;
   final String readingTimeLabel;
   final List<String> tags;
+
+  /// Makale içinde yazar/editör tarafından tanımlanmış bağlamsal kelime
+  /// anlamları (`word_meanings` haritası; küçük harfe normalleştirilmiş anahtar).
+  final Map<String, String> wordMeanings;
   final DateTime? publishedAt;
   final DateTime? updatedAt;
   final int sortOrder;
@@ -45,6 +51,20 @@ class Article {
   /// Gelecekte JSON kaynağına eklenecek ek alanların önbellekte kaybolmaması
   /// için ham JSON kaydı saklanır.
   final String rawJson;
+
+  /// Açık makalenin `word_meanings` haritasında önce kelimenin kendisini,
+  /// bulunamazsa `EnglishMorphologyResolver` kök/temel form adaylarını arar.
+  ({String matchedKey, String meaning})? findWordMeaning(String rawWord) {
+    if (wordMeanings.isEmpty) return null;
+    final candidates = EnglishMorphologyResolver.resolveCandidates(rawWord);
+    for (final candidate in candidates) {
+      final value = wordMeanings[candidate];
+      if (value != null && value.trim().isNotEmpty) {
+        return (matchedKey: candidate, meaning: value.trim());
+      }
+    }
+    return null;
+  }
 
   /// Kısa makale açıklaması (`description` / `summary` alanı).
   String get description => summary;
@@ -138,6 +158,9 @@ class Article {
     );
 
     final tags = _readStringList(json['tags']);
+    final wordMeanings = _readWordMeanings(
+      json['word_meanings'] ?? json['wordMeanings'],
+    );
     final publishedAt = _readDateTime(
       json,
       const <String>['published_at', 'publishedAt', 'date'],
@@ -168,6 +191,7 @@ class Article {
       readingTimeMinutes: readingTimeMinutes < 0 ? 0 : readingTimeMinutes,
       readingTimeLabel: readingTimeLabel,
       tags: List<String>.unmodifiable(tags),
+      wordMeanings: Map<String, String>.unmodifiable(wordMeanings),
       publishedAt: publishedAt,
       updatedAt: updatedAt,
       sortOrder: fallbackIndex,
@@ -178,6 +202,7 @@ class Article {
   factory Article.fromDbRow(Map<String, Object?> row) {
     final publishedMillis = row['published_at'] as int?;
     final updatedMillis = row['updated_at'] as int?;
+    final rawJson = (row['raw_json'] as String?) ?? '{}';
 
     return Article(
       id: (row['id'] as String? ?? '').trim(),
@@ -195,6 +220,9 @@ class Article {
       tags: List<String>.unmodifiable(
         _decodeTagsJson(row['tags_json'] as String?),
       ),
+      wordMeanings: Map<String, String>.unmodifiable(
+        _extractWordMeaningsFromRawJson(rawJson),
+      ),
       publishedAt: publishedMillis != null
           ? DateTime.fromMillisecondsSinceEpoch(publishedMillis)
           : null,
@@ -202,7 +230,7 @@ class Article {
           ? DateTime.fromMillisecondsSinceEpoch(updatedMillis)
           : null,
       sortOrder: (row['sort_order'] as int?) ?? 0,
-      rawJson: (row['raw_json'] as String?) ?? '{}',
+      rawJson: rawJson,
     );
   }
 
@@ -245,9 +273,40 @@ class Article {
       'reading_time_minutes': readingTimeMinutes,
       if (readingTimeLabel.isNotEmpty) 'reading_time': readingTimeLabel,
       'tags': tags,
+      if (wordMeanings.isNotEmpty) 'word_meanings': wordMeanings,
       if (publishedAt != null) 'published_at': publishedAt!.toIso8601String(),
       if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
     };
+  }
+
+  static Map<String, String> _readWordMeanings(Object? raw) {
+    if (raw is! Map) return const <String, String>{};
+    final result = <String, String>{};
+    for (final entry in raw.entries) {
+      final key = EnglishMorphologyResolver.normalize(entry.key.toString());
+      final val = (entry.value?.toString() ?? '').trim();
+      if (key.isNotEmpty && val.isNotEmpty) {
+        result[key] = val;
+      }
+    }
+    return result;
+  }
+
+  static Map<String, String> _extractWordMeaningsFromRawJson(String rawJson) {
+    if (rawJson.trim().isEmpty || rawJson == '{}') {
+      return const <String, String>{};
+    }
+    try {
+      final decoded = jsonDecode(rawJson);
+      if (decoded is Map) {
+        return _readWordMeanings(
+          decoded['word_meanings'] ?? decoded['wordMeanings'],
+        );
+      }
+    } catch (_) {
+      // Bozuk ham JSON uygulamayı etkilememeli.
+    }
+    return const <String, String>{};
   }
 
   static String _readReadingTimeLabel(Map<String, Object?> json) {

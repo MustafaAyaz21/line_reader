@@ -1,9 +1,25 @@
 /// Ücretsiz çeviri/sözlük servisleri ve isteğe bağlı Gemini API uç nokta ayarları.
 abstract final class ApiConfig {
-  /// İsteğe bağlı Gemini API uç noktası (kullanıcı uygulama içinden anahtar
-  /// kaydettiğinde aktif olur; anahtar yoksa anahtarsız ücretsiz servisler çalışır).
+  /// İsteğe bağlı Gemini API uç noktası (yalnızca tarayıcı bağlamsal AI
+  /// çevirisi için derleme zamanı anahtarı ile aktif olur; son kullanıcıdan
+  /// manuel API anahtarı istenmez).
   static const String geminiBaseUrl =
       'https://generativelanguage.googleapis.com/v1beta/models';
+
+  /// Derleme zamanında (`--dart-define=GEMINI_API_KEY=...`) tanımlanabilen
+  /// yönetilen Gemini API anahtarı (yalnızca tarayıcı bağlamsal çevirisinde kullanılır).
+  static const String managedGeminiApiKey = String.fromEnvironment(
+    'GEMINI_API_KEY',
+    defaultValue: '',
+  );
+
+  /// Tarayıcı bağlamsal AI çevirisi için Cloudflare Workers AI uç noktası.
+  /// Yalnızca kayıtlı Firebase kullanıcılarının imzalı ID Token'ı ile yanıt verir;
+  /// APK içinde hiçbir gizli anahtar tutulmaz.
+  static const String browserAiTranslateEndpoint = String.fromEnvironment(
+    'AI_TRANSLATE_ENDPOINT',
+    defaultValue: 'https://linereader-ai.xreasayaz21.workers.dev',
+  );
 
   /// Varsayılan güncel Gemini modeli.
   static const String geminiModel = 'gemini-3.0-flash';

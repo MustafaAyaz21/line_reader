@@ -182,13 +182,28 @@ class AppUpdateService {
     if (a == null) return b;
     if (b == null) return a;
 
+    final highestMinCode =
+        a.minVersionCode >= b.minVersionCode ? a.minVersionCode : b.minVersionCode;
+
     final semverDiff = compareVersions(b.latestVersion, a.latestVersion);
     if (semverDiff > 0) {
       // Releases API daha yeni (raw.githubusercontent.com henüz CDN önbelleğinde).
-      return b;
+      return AppUpdateInfo(
+        latestVersion: b.latestVersion,
+        versionCode: b.versionCode,
+        apkUrl: b.apkUrl,
+        releaseNotes: b.releaseNotes,
+        minVersionCode: highestMinCode,
+      );
     }
     if (semverDiff < 0) {
-      return a;
+      return AppUpdateInfo(
+        latestVersion: a.latestVersion,
+        versionCode: a.versionCode,
+        apkUrl: a.apkUrl,
+        releaseNotes: a.releaseNotes,
+        minVersionCode: highestMinCode,
+      );
     }
 
     // Aynı sürümse version_code ve daha dolu release_notes içeren kaydı tercih et.
@@ -201,9 +216,17 @@ class AppUpdateService {
         apkUrl: a.apkUrl.startsWith('http') ? a.apkUrl : b.apkUrl,
         releaseNotes:
             a.releaseNotes.isNotEmpty ? a.releaseNotes : b.releaseNotes,
+        minVersionCode: highestMinCode,
       );
     }
-    return b;
+    return AppUpdateInfo(
+      latestVersion: b.latestVersion,
+      versionCode: b.versionCode,
+      apkUrl: b.apkUrl.startsWith('http') ? b.apkUrl : a.apkUrl,
+      releaseNotes:
+          b.releaseNotes.isNotEmpty ? b.releaseNotes : a.releaseNotes,
+      minVersionCode: highestMinCode,
+    );
   }
 
   Future<AppUpdateInfo?> _fetchFromVersionJson() async {

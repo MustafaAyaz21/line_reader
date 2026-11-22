@@ -109,23 +109,38 @@ class AppStrings {
   String get removeShort => t('Kaldır', 'Remove');
   String get lookupMeaningAction => t('Anlamına Bak', 'Look Up');
 
-  // Misafir ve Hesap
+  // Misafir, Hesap, Kod ve Zorunlu Güncelleme
   String get guestModeTitle => t('Misafir Modu', 'Guest Mode');
+  String get standardAccountTitle => t('Standart Hesap', 'Standard Account');
+  String get unlimitedAccountBadge =>
+      t('Sınırsız Hesap (Yetkili)', 'Unlimited Account');
   String get continueAsGuest =>
       t('Misafir Olarak Devam Et', 'Continue as Guest');
   String get continueWithGoogle =>
       t('Google (Gmail) ile Devam Et', 'Continue with Google (Gmail)');
+  String get redeemCodeTitle => t('Kod Kullan', 'Redeem Code');
+  String get redeemCodeApply => t('Kodu Uygula', 'Apply Code');
+  String get redeemCodeHint => t('Örn: AYAZ2026', 'e.g. AYAZ2026');
+  String get mandatoryUpdateTitle => t('Zorunlu Güncelleme', 'Update Required');
+  String mandatoryUpdateSubtitle(String latestVersion) => t(
+        'Line Reader\'ı kullanmaya devam etmek için lütfen v$latestVersion sürümüne güncelleyin.',
+        'Please update to Line Reader v$latestVersion to continue using the app.',
+      );
   String guestLimitNotice(int limit) => t(
-        'Misafir modunda günlük $limit kelime çeviri hakkınız vardır. Sınırsız çeviri için ücretsiz hesap oluşturun.',
-        'Guest mode includes $limit word translations per day. Create a free account for unlimited translations.',
+        'Misafir modunda günlük $limit kelime çeviri hakkınız vardır. Ücretsiz kayıt ile günlük 80 kelimeye çıkarın, aktivasyon kodu ile sınırsız ve reklamsız kullanın.',
+        'Guest mode includes $limit word translations per day. Sign up free for 80 words/day, or redeem a code for unlimited ad-free access.',
       );
   String guestQuotaRemaining(int remaining, int limit) => t(
         'Bugün kalan çeviri hakkı: $remaining / $limit',
         'Translations left today: $remaining / $limit',
       );
   String guestQuotaReachedMessage(int limit) => t(
-        'Misafir olarak günlük $limit kelime çeviri hakkınız doldu. Sınırsız çeviri için ücretsiz giriş yapın veya kayıt olun.',
-        'You have reached your daily guest limit of $limit word translations. Sign in or create a free account for unlimited translations.',
+        'Misafir olarak günlük $limit kelime çeviri hakkınız doldu. Günlük 80 kelime hakkı için ücretsiz giriş yapın veya kayıt olun.',
+        'You have reached your daily guest limit of $limit word translations. Sign in or create a free account for 80 words/day.',
+      );
+  String standardQuotaReachedMessage(int limit) => t(
+        'Standart hesap günlük $limit kelime çeviri hakkınız doldu. Sınırsız çeviri, reklamsız kullanım ve tarayıcı AI özelliği için aktivasyon kodunuzu girebilirsiniz.',
+        'You have reached your daily standard limit of $limit word translations. Redeem an activation code for unlimited ad-free translations and Browser AI.',
       );
 }
 

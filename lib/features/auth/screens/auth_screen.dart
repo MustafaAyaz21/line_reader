@@ -250,8 +250,8 @@ class _AuthScreenState extends State<AuthScreen> {
                       const SizedBox(height: 6),
                       Text(
                         s.t(
-                          'Sınırsız kelime çevirisi için ücretsiz hesabınızla devam edin.',
-                          'Continue with a free account for unlimited word translations.',
+                          'Günlük 80 kelime çeviri hakkı için ücretsiz hesabınızla devam edin; aktivasyon kodu ile sınırsız erişime geçin.',
+                          'Continue with a free account for 80 daily word translations; redeem a code for unlimited access.',
                         ),
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodyMedium?.copyWith(

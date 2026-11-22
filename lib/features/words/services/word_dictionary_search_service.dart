@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 
 import '../../../core/config/api_config.dart';
 import '../../translation/models/word_meaning.dart';
+import '../../translation/services/local_dictionary_service.dart';
 import '../../translation/services/word_translation_service.dart';
 import '../../translation/utils/turkish_infinitive_normalizer.dart';
 import '../models/word_search_detail.dart';
@@ -24,10 +25,12 @@ class WordDictionarySearchService {
     String? Function()? geminiApiKeyProvider,
     bool Function()? shouldAttemptGeminiProvider,
     http.Client? httpClient,
+    LocalDictionaryService? localDictionary,
   })  : _geminiApiKeyProvider = geminiApiKeyProvider,
         _shouldAttemptGeminiProvider = shouldAttemptGeminiProvider,
         _httpClient = httpClient ?? http.Client(),
-        _ownsClient = httpClient == null;
+        _ownsClient = httpClient == null,
+        _localDictionary = localDictionary ?? LocalDictionaryService();
 
   static const int _targetMinMeanings = 10;
   static const int _targetMaxMeanings = 15;
@@ -55,6 +58,7 @@ Respond ONLY with valid JSON:
   final bool Function()? _shouldAttemptGeminiProvider;
   final http.Client _httpClient;
   final bool _ownsClient;
+  final LocalDictionaryService _localDictionary;
   String? _activeGeminiModel;
 
   /// Verilen İngilizce kelime için 10–15 farklı anlam ve 3 kısa örnek cümle getirir.
@@ -129,110 +133,152 @@ Respond ONLY with valid JSON:
       }
     }
 
+    TranslationException? onlineError;
+
     // 2) Anlam sayısı < 10 veya örnek < 3 ise ücretsiz çoklu kaynaklardan tamamla.
     if (collectedMeanings.length < _targetMinMeanings ||
         collectedExamples.length < _targetExamplesCount) {
-      final freeResults = await Future.wait<Object?>(<Future<Object?>>[
-        _fetchGoogleBilingualBundle(normalizedWord),
-        _fetchFreeDictionaryBundle(normalizedWord),
-      ]);
+      try {
+        final freeResults = await Future.wait<Object?>(<Future<Object?>>[
+          _fetchGoogleBilingualBundle(normalizedWord),
+          _fetchFreeDictionaryBundle(normalizedWord),
+        ]);
 
-      final googleBundle = freeResults[0] as _GoogleDictionaryBundle?;
-      final dictBundle = freeResults[1] as _EnglishDictBundle?;
+        final googleBundle = freeResults[0] as _GoogleDictionaryBundle?;
+        final dictBundle = freeResults[1] as _EnglishDictBundle?;
 
-      if (googleBundle != null) {
-        for (final m in googleBundle.meanings) {
-          addMeaning(m);
+        if (googleBundle != null) {
+          for (final m in googleBundle.meanings) {
+            addMeaning(m);
+          }
         }
-      }
 
-      // Hâlâ 10'dan az anlam varsa İngilizce eşanlamlılar ve sözcük türü varyasyonlarını çevir.
-      if (collectedMeanings.length < _targetMinMeanings) {
-        final extraTerms = <String>[
-          if (dictBundle != null) ...dictBundle.synonyms,
-          if (!normalizedWord.contains(' ')) ...<String>[
-            'to $normalizedWord',
-            'a $normalizedWord',
-            'very $normalizedWord',
-          ],
-          if (dictBundle != null) ...dictBundle.shortDefinitions,
-        ];
-        final extraMeanings = await _translateBatchTerms(
-          terms: extraTerms,
-          defaultPos: collectedMeanings.isNotEmpty
-              ? collectedMeanings.first.partOfSpeech
-              : dictBundle?.primaryPos,
-          limit: (_targetMaxMeanings - collectedMeanings.length).clamp(0, 15),
-        );
-        for (final m in extraMeanings) {
-          addMeaning(m);
+        // Hâlâ 10'dan az anlam varsa İngilizce eşanlamlılar ve sözcük türü varyasyonlarını çevir.
+        if (collectedMeanings.length < _targetMinMeanings) {
+          final extraTerms = <String>[
+            if (dictBundle != null) ...dictBundle.synonyms,
+            if (!normalizedWord.contains(' ')) ...<String>[
+              'to $normalizedWord',
+              'a $normalizedWord',
+              'very $normalizedWord',
+            ],
+            if (dictBundle != null) ...dictBundle.shortDefinitions,
+          ];
+          final extraMeanings = await _translateBatchTerms(
+            terms: extraTerms,
+            defaultPos: collectedMeanings.isNotEmpty
+                ? collectedMeanings.first.partOfSpeech
+                : dictBundle?.primaryPos,
+            limit: (_targetMaxMeanings - collectedMeanings.length).clamp(0, 15),
+          );
+          for (final m in extraMeanings) {
+            addMeaning(m);
+          }
         }
-      }
 
-      // Örnek cümleleri topla (önce gerçek sözlük örnekleri, kısa ve net olanlar).
-      final rawEnglishExamples = <String>[];
-      if (dictBundle != null) {
-        rawEnglishExamples.addAll(dictBundle.examples);
-      }
-      if (googleBundle != null) {
-        rawEnglishExamples.addAll(googleBundle.examples);
-      }
-
-      rawEnglishExamples.sort((a, b) => a.length.compareTo(b.length));
-      final chosenEnglish = <String>[];
-      final chosenKeys = <String>{
-        ...collectedExamples.map((e) => e.english.toLowerCase()),
-      };
-
-      for (final candidate in rawEnglishExamples) {
-        if (collectedExamples.length + chosenEnglish.length >=
-            _targetExamplesCount) {
-          break;
+        // Örnek cümleleri topla (önce gerçek sözlük örnekleri, kısa ve net olanlar).
+        final rawEnglishExamples = <String>[];
+        if (dictBundle != null) {
+          rawEnglishExamples.addAll(dictBundle.examples);
         }
-        final clean = _cleanSentence(candidate);
-        if (clean.length < 14 || clean.length > 130) continue;
-        if (chosenKeys.add(clean.toLowerCase())) {
-          chosenEnglish.add(clean);
+        if (googleBundle != null) {
+          rawEnglishExamples.addAll(googleBundle.examples);
         }
-      }
 
-      // 3 örneğe ulaşmadıysa kelimenin türüne uygun kısa doğal cümlelerle tamamla.
-      final neededExamples =
-          _targetExamplesCount - (collectedExamples.length + chosenEnglish.length);
-      if (neededExamples > 0) {
-        final primaryPos = collectedMeanings.isNotEmpty
-            ? collectedMeanings.first.partOfSpeech
-            : dictBundle?.primaryPos;
-        final fallbackSentences = _buildFallbackShortExamples(
-          word: normalizedWord,
-          pos: primaryPos,
-        );
-        for (final sentence in fallbackSentences) {
+        rawEnglishExamples.sort((a, b) => a.length.compareTo(b.length));
+        final chosenEnglish = <String>[];
+        final chosenKeys = <String>{
+          ...collectedExamples.map((e) => e.english.toLowerCase()),
+        };
+
+        for (final candidate in rawEnglishExamples) {
           if (collectedExamples.length + chosenEnglish.length >=
               _targetExamplesCount) {
             break;
           }
-          if (chosenKeys.add(sentence.toLowerCase())) {
-            chosenEnglish.add(sentence);
+          final clean = _cleanSentence(candidate);
+          if (clean.length < 14 || clean.length > 130) continue;
+          if (chosenKeys.add(clean.toLowerCase())) {
+            chosenEnglish.add(clean);
           }
         }
-      }
 
-      if (chosenEnglish.isNotEmpty) {
-        final translatedExamples = await _translateSentencesBatch(chosenEnglish);
-        for (var i = 0; i < chosenEnglish.length; i++) {
-          final tr = i < translatedExamples.length ? translatedExamples[i] : null;
-          addExample(
-            WordExampleSentence(
-              english: chosenEnglish[i],
-              turkish: tr,
-            ),
+        // 3 örneğe ulaşmadıysa kelimenin türüne uygun kısa doğal cümlelerle tamamla.
+        final neededExamples = _targetExamplesCount -
+            (collectedExamples.length + chosenEnglish.length);
+        if (neededExamples > 0) {
+          final primaryPos = collectedMeanings.isNotEmpty
+              ? collectedMeanings.first.partOfSpeech
+              : dictBundle?.primaryPos;
+          final fallbackSentences = _buildFallbackShortExamples(
+            word: normalizedWord,
+            pos: primaryPos,
           );
+          for (final sentence in fallbackSentences) {
+            if (collectedExamples.length + chosenEnglish.length >=
+                _targetExamplesCount) {
+              break;
+            }
+            if (chosenKeys.add(sentence.toLowerCase())) {
+              chosenEnglish.add(sentence);
+            }
+          }
         }
+
+        if (chosenEnglish.isNotEmpty) {
+          final translatedExamples =
+              await _translateSentencesBatch(chosenEnglish);
+          for (var i = 0; i < chosenEnglish.length; i++) {
+            final tr =
+                i < translatedExamples.length ? translatedExamples[i] : null;
+            addExample(
+              WordExampleSentence(
+                english: chosenEnglish[i],
+                turkish: tr,
+              ),
+            );
+          }
+        }
+      } on TranslationException catch (error) {
+        onlineError = error;
+      } catch (error) {
+        debugPrint(
+          '[WordDictionarySearchService] Cevrimici arama hatasi: $error',
+        );
+      }
+    }
+
+    // 3) Yerel sözlük + kök/ek çözümleyici ile çevrimdışı veya eksik anlamları tamamla.
+    if (collectedMeanings.length < _targetMinMeanings) {
+      try {
+        final localResult = await _localDictionary.lookup(normalizedWord);
+        if (localResult != null) {
+          for (final entry in localResult.meaning.orderedEntries) {
+            addMeaning(entry);
+          }
+          if (collectedExamples.isEmpty) {
+            final fallbackExamples = _buildFallbackShortExamples(
+              word: localResult.matchedLemma,
+              pos: collectedMeanings.isNotEmpty
+                  ? collectedMeanings.first.partOfSpeech
+                  : null,
+            );
+            for (final sentence in fallbackExamples) {
+              addExample(WordExampleSentence(english: sentence));
+            }
+          }
+        }
+      } catch (error) {
+        debugPrint(
+          '[WordDictionarySearchService] Yerel sozluk arama hatasi: $error',
+        );
       }
     }
 
     if (collectedMeanings.isEmpty) {
+      if (onlineError != null) {
+        throw onlineError;
+      }
       throw const TranslationException(
         type: TranslationErrorType.invalidResponse,
         message: 'Bu kelime için anlam bulunamadı. Farklı bir kelime deneyin.',

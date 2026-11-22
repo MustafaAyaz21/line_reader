@@ -7,6 +7,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../../core/database/app_database.dart';
 import '../../core/tts/tts_service.dart';
 import '../../core/utils/url_helper.dart';
+import '../ads/widgets/promo_interstitial_dialog.dart';
 import '../auth/controllers/auth_controller.dart';
 import '../translation/data/translation_cache_repository.dart';
 import '../translation/models/word_meaning.dart';
@@ -651,6 +652,14 @@ class _BrowserScreenState extends State<BrowserScreen> {
     SelectionModeChannel.finishActionMode();
 
     try {
+      final auth = widget.authController;
+      if (auth != null &&
+          !auth.hasReachedDailyLimit &&
+          auth.recordWordLookupAndShouldShowPromo()) {
+        await PromoInterstitialDialog.show(context);
+        if (!mounted) return;
+      }
+
       // Çeviri veya veritabanı sorgusunu beklemeden BottomSheet'i ANINDA aç;
       // seçilen kelime + yükleniyor göstergesi hemen görünsün, listeler ve 4 anlam
       // geldikçe sheet içindeki state güncellensin.

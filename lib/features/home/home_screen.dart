@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/config/api_config.dart';
 import '../../core/database/app_database.dart';
 import '../../core/localization/app_locale.dart';
 import '../../core/localization/app_strings.dart';
@@ -14,8 +15,10 @@ import '../auth/screens/auth_screen.dart';
 import '../browser/browser_screen.dart';
 import '../translation/data/translation_cache_repository.dart';
 import '../translation/models/word_meaning.dart';
+import '../translation/services/browser_ai_translation_service.dart';
 import '../translation/services/cached_translation_service.dart';
 import '../update/controllers/app_update_controller.dart';
+import '../update/screens/app_update_screen.dart';
 import '../words/controllers/words_controller.dart';
 import '../words/data/word_repository.dart';
 import '../words/models/saved_word.dart';
@@ -47,7 +50,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   WordsController? _wordsController;
   ApiKeyController? _apiKeyController;
-  CachedTranslationService? _translationService;
+  CachedTranslationService? _browserTranslationService;
+  CachedTranslationService? _articleTranslationService;
   TtsService? _ttsService;
   AppUpdateController? _updateController;
   ArticlesController? _articlesController;
@@ -71,6 +75,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       _checkForAppUpdateSilently();
       _refreshArticlesSilently();
+      _authController?.refreshEntitlement();
     }
   }
 
@@ -99,23 +104,55 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _authController = controller;
     }
 
-    _translationService ??= CachedTranslationService(
-      cacheRepository: TranslationCacheRepository(AppDatabase.instance),
-      geminiApiKeyProvider: () => _apiKeyController?.apiKey,
-      shouldAttemptGeminiProvider: () =>
-          _apiKeyController?.shouldAttemptGemini ?? false,
-      onGeminiVerified: () => _apiKeyController?.markVerified(),
-      onGeminiUnauthorized: (message) =>
-          _apiKeyController?.markInvalid(message),
+    bool shouldAttemptBrowserAi() {
+      // Yalnızca aktivasyon kodu veya yönetici tarafından yetkilendirilmiş
+      // sınırsız hesaplar tarayıcı AI bağlamsal çevirisini kullanabilir;
+      // misafir ve standart hesaplar ücretsiz sözlük + yerel önbellek kullanır.
+      if (!(_authController?.isUnlimited ?? false)) {
+        return false;
+      }
+      if (ApiConfig.browserAiTranslateEndpoint.trim().startsWith('http')) {
+        return true;
+      }
+      if (ApiConfig.managedGeminiApiKey.trim().isNotEmpty) {
+        return true;
+      }
+      return false;
+    }
+
+    final sharedCacheRepository =
+        TranslationCacheRepository(AppDatabase.instance);
+
+    // Yalnızca Tarayıcı (web) ekranında + yetkili (sınırsız) kullanıcı için
+    // bağlamsal AI (Cloudflare Workers AI) + SQLite önbellek + ücretsiz sözlük yedekli servis.
+    _browserTranslationService ??= CachedTranslationService(
+      cacheRepository: sharedCacheRepository,
+      geminiApiKeyProvider: null,
+      shouldAttemptGeminiProvider: shouldAttemptBrowserAi,
+      geminiService: BrowserAiTranslationService(
+        isUserAuthenticatedProvider: () =>
+            _authController?.isUnlimited ?? false,
+        authTokenProvider: () =>
+            _authController?.getIdToken() ?? Future<String?>.value(null),
+      ),
       beforeLookupQuotaCheck: () =>
-          _authController?.consumeTranslationQuotaIfGuest() ??
+          _authController?.consumeTranslationQuota() ??
+          Future<bool>.value(true),
+    );
+
+    // Makale okuma ekranı için AI çağrısı yapmayan (önbellek + ücretsiz/yerel sözlük) servis.
+    _articleTranslationService ??= CachedTranslationService(
+      cacheRepository: sharedCacheRepository,
+      geminiApiKeyProvider: null,
+      shouldAttemptGeminiProvider: () => false,
+      beforeLookupQuotaCheck: () =>
+          _authController?.consumeTranslationQuota() ??
           Future<bool>.value(true),
     );
 
     _ttsService ??= TtsService(
-      geminiApiKeyProvider: () => _apiKeyController?.apiKey,
-      shouldUseGeminiProvider: () =>
-          _apiKeyController?.shouldAttemptGemini ?? false,
+      geminiApiKeyProvider: () => null,
+      shouldUseGeminiProvider: () => false,
     );
 
     _updateController ??= AppUpdateController();
@@ -154,7 +191,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _wordsController?.dispose();
     _apiKeyController?.dispose();
-    _translationService?.dispose();
+    _browserTranslationService?.dispose();
+    _articleTranslationService?.dispose();
     _ttsService?.dispose();
     _updateController?.dispose();
     _articlesController?.dispose();
@@ -185,7 +223,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _handleClearTranslationCache() async {
     _ensureInitialized();
-    await _translationService!.clearCache();
+    await _browserTranslationService!.clearCache();
   }
 
   void _openBrowser() {
@@ -253,10 +291,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _ensureInitialized();
     final localeController = _resolveLocaleController(context);
     final authController = _authController!;
+    final updateController = _updateController!;
 
     return ListenableBuilder(
-      listenable: authController,
+      listenable: Listenable.merge(<Listenable>[
+        authController,
+        updateController,
+      ]),
       builder: (context, _) {
+        if (updateController.requiresMandatoryUpdate) {
+          return AppUpdateScreen(
+            controller: updateController,
+            isMandatory: true,
+          );
+        }
+
         if (authController.isLoading) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
@@ -296,7 +345,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   authController: authController,
                   updateController: _updateController!,
                   articlesController: _articlesController!,
-                  translationService: _translationService!,
+                  translationService: _articleTranslationService!,
                   ttsService: _ttsService,
                   onAddWord: _handleAddWord,
                   loadWordLists: _handleLoadWordLists,
@@ -307,7 +356,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     key: const ValueKey<String>('browser_screen'),
                     onAddWord: _handleAddWord,
                     loadWordLists: _handleLoadWordLists,
-                    translationService: _translationService!,
+                    translationService: _browserTranslationService!,
                     ttsService: _ttsService,
                     authController: authController,
                     onReturnToMenu: _returnToMainMenu,

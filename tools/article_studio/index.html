@@ -322,10 +322,107 @@
       line-height: 1.5;
     }
 
-    /* Center Editor */
+    /* Center Editor Column + Gemini Generator Bar */
+    .editor-column {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .ai-studio-bar {
+      background: linear-gradient(180deg, #ffffff 0%, #f8faff 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .ai-studio-row {
+      max-width: 780px;
+      width: 100%;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .ai-select,
+    .ai-input {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 11px;
+      font-family: inherit;
+      font-size: 13px;
+      color: var(--text);
+      background: #fff;
+      outline: none;
+    }
+
+    .ai-select {
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .ai-select:focus,
+    .ai-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+
+    .btn-ai {
+      background: linear-gradient(135deg, #2563eb, #6366f1);
+      border-color: #4f46e5;
+      color: #fff;
+    }
+
+    .btn-ai:hover:not(:disabled) {
+      background: linear-gradient(135deg, #1d4ed8, #4f46e5);
+      border-color: #4338ca;
+    }
+
+    .ai-key-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      background: #f59e0b;
+    }
+
+    .ai-key-dot.ready {
+      background: #16a34a;
+    }
+
+    .ai-settings-drawer {
+      max-width: 780px;
+      width: 100%;
+      margin: 0 auto;
+      background: #f1f5f9;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 11px 13px;
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .ai-settings-drawer.open {
+      display: flex;
+    }
+
+    .ai-settings-hint {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
     .editor-pane {
+      flex: 1;
       overflow-y: auto;
-      padding: 20px 24px 36px;
+      padding: 18px 24px 36px;
       min-height: 0;
     }
 
@@ -708,9 +805,157 @@
     .toast.success { background: #166534; }
     .toast.error { background: #b91c1c; }
 
+    /* Mode Tabs & Admin Panel */
+    .mode-tabs {
+      display: inline-flex;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 3px;
+      gap: 3px;
+    }
+
+    .mode-tab {
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .mode-tab.active {
+      background: var(--surface);
+      color: var(--primary);
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+    }
+
+    .access-view {
+      flex: 1;
+      overflow-y: auto;
+      padding: 22px 24px 40px;
+      display: none;
+    }
+
+    .access-view.active { display: block; }
+
+    .access-container {
+      max-width: 1120px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .access-grid {
+      display: grid;
+      grid-template-columns: 1.15fr 1fr;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .admin-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px 20px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .admin-card h3 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 800;
+    }
+
+    .admin-sub {
+      margin: 0;
+      font-size: 12.5px;
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+
+    .admin-form-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .admin-input {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 9px 12px;
+      font-family: inherit;
+      font-size: 13.5px;
+      color: var(--text);
+      background: var(--surface-alt);
+      outline: none;
+    }
+
+    .admin-input:focus {
+      border-color: var(--primary);
+      background: #fff;
+    }
+
+    .admin-table {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .admin-row {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 11px 13px;
+      background: var(--surface-alt);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .code-badge {
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: 13.5px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 8px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+    }
+
+    .code-badge.inactive {
+      background: #f3f4f6;
+      color: #6b7280;
+      border-color: #d1d5db;
+      text-decoration: line-through;
+    }
+
+    .usage-pill {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: #ecfdf5;
+      color: #166534;
+    }
+
+    .usage-pill.full {
+      background: #fef2f2;
+      color: #b91c1c;
+    }
+
     @media (max-width: 1180px) {
       .workspace { grid-template-columns: 270px 1fr; }
       .preview-pane { display: none; }
+      .access-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -719,9 +964,14 @@
     <div class="brand">
       <div class="brand-badge">LR</div>
       <div>
-        Line Reader Makale Paneli
+        Line Reader Yönetim Paneli
         <small id="repoInfo">content/articles.json • GitHub &amp; Cloudflare Pages uyumlu</small>
       </div>
+    </div>
+
+    <div class="mode-tabs">
+      <button class="mode-tab active" id="tabArticlesBtn">Makaleler</button>
+      <button class="mode-tab" id="tabAccessBtn">Kodlar &amp; Yetkiler</button>
     </div>
 
     <div id="statusPill" class="status-pill">
@@ -742,7 +992,7 @@
     </button>
   </header>
 
-  <main class="workspace">
+  <main class="workspace" id="articlesWorkspace">
     <!-- Sol: Seviye Filtreleri ve Makale Listesi -->
     <aside class="sidebar">
       <div class="sidebar-top">
@@ -760,8 +1010,66 @@
       <div class="article-list" id="articleList"></div>
     </aside>
 
-    <!-- Orta: Makale Editörü -->
-    <section class="editor-pane" id="editorPane"></section>
+    <!-- Orta: Gemini Üretici + Makale Editörü -->
+    <section class="editor-column">
+      <div class="ai-studio-bar">
+        <div class="ai-studio-row">
+          <select id="aiLevelSelect" class="ai-select" title="Oluşturulacak makalenin CEFR seviyesi">
+            <option value="A1">A1 • Başlangıç</option>
+            <option value="A2">A2 • Temel</option>
+            <option value="B1" selected>B1 • Orta</option>
+            <option value="B2">B2 • Üst Orta</option>
+            <option value="C1">C1 • İleri</option>
+            <option value="C2">C2 • Uzman</option>
+          </select>
+          <input
+            type="text"
+            id="aiTopicInput"
+            class="ai-input"
+            style="flex:1; min-width:170px;"
+            placeholder="Konu (opsiyonel — boş bırakırsan rastgele seçer)"
+          />
+          <button type="button" class="btn btn-ai" id="aiGenerateBtn" title="Seçili seviyede ~350 kelimelik İngilizce makale + kelime anlamlarını otomatik üretir">
+            ✨ Gemini ile Oluştur
+          </button>
+          <button type="button" class="btn btn-sm" id="newFromTemplateBtn" title="Seçili seviyede kendi yazacağınız makale için hazır şablon açar">
+            📄 Şablon ile Ekle
+          </button>
+          <button type="button" class="btn btn-sm" id="copyPromptTemplateBtn" title="Harici Gemini / ChatGPT için hazır prompt şablonunu kopyalar">
+            📋 Prompt
+          </button>
+          <button type="button" class="btn btn-sm" id="toggleGeminiSettingsBtn" title="Yerel Gemini API anahtarı ayarı">
+            <span id="aiKeyDot" class="ai-key-dot"></span>
+            Gemini Ayarı
+          </button>
+        </div>
+
+        <div class="ai-settings-drawer" id="aiSettingsDrawer">
+          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            <input
+              type="password"
+              id="geminiApiKeyInput"
+              class="ai-input"
+              style="flex:1; min-width:220px;"
+              placeholder="Gemini API Anahtarınız (AIza...)"
+            />
+            <select id="geminiModelSelect" class="ai-select" title="Gemini Modeli">
+              <option value="gemini-2.5-flash">gemini-2.5-flash (Önerilen)</option>
+              <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite (Hızlı)</option>
+              <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+            </select>
+            <button type="button" class="btn btn-primary btn-sm" id="saveGeminiConfigBtn">
+              Anahtarı Kaydet
+            </button>
+          </div>
+          <div class="ai-settings-hint" id="geminiStatusHint">
+            API anahtarınız yalnızca bu bilgisayardaki yerel <code>admin_config.local.json</code> dosyasında saklanır; GitHub'a veya APK'ya asla çıkmaz.
+          </div>
+        </div>
+      </div>
+
+      <div class="editor-pane" id="editorPane"></div>
+    </section>
 
     <!-- Sağ: Canlı Önizleme -->
     <aside class="preview-pane">
@@ -776,6 +1084,70 @@
       <div class="preview-scroll" id="previewScroll"></div>
     </aside>
   </main>
+
+  <!-- Kodlar & Yetkiler Sekmesi -->
+  <section class="access-view" id="accessView">
+    <div class="access-container">
+      <div class="admin-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+          <div>
+            <h3>Cloudflare Worker Yönetici Bağlantısı</h3>
+            <p class="admin-sub">
+              Yönetici şifresi (<code>ADMIN_SECRET</code>) yalnızca bu bilgisayarda yerel olarak saklanır; GitHub'a veya APK'ya asla çıkmaz.
+            </p>
+          </div>
+          <span id="adminConnBadge" class="usage-pill">Kontrol ediliyor...</span>
+        </div>
+        <div class="admin-form-row">
+          <input type="text" id="adminWorkerUrlInput" class="admin-input" style="flex:1;min-width:260px;" placeholder="https://linereader-ai.xreasayaz21.workers.dev" />
+          <input type="password" id="adminSecretInput" class="admin-input" style="width:240px;" placeholder="ADMIN_SECRET şifreniz" />
+          <button class="btn btn-primary" id="saveAdminConfigBtn">Bağlan ve Kaydet</button>
+          <button class="btn" id="refreshAdminDataBtn">Listeleri Yenile</button>
+        </div>
+      </div>
+
+      <div class="access-grid">
+        <!-- Sol: Aktivasyon Kodları -->
+        <div class="admin-card">
+          <div>
+            <h3>Aktivasyon Kodları (Özel Kod Oluştur)</h3>
+            <p class="admin-sub">İstediğiniz adla (ör. <b>AYAZ2026</b>) ve istediğiniz kullanım adediyle kod oluşturun; kullanıcılar Ayarlar ekranından kodu girince anında sınırsız + reklamsız + Tarayıcı AI yetkisi kazanır.</p>
+          </div>
+
+          <div class="admin-form-row">
+            <input type="text" id="newCodeInput" class="admin-input" style="flex:1;min-width:150px;text-transform:uppercase;font-weight:700;" placeholder="Örn: AYAZ2026" />
+            <input type="number" id="newCodeMaxUses" class="admin-input" style="width:105px;" min="1" max="100000" value="1" title="Kullanım Sayısı" />
+            <button class="btn btn-sm" id="randomCodeBtn" type="button">Rastgele</button>
+          </div>
+          <div class="admin-form-row">
+            <input type="text" id="newCodeNote" class="admin-input" style="flex:1;" placeholder="Kısa not (opsiyonel — ör. Arkadaşlar için)" />
+            <button class="btn btn-success" id="createCodeBtn">+ Kod Oluştur</button>
+          </div>
+
+          <div class="admin-table" id="adminCodesList">
+            <div class="empty-list">Kodları görmek için yönetici bağlantısını kaydedin.</div>
+          </div>
+        </div>
+
+        <!-- Sağ: Manuel Kullanıcı Yetki Yönetimi -->
+        <div class="admin-card">
+          <div>
+            <h3>Kullanıcı Yetkileri (Ver / Kaldır)</h3>
+            <p class="admin-sub">Kod paylaşmadan istediğiniz kullanıcının e-posta adresine anında sınırsız yetki verin veya tek tıkla yetkisini geri alın.</p>
+          </div>
+
+          <div class="admin-form-row">
+            <input type="email" id="grantUserEmailInput" class="admin-input" style="flex:1;min-width:210px;" placeholder="kullanici@gmail.com" />
+            <button class="btn btn-primary" id="grantUserBtn">Yetki Ver</button>
+          </div>
+
+          <div class="admin-table" id="adminUsersList">
+            <div class="empty-list">Yetkili kullanıcıları görmek için yönetici bağlantısını kaydedin.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
   <div id="toast" class="toast"></div>
   <input type="file" id="hiddenFileInput" accept=".txt,.md,text/plain" style="display:none;" />
@@ -1514,7 +1886,9 @@
     }
 
     function createNewArticle() {
-      const defaultLevel = state.filterLevel !== "ALL" ? state.filterLevel : "A1";
+      const defaultLevel = state.filterLevel !== "ALL"
+        ? state.filterLevel
+        : (document.getElementById("aiLevelSelect")?.value || "A1");
       const fresh = {
         id: uniqueIdFor("yeni-makale", defaultLevel),
         level: defaultLevel,
@@ -1522,7 +1896,7 @@
         description: "",
         reading_time: "3 - 5 dk",
         category: "",
-        author: "",
+        author: "Line Reader",
         language: "en",
         content: "",
         word_meanings_text: "",
@@ -1537,6 +1911,244 @@
       const titleInput = document.getElementById("fieldTitle");
       if (titleInput) titleInput.focus();
     }
+
+    function createArticleFromTemplate() {
+      const chosenLevel = levelMeta(document.getElementById("aiLevelSelect")?.value || "B1").code;
+      const customTopic = (document.getElementById("aiTopicInput")?.value || "").trim();
+      const titleText = customTopic
+        ? `${customTopic} — Draft Title`
+        : `[${chosenLevel}] Write Your English Title Here`;
+      const templateContent = [
+        "Paragraph 1 (Introduction): Introduce the main topic clearly in 3-4 natural English sentences suited to " + chosenLevel + " level.",
+        "Paragraph 2 (Background / Detail): Explain why this topic matters or share an interesting example, story, or fact.",
+        "Paragraph 3 (Deeper Perspective): Add a second perspective, practical tip, or surprising detail to keep the reader engaged.",
+        "Paragraph 4 (Conclusion): Wrap up the article with a memorable final thought (aim for roughly 350 words in total)."
+      ].join("\n\n");
+
+      const templateMeanings = [
+        "example: örnek",
+        "perspective: bakış açısı",
+        "practical: pratik, kullanışlı",
+        "memorable: akılda kalıcı"
+      ].join("\n");
+
+      const fresh = {
+        id: uniqueIdFor(titleText, chosenLevel),
+        level: chosenLevel,
+        title: titleText,
+        description: "Write a concise 1-2 sentence English summary for the article card here.",
+        reading_time: estimateReadingTime(templateContent),
+        category: "General",
+        author: "Line Reader",
+        language: "en",
+        content: templateContent,
+        word_meanings_text: templateMeanings,
+        published_at: new Date().toISOString(),
+        _autoId: true,
+        _autoReadTime: true
+      };
+
+      state.articles.unshift(fresh);
+      state.selectedIndex = 0;
+      state.dirty = true;
+      renderAll();
+      const titleInput = document.getElementById("fieldTitle");
+      if (titleInput) {
+        titleInput.focus();
+        titleInput.select();
+      }
+      showToast(`${chosenLevel} seviyesi için hazır makale şablonu oluşturuldu.`, "success");
+    }
+
+    async function copyPromptTemplate() {
+      const chosenLevel = levelMeta(document.getElementById("aiLevelSelect")?.value || "B1").code;
+      const customTopic = (document.getElementById("aiTopicInput")?.value || "").trim();
+      const topicLine = customTopic
+        ? `Topic: ${customTopic}`
+        : "Topic: Choose any fresh, engaging, interesting topic (science, culture, psychology, history, travel, nature, technology, or daily life).";
+
+      const promptText = [
+        `Write an original English reading article for the Line Reader app.`,
+        `Level: CEFR ${chosenLevel}`,
+        topicLine,
+        `Author: Line Reader`,
+        `Length: Around 350 words (320-380 words), divided into 4-5 clear paragraphs.`,
+        ``,
+        `Provide the output in these exact sections:`,
+        `1) Title (in English)`,
+        `2) Description (1-2 sentence summary in English)`,
+        `3) Category (1-2 words in English)`,
+        `4) Content (4-5 English paragraphs, ~350 words)`,
+        `5) Word Meanings (35-45 key words from the article, each on a new line in "word: contextual Turkish meaning" format)`
+      ].join("\n");
+
+      try {
+        await navigator.clipboard.writeText(promptText);
+        showToast(`${chosenLevel} seviyesi için AI prompt şablonu panoya kopyalandı.`, "success");
+      } catch (_) {
+        window.prompt("Prompt şablonunu kopyalayın:", promptText);
+      }
+    }
+
+    /* ---------------- Gemini Makale Üretici ---------------- */
+    const aiEl = {
+      levelSelect: document.getElementById("aiLevelSelect"),
+      topicInput: document.getElementById("aiTopicInput"),
+      generateBtn: document.getElementById("aiGenerateBtn"),
+      templateBtn: document.getElementById("newFromTemplateBtn"),
+      copyPromptBtn: document.getElementById("copyPromptTemplateBtn"),
+      toggleSettingsBtn: document.getElementById("toggleGeminiSettingsBtn"),
+      settingsDrawer: document.getElementById("aiSettingsDrawer"),
+      keyDot: document.getElementById("aiKeyDot"),
+      apiKeyInput: document.getElementById("geminiApiKeyInput"),
+      modelSelect: document.getElementById("geminiModelSelect"),
+      saveConfigBtn: document.getElementById("saveGeminiConfigBtn"),
+      statusHint: document.getElementById("geminiStatusHint")
+    };
+
+    let hasGeminiKey = false;
+    let isGeneratingArticle = false;
+
+    async function loadAiConfig() {
+      try {
+        const res = await fetch("/api/ai/config");
+        const cfg = await res.json();
+        if (cfg && cfg.ok) {
+          hasGeminiKey = Boolean(cfg.hasGeminiKey);
+          aiEl.keyDot.classList.toggle("ready", hasGeminiKey);
+          if (cfg.geminiModel && Array.from(aiEl.modelSelect.options).some(o => o.value === cfg.geminiModel)) {
+            aiEl.modelSelect.value = cfg.geminiModel;
+          }
+          aiEl.statusHint.innerHTML = hasGeminiKey
+            ? "<b>Gemini bağlı.</b> Anahtarınız yalnızca bu bilgisayarda yerel <code>admin_config.local.json</code> dosyasında saklanır (GitHub'a çıkmaz)."
+            : "Henüz Gemini API anahtarı kaydedilmedi. Google AI Studio anahtarınızı yapıştırıp kaydedin (yalnızca bu PC'de yerel saklanır).";
+        }
+      } catch (_) {}
+    }
+
+    async function saveAiConfig() {
+      const key = aiEl.apiKeyInput.value.trim();
+      const model = aiEl.modelSelect.value;
+      if (!key && !hasGeminiKey) {
+        showToast("Lütfen geçerli bir Gemini API anahtarı girin.", "error");
+        return;
+      }
+      aiEl.saveConfigBtn.disabled = true;
+      try {
+        const res = await fetch("/api/ai/config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json; charset=utf-8" },
+          body: JSON.stringify({
+            geminiApiKey: key,
+            geminiModel: model
+          })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.message || data.error || "Kaydedilemedi.");
+        aiEl.apiKeyInput.value = "";
+        await loadAiConfig();
+        aiEl.settingsDrawer.classList.remove("open");
+        showToast(data.message || "Gemini ayarı kaydedildi.", "success");
+      } catch (err) {
+        showToast(err.message || "Gemini ayarı kaydedilemedi.", "error");
+      } finally {
+        aiEl.saveConfigBtn.disabled = false;
+      }
+    }
+
+    async function generateArticleWithGemini() {
+      if (isGeneratingArticle || state.busy) return;
+      if (!hasGeminiKey) {
+        aiEl.settingsDrawer.classList.add("open");
+        aiEl.apiKeyInput.focus();
+        showToast("Önce Gemini API anahtarınızı kaydedin.", "error");
+        return;
+      }
+
+      const chosenLevel = levelMeta(aiEl.levelSelect.value || "B1").code;
+      const customTopic = aiEl.topicInput.value.trim();
+      const existingTitles = state.articles.map(a => a.title).filter(Boolean).slice(0, 40);
+
+      isGeneratingArticle = true;
+      const originalLabel = aiEl.generateBtn.textContent;
+      aiEl.generateBtn.disabled = true;
+      aiEl.generateBtn.textContent = "⏳ Oluşturuluyor...";
+
+      try {
+        const res = await fetch("/api/ai/generate-article", {
+          method: "POST",
+          headers: { "Content-Type": "application/json; charset=utf-8" },
+          body: JSON.stringify({
+            level: chosenLevel,
+            topic: customTopic,
+            existingTitles
+          })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok || !data.article) {
+          if (data && data.needsKey) {
+            aiEl.settingsDrawer.classList.add("open");
+            aiEl.apiKeyInput.focus();
+          }
+          throw new Error((data && (data.message || data.error)) || "Makale üretilemedi.");
+        }
+
+        const gen = data.article;
+        const wmText = formatWordMeaningsMap(gen.word_meanings || {});
+        const contentText = (gen.content || "").replace(/\r\n/g, "\n").trim();
+        const fresh = {
+          id: uniqueIdFor(gen.title || "article", chosenLevel),
+          level: chosenLevel,
+          title: (gen.title || "").trim(),
+          description: (gen.description || "").trim(),
+          reading_time: estimateReadingTime(contentText),
+          category: (gen.category || "General").trim(),
+          author: "Line Reader",
+          language: "en",
+          content: contentText,
+          word_meanings_text: wmText,
+          published_at: new Date().toISOString(),
+          _autoId: true,
+          _autoReadTime: true
+        };
+
+        state.articles.unshift(fresh);
+        state.selectedIndex = 0;
+        if (state.filterLevel !== "ALL" && state.filterLevel !== chosenLevel) {
+          state.filterLevel = "ALL";
+        }
+        state.dirty = true;
+        aiEl.topicInput.value = "";
+        renderAll();
+
+        const wc = countWords(fresh.content);
+        const wmCount = parseWordMeaningsText(fresh.word_meanings_text).count;
+        showToast(`✨ ${chosenLevel} makale oluşturuldu (${wc} kelime • ${wmCount} kelime anlamı).`, "success");
+      } catch (err) {
+        showToast(err.message || "Gemini makale oluşturma hatası.", "error");
+      } finally {
+        isGeneratingArticle = false;
+        aiEl.generateBtn.disabled = false;
+        aiEl.generateBtn.textContent = originalLabel;
+      }
+    }
+
+    aiEl.toggleSettingsBtn.addEventListener("click", () => {
+      aiEl.settingsDrawer.classList.toggle("open");
+      if (aiEl.settingsDrawer.classList.contains("open")) {
+        aiEl.apiKeyInput.focus();
+      }
+    });
+    aiEl.saveConfigBtn.addEventListener("click", saveAiConfig);
+    aiEl.generateBtn.addEventListener("click", generateArticleWithGemini);
+    aiEl.templateBtn.addEventListener("click", createArticleFromTemplate);
+    aiEl.copyPromptBtn.addEventListener("click", copyPromptTemplate);
+    aiEl.topicInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        generateArticleWithGemini();
+      }
+    });
 
     async function saveDraft() {
       if (state.busy || !validateBeforeSave()) return;
@@ -1674,7 +2286,262 @@
       }
     });
 
+    /* ---------------- Kodlar & Yetkiler Sekmesi ---------------- */
+    const accessEl = {
+      tabArticlesBtn: document.getElementById("tabArticlesBtn"),
+      tabAccessBtn: document.getElementById("tabAccessBtn"),
+      articlesWorkspace: document.getElementById("articlesWorkspace"),
+      accessView: document.getElementById("accessView"),
+      adminConnBadge: document.getElementById("adminConnBadge"),
+      workerUrlInput: document.getElementById("adminWorkerUrlInput"),
+      secretInput: document.getElementById("adminSecretInput"),
+      saveConfigBtn: document.getElementById("saveAdminConfigBtn"),
+      refreshBtn: document.getElementById("refreshAdminDataBtn"),
+      newCodeInput: document.getElementById("newCodeInput"),
+      newCodeMaxUses: document.getElementById("newCodeMaxUses"),
+      newCodeNote: document.getElementById("newCodeNote"),
+      randomCodeBtn: document.getElementById("randomCodeBtn"),
+      createCodeBtn: document.getElementById("createCodeBtn"),
+      codesList: document.getElementById("adminCodesList"),
+      grantEmailInput: document.getElementById("grantUserEmailInput"),
+      grantUserBtn: document.getElementById("grantUserBtn"),
+      usersList: document.getElementById("adminUsersList")
+    };
+
+    let adminLoadedOnce = false;
+
+    function switchMainTab(tab) {
+      const isArticles = tab === "articles";
+      accessEl.tabArticlesBtn.classList.toggle("active", isArticles);
+      accessEl.tabAccessBtn.classList.toggle("active", !isArticles);
+      accessEl.articlesWorkspace.style.display = isArticles ? "" : "none";
+      accessEl.accessView.classList.toggle("active", !isArticles);
+      el.saveDraftBtn.style.display = isArticles ? "" : "none";
+      el.publishBtn.style.display = isArticles ? "" : "none";
+      el.statusPill.style.display = isArticles ? "" : "none";
+      if (!isArticles && !adminLoadedOnce) {
+        adminLoadedOnce = true;
+        loadAdminConfigAndData();
+      }
+    }
+
+    accessEl.tabArticlesBtn.addEventListener("click", () => switchMainTab("articles"));
+    accessEl.tabAccessBtn.addEventListener("click", () => switchMainTab("access"));
+
+    async function loadAdminConfigAndData() {
+      try {
+        const res = await fetch("/api/admin/config");
+        const cfg = await res.json();
+        accessEl.workerUrlInput.value = cfg.workerUrl || "https://linereader-ai.xreasayaz21.workers.dev";
+        if (cfg.hasSecret) {
+          accessEl.adminConnBadge.textContent = "Bağlı (Şifre kayıtlı)";
+          accessEl.adminConnBadge.className = "usage-pill";
+          await refreshAdminLists();
+        } else {
+          accessEl.adminConnBadge.textContent = "ADMIN_SECRET girilmedi";
+          accessEl.adminConnBadge.className = "usage-pill full";
+        }
+      } catch (err) {
+        showToast("Yönetici ayarı okunamadı: " + err.message, "error");
+      }
+    }
+
+    async function refreshAdminLists() {
+      await Promise.all([loadAdminCodes(), loadAdminUsers()]);
+    }
+
+    async function loadAdminCodes() {
+      try {
+        const res = await fetch("/api/admin/codes");
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          accessEl.codesList.innerHTML = `<div class="empty-list">${escapeHtml(data.message || data.error || "Kodlar alınamadı.")}</div>`;
+          return;
+        }
+        const codes = data.codes || [];
+        if (codes.length === 0) {
+          accessEl.codesList.innerHTML = `<div class="empty-list">Henüz oluşturulmuş aktivasyon kodu yok.</div>`;
+          return;
+        }
+        accessEl.codesList.innerHTML = codes.map(c => {
+          const active = Number(c.is_active) === 1;
+          const used = Number(c.used_count) || 0;
+          const max = Number(c.max_uses) || 1;
+          const isFull = used >= max;
+          return `
+            <div class="admin-row">
+              <span class="code-badge ${active ? "" : "inactive"}">${escapeHtml(c.code)}</span>
+              <span class="usage-pill ${isFull ? "full" : ""}">${used} / ${max} kullanım</span>
+              ${c.note ? `<span style="font-size:12px;color:var(--text-muted);">${escapeHtml(c.note)}</span>` : ""}
+              <div style="margin-left:auto;display:flex;gap:6px;">
+                <button class="mini-btn" data-code-act="copy" data-code="${escapeHtml(c.code)}">Kopyala</button>
+                <button class="mini-btn" data-code-act="toggle" data-code="${escapeHtml(c.code)}" data-active="${active ? "1" : "0"}">${active ? "Durdur" : "Aktifleştir"}</button>
+                <button class="mini-btn del" data-code-act="delete" data-code="${escapeHtml(c.code)}">Sil</button>
+              </div>
+            </div>
+          `;
+        }).join("");
+
+        accessEl.codesList.querySelectorAll("button[data-code-act]").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const code = btn.dataset.code;
+            const act = btn.dataset.codeAct;
+            if (act === "copy") {
+              navigator.clipboard?.writeText(code);
+              showToast(`"${code}" panoya kopyalandı.`, "success");
+            } else if (act === "toggle") {
+              const nextActive = btn.dataset.active !== "1";
+              const r = await fetch("/api/admin/codes", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ code, is_active: nextActive })
+              });
+              const d = await r.json();
+              showToast(d.message || "Güncellendi.", r.ok ? "success" : "error");
+              await loadAdminCodes();
+            } else if (act === "delete") {
+              if (!confirm(`"${code}" kodunu silmek istiyor musunuz?`)) return;
+              const r = await fetch("/api/admin/codes", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ code })
+              });
+              const d = await r.json();
+              showToast(d.message || "Silindi.", r.ok ? "success" : "error");
+              await loadAdminCodes();
+            }
+          });
+        });
+      } catch (err) {
+        accessEl.codesList.innerHTML = `<div class="empty-list">Bağlantı hatası: ${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    async function loadAdminUsers() {
+      try {
+        const res = await fetch("/api/admin/users");
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          accessEl.usersList.innerHTML = `<div class="empty-list">${escapeHtml(data.message || data.error || "Kullanıcılar alınamadı.")}</div>`;
+          return;
+        }
+        const users = data.users || [];
+        if (users.length === 0) {
+          accessEl.usersList.innerHTML = `<div class="empty-list">Henüz sınırsız yetkili kullanıcı yok.</div>`;
+          return;
+        }
+        accessEl.usersList.innerHTML = users.map(u => {
+          const badge = u.code_used ? `Kod: ${u.code_used}` : "Manuel Yetki";
+          return `
+            <div class="admin-row">
+              <div style="min-width:160px;">
+                <div style="font-size:13.5px;font-weight:700;">${escapeHtml(u.email)}</div>
+                <div style="font-size:11.5px;color:var(--text-muted);">${escapeHtml(badge)}</div>
+              </div>
+              <button class="mini-btn del" style="margin-left:auto;" data-revoke-email="${escapeHtml(u.email)}">Yetkiyi Kaldır</button>
+            </div>
+          `;
+        }).join("");
+
+        accessEl.usersList.querySelectorAll("button[data-revoke-email]").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const email = btn.dataset.revokeEmail;
+            if (!confirm(`${email} hesabının sınırsız yetkisini kaldırmak istiyor musunuz?`)) return;
+            const r = await fetch("/api/admin/users", {
+              method: "DELETE",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email })
+            });
+            const d = await r.json();
+            showToast(d.message || "Yetki kaldırıldı.", r.ok ? "success" : "error");
+            await loadAdminUsers();
+          });
+        });
+      } catch (err) {
+        accessEl.usersList.innerHTML = `<div class="empty-list">Bağlantı hatası: ${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    accessEl.saveConfigBtn.addEventListener("click", async () => {
+      try {
+        const res = await fetch("/api/admin/config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            workerUrl: accessEl.workerUrlInput.value.trim(),
+            adminSecret: accessEl.secretInput.value.trim()
+          })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || "Kaydedilemedi");
+        accessEl.secretInput.value = "";
+        showToast(data.message || "Kaydedildi.", "success");
+        await loadAdminConfigAndData();
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    });
+
+    accessEl.refreshBtn.addEventListener("click", refreshAdminLists);
+
+    accessEl.randomCodeBtn.addEventListener("click", () => {
+      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      let out = "LR-";
+      for (let i = 0; i < 6; i++) out += chars[Math.floor(Math.random() * chars.length)];
+      accessEl.newCodeInput.value = out;
+    });
+
+    accessEl.createCodeBtn.addEventListener("click", async () => {
+      const code = accessEl.newCodeInput.value.trim().toUpperCase();
+      const maxUses = Math.max(1, parseInt(accessEl.newCodeMaxUses.value, 10) || 1);
+      const note = accessEl.newCodeNote.value.trim();
+      if (!code || code.length < 3) {
+        showToast("En az 3 karakterli bir kod yazın (örn: AYAZ2026).", "error");
+        return;
+      }
+      try {
+        const res = await fetch("/api/admin/codes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, max_uses: maxUses, note })
+        });
+        const data = await res.json();
+        showToast(data.message || data.error || "İşlem tamamlandı.", res.ok ? "success" : "error");
+        if (res.ok) {
+          accessEl.newCodeInput.value = "";
+          accessEl.newCodeNote.value = "";
+          await loadAdminCodes();
+        }
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    });
+
+    accessEl.grantUserBtn.addEventListener("click", async () => {
+      const email = accessEl.grantEmailInput.value.trim().toLowerCase();
+      if (!email || !email.includes("@")) {
+        showToast("Geçerli bir e-posta adresi yazın.", "error");
+        return;
+      }
+      try {
+        const res = await fetch("/api/admin/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email })
+        });
+        const data = await res.json();
+        showToast(data.message || data.error || "İşlem tamamlandı.", res.ok ? "success" : "error");
+        if (res.ok) {
+          accessEl.grantEmailInput.value = "";
+          await loadAdminUsers();
+        }
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    });
+
     loadInitial();
+    loadAiConfig();
   </script>
 </body>
 </html>

@@ -50,6 +50,16 @@ class AppUpdateController extends ChangeNotifier {
         remoteInfo: _remoteInfo,
       );
 
+  /// Sunucudaki `min_version_code` kurulu build numarasından büyükse ve yeni
+  /// sürüm mevcutsa uygulama açılışta zorunlu güncelleme ekranı gösterir.
+  bool get requiresMandatoryUpdate {
+    final info = _remoteInfo;
+    if (info == null || !hasUpdate) return false;
+    return info.minVersionCode > 0 &&
+        _currentBuildNumber > 0 &&
+        _currentBuildNumber < info.minVersionCode;
+  }
+
   bool get isDownloading => _isDownloading;
   double? get downloadProgress => _downloadProgress;
   int get receivedBytes => _receivedBytes;

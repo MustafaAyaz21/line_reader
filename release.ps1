@@ -11,7 +11,8 @@
 param(
     [ValidateSet("patch", "minor", "major")]
     [string]$BumpType = "patch",
-    [string]$Notes = "Performans iyileştirmeleri ve hata düzeltmeleri."
+    [string]$Notes = "Performans iyileştirmeleri ve hata düzeltmeleri.",
+    [int]$MinVersionCode = 0
 )
 
 $ErrorActionPreference = "Stop"
@@ -101,10 +102,11 @@ try {
     Write-Step "version.json güncelleniyor..."
     $apkDownloadUrl = "https://github.com/$RepoSlug/releases/download/v$newVersion/app-release.apk"
     $versionObject = [ordered]@{
-        latest_version = $newVersion
-        version_code   = $newBuildNumber
-        apk_url        = $apkDownloadUrl
-        release_notes  = $Notes
+        latest_version   = $newVersion
+        version_code     = $newBuildNumber
+        min_version_code = $MinVersionCode
+        apk_url          = $apkDownloadUrl
+        release_notes    = $Notes
     }
     $versionJsonText = ($versionObject | ConvertTo-Json -Depth 4) + "`n"
     Write-Utf8NoBom -Path $VersionJsonPath -Content $versionJsonText
@@ -123,10 +125,14 @@ try {
         & git remote set-url origin $RemoteUrl
     }
 
-    # Güvenlik: key.properties veya .jks dosyalarının stage edilmeyeceğinden emin ol
+    # Güvenlik: gizli imzalama/Firebase/admin dosyalarının stage edilmeyeceğinden emin ol
     & git add .
     $stagedSecrets = (& git diff --cached --name-only) | Where-Object {
-        $_ -match 'key\.properties$' -or $_ -match '\.jks$' -or $_ -match '\.keystore$'
+        $_ -match 'key\.properties$' -or
+        $_ -match '\.jks$' -or
+        $_ -match '\.keystore$' -or
+        $_ -match 'google-services\.json$' -or
+        $_ -match 'admin_config\.local\.json$'
     }
     if ($stagedSecrets) {
         throw "Güvenlik engeli: Gizli imzalama dosyası Git'e eklenmeye çalışıldı: $($stagedSecrets -join ', ')"

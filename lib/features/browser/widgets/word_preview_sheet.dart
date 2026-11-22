@@ -235,6 +235,79 @@ class _WordPreviewSheetState extends State<WordPreviewSheet> {
     }
   }
 
+  Future<void> _handleRedeemCodeForQuota() async {
+    final authController = widget.authController;
+    if (authController == null) return;
+    final s = context.l10n;
+    final codeCtrl = TextEditingController();
+
+    final enteredCode = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(s.redeemCodeTitle),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Text(
+                s.t(
+                  'Aktivasyon kodunuzu girerek sınırsız kelime çevirisi, tarayıcı AI ve reklamsız kullanımı hemen etkinleştirebilirsiniz.',
+                  'Enter your activation code to unlock unlimited translations, Browser AI, and ad-free reading.',
+                ),
+                style: Theme.of(dialogContext).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: codeCtrl,
+                autofocus: true,
+                textCapitalization: TextCapitalization.characters,
+                autocorrect: false,
+                decoration: InputDecoration(
+                  hintText: s.redeemCodeHint,
+                  border: const OutlineInputBorder(),
+                ),
+                onSubmitted: (value) =>
+                    Navigator.of(dialogContext).pop(value.trim()),
+              ),
+            ],
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(s.cancel),
+            ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.of(dialogContext).pop(codeCtrl.text.trim()),
+              child: Text(s.redeemCodeApply),
+            ),
+          ],
+        );
+      },
+    );
+    codeCtrl.dispose();
+
+    if (enteredCode == null || enteredCode.isEmpty || !mounted) return;
+
+    final result = await authController.redeemAccessCode(enteredCode);
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(result.message),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+
+    if (result.isSuccess) {
+      await _fetchMeaning();
+    }
+  }
+
   Future<void> _handleSpeakWord() async {
     await _resolveTtsService().toggleSpeak(
       text: widget.word,
@@ -672,6 +745,8 @@ class _WordPreviewSheetState extends State<WordPreviewSheet> {
 
     if (_errorType == TranslationErrorType.guestLimitReached) {
       final s = context.l10n;
+      final isStandardUser = (widget.authController?.isAuthenticated ?? false) &&
+          !(widget.authController?.isUnlimited ?? false);
       return Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
@@ -683,9 +758,13 @@ class _WordPreviewSheetState extends State<WordPreviewSheet> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              s.guestQuotaReachedMessage(
-                AuthController.guestDailyTranslationLimit,
-              ),
+              isStandardUser
+                  ? s.standardQuotaReachedMessage(
+                      AuthController.standardUserDailyTranslationLimit,
+                    )
+                  : s.guestQuotaReachedMessage(
+                      AuthController.guestDailyTranslationLimit,
+                    ),
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onErrorContainer,
                 height: 1.4,
@@ -693,14 +772,26 @@ class _WordPreviewSheetState extends State<WordPreviewSheet> {
             ),
             if (widget.authController != null) ...[
               const SizedBox(height: 10),
-              FilledButton.icon(
-                key: const ValueKey<String>('sheet_guest_limit_signin_button'),
-                onPressed: _handleOpenAuthForQuota,
-                icon: const Icon(Icons.login_rounded, size: 18),
-                label: Text(
-                  s.t('Giriş Yap / Kayıt Ol', 'Sign In / Sign Up'),
+              if (isStandardUser)
+                FilledButton.icon(
+                  key: const ValueKey<String>(
+                    'sheet_standard_limit_redeem_button',
+                  ),
+                  onPressed: _handleRedeemCodeForQuota,
+                  icon: const Icon(Icons.vpn_key_rounded, size: 18),
+                  label: Text(s.redeemCodeTitle),
+                )
+              else
+                FilledButton.icon(
+                  key: const ValueKey<String>(
+                    'sheet_guest_limit_signin_button',
+                  ),
+                  onPressed: _handleOpenAuthForQuota,
+                  icon: const Icon(Icons.login_rounded, size: 18),
+                  label: Text(
+                    s.t('Giriş Yap / Kayıt Ol', 'Sign In / Sign Up'),
+                  ),
                 ),
-              ),
             ],
           ],
         ),

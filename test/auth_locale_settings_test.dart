@@ -6,12 +6,17 @@ import 'package:linereader/core/database/app_database.dart';
 import 'package:linereader/core/localization/app_locale.dart';
 import 'package:linereader/core/settings/api_key_controller.dart';
 import 'package:linereader/core/settings/settings_repository.dart';
+import 'package:linereader/features/ads/widgets/promo_interstitial_dialog.dart';
 import 'package:linereader/features/auth/controllers/auth_controller.dart';
 import 'package:linereader/features/auth/data/auth_local_repository.dart';
 import 'package:linereader/features/auth/models/auth_user.dart';
 import 'package:linereader/features/auth/screens/auth_screen.dart';
 import 'package:linereader/features/auth/services/auth_service.dart';
+import 'package:linereader/features/auth/services/entitlement_service.dart';
 import 'package:linereader/features/settings/screens/settings_screen.dart';
+import 'package:linereader/features/update/controllers/app_update_controller.dart';
+import 'package:linereader/features/update/models/app_update_info.dart';
+import 'package:linereader/features/update/services/app_update_service.dart';
 
 class _InMemoryLanguageStore implements AppLanguageStore {
   AppLanguage saved = AppLanguage.tr;
@@ -29,6 +34,8 @@ class _InMemoryAuthLocalStore implements AuthLocalStore {
   bool guestEnabled = false;
   String quotaDate = '';
   int quotaUsed = 0;
+  bool cachedUnlimited = false;
+  String? cachedCodeUsed;
 
   @override
   Future<bool> isGuestModeEnabled() async => guestEnabled;
@@ -51,6 +58,59 @@ class _InMemoryAuthLocalStore implements AuthLocalStore {
     quotaDate = dateKey;
     quotaUsed = usedCount;
   }
+
+  @override
+  Future<({bool isUnlimited, String? codeUsed})> loadCachedEntitlement() async {
+    return (isUnlimited: cachedUnlimited, codeUsed: cachedCodeUsed);
+  }
+
+  @override
+  Future<void> saveCachedEntitlement({
+    required bool isUnlimited,
+    String? codeUsed,
+  }) async {
+    cachedUnlimited = isUnlimited;
+    cachedCodeUsed = isUnlimited ? codeUsed : null;
+  }
+}
+
+class _FakeEntitlementClient implements EntitlementClient {
+  bool remoteUnlimited = false;
+  String? remoteCodeUsed;
+  final String validCode = 'AYAZ2026';
+
+  @override
+  Future<EntitlementStatus?> fetchEntitlement(String idToken) async {
+    return EntitlementStatus(
+      isUnlimited: remoteUnlimited,
+      source: remoteUnlimited ? 'code' : 'none',
+      codeUsed: remoteCodeUsed,
+    );
+  }
+
+  @override
+  Future<RedeemCodeResult> redeemCode({
+    required String idToken,
+    required String code,
+  }) async {
+    final normalized = code.trim().toUpperCase();
+    if (normalized == validCode) {
+      remoteUnlimited = true;
+      remoteCodeUsed = normalized;
+      return RedeemCodeResult(
+        isSuccess: true,
+        message: 'Sınırsız yetki aktif edildi!',
+        code: normalized,
+      );
+    }
+    return const RedeemCodeResult(
+      isSuccess: false,
+      message: 'Geçersiz veya kullanılmış kod.',
+    );
+  }
+
+  @override
+  void dispose() {}
 }
 
 class _FakeAuthBackend implements AuthBackend {
@@ -118,147 +178,395 @@ class _FakeAuthBackend implements AuthBackend {
   }
 
   @override
+  Future<String?> getIdToken() async =>
+      _current == null ? null : 'fake-jwt-token';
+
+  @override
   Future<void> signOut() async {
     _current = null;
     _stream.add(null);
   }
 }
 
+class _FakeAppUpdateService extends AppUpdateService {
+  _FakeAppUpdateService(this.fakeResult);
+
+  final AppUpdateCheckResult fakeResult;
+
+  @override
+  Future<AppUpdateCheckResult> checkUpdateStatus() async => fakeResult;
+}
+
 void main() {
-  group('AuthController & Günlük 40 Kelime Misafir Kotası', () {
-    test('misafir kullanıcı günde en fazla 40 çeviri yapabilir ve ertesi gün sıfırlanır',
-        () async {
-      var fakeNow = DateTime(2026, 11, 22, 10, 0);
-      final localStore = _InMemoryAuthLocalStore();
-      final controller = AuthController(
-        backend: _FakeAuthBackend(),
-        localStore: localStore,
-        nowProvider: () => fakeNow,
-      );
+  group('AuthController • 3 Katmanlı Kota, Kod Kullanımı & Reklam Sıklığı', () {
+    test(
+      'Misafir 40, standart kayıtlı 80, aktivasyon kodlu sınırsız kota uygular',
+      () async {
+        var fakeNow = DateTime(2026, 11, 22, 10, 0);
+        final localStore = _InMemoryAuthLocalStore();
+        final entitlementClient = _FakeEntitlementClient();
+        final controller = AuthController(
+          backend: _FakeAuthBackend(),
+          localStore: localStore,
+          entitlementClient: entitlementClient,
+          nowProvider: () => fakeNow,
+        );
 
-      await controller.initialize();
-      expect(controller.needsOnboarding, isTrue);
+        await controller.initialize();
+        expect(controller.needsOnboarding, isTrue);
 
-      await controller.continueAsGuest();
-      expect(controller.isGuest, isTrue);
-      expect(controller.guestRemainingToday, 40);
+        // 1) Misafir: günlük 40 kelime
+        await controller.continueAsGuest();
+        expect(controller.isGuest, isTrue);
+        expect(controller.dailyTranslationLimit, 40);
+        expect(controller.guestRemainingToday, 40);
 
-      for (var i = 0; i < 40; i++) {
-        final allowed = await controller.consumeTranslationQuotaIfGuest();
-        expect(allowed, isTrue);
-      }
-      expect(controller.guestRemainingToday, 0);
-      expect(controller.hasReachedGuestLimit, isTrue);
+        for (var i = 0; i < 40; i++) {
+          expect(await controller.consumeTranslationQuota(), isTrue);
+        }
+        expect(controller.guestRemainingToday, 0);
+        expect(controller.hasReachedGuestLimit, isTrue);
+        expect(await controller.consumeTranslationQuota(), isFalse);
 
-      // 41. çeviri engellenmeli.
-      final overLimit = await controller.consumeTranslationQuotaIfGuest();
-      expect(overLimit, isFalse);
+        // Ertesi gün sıfırlanır
+        fakeNow = DateTime(2026, 11, 23, 0, 5);
+        expect(controller.guestRemainingToday, 40);
 
-      // Ertesi gün kota yeniden 40 olmalı.
-      fakeNow = DateTime(2026, 11, 23, 0, 5);
-      expect(controller.guestRemainingToday, 40);
-      expect(await controller.consumeTranslationQuotaIfGuest(), isTrue);
-      expect(controller.guestRemainingToday, 39);
+        // 2) Kayıtlı Standart Hesap: günlük 80 kelime (kod kullanmadan sınırsız değil)
+        final res = await controller.signInWithGoogle();
+        expect(res.isSuccess, isTrue);
+        expect(controller.isAuthenticated, isTrue);
+        expect(controller.isUnlimited, isFalse);
+        expect(controller.dailyTranslationLimit, 80);
 
-      // Google ile giriş yapınca sınırsız olmalı.
-      final res = await controller.signInWithGoogle();
-      expect(res.isSuccess, isTrue);
-      expect(controller.isAuthenticated, isTrue);
-      expect(controller.hasReachedGuestLimit, isFalse);
-      for (var i = 0; i < 60; i++) {
-        expect(await controller.consumeTranslationQuotaIfGuest(), isTrue);
-      }
+        for (var i = 0; i < 80; i++) {
+          expect(await controller.consumeTranslationQuota(), isTrue);
+        }
+        expect(controller.dailyRemainingToday, 0);
+        expect(controller.hasReachedDailyLimit, isTrue);
+        expect(await controller.consumeTranslationQuota(), isFalse);
 
-      controller.dispose();
-    });
+        // 3) Geçersiz kod reddedilir, doğru kod (AYAZ2026) sınırsız açar
+        final badRedeem = await controller.redeemAccessCode('YANLIS');
+        expect(badRedeem.isSuccess, isFalse);
+        expect(controller.isUnlimited, isFalse);
+
+        final goodRedeem = await controller.redeemAccessCode('ayaz2026');
+        expect(goodRedeem.isSuccess, isTrue);
+        expect(controller.isUnlimited, isTrue);
+        expect(controller.entitlementCodeUsed, 'AYAZ2026');
+        expect(controller.hasReachedDailyLimit, isFalse);
+
+        for (var i = 0; i < 120; i++) {
+          expect(await controller.consumeTranslationQuota(), isTrue);
+        }
+
+        controller.dispose();
+      },
+    );
+
+    test(
+      'Özel duyuru/reklam sıklığı misafirde 5, standart hesapta 8, yetkilide 0 olur',
+      () async {
+        final controller = AuthController(
+          backend: _FakeAuthBackend(),
+          localStore: _InMemoryAuthLocalStore(),
+          entitlementClient: _FakeEntitlementClient(),
+        );
+        await controller.initialize();
+        await controller.continueAsGuest();
+
+        // Misafir: 5. ve 10. sorguda true
+        final guestTriggers = <int>[];
+        for (var i = 1; i <= 12; i++) {
+          if (controller.recordWordLookupAndShouldShowPromo()) {
+            guestTriggers.add(i);
+          }
+        }
+        expect(guestTriggers, <int>[5, 10]);
+
+        // Standart kayıtlı: 8. ve 16. sorguda true
+        await controller.signInWithGoogle();
+        final standardTriggers = <int>[];
+        for (var i = 1; i <= 18; i++) {
+          if (controller.recordWordLookupAndShouldShowPromo()) {
+            standardTriggers.add(i);
+          }
+        }
+        expect(standardTriggers, <int>[8, 16]);
+
+        // Yetkili (kod kullanmış): hiç gösterilmez
+        await controller.redeemAccessCode('AYAZ2026');
+        final unlimitedTriggers = <int>[];
+        for (var i = 1; i <= 20; i++) {
+          if (controller.recordWordLookupAndShouldShowPromo()) {
+            unlimitedTriggers.add(i);
+          }
+        }
+        expect(unlimitedTriggers, isEmpty);
+
+        controller.dispose();
+      },
+    );
   });
 
-  group('AuthScreen & SettingsScreen & Dil Seçimi', () {
-    testWidgets('AuthScreen misafir 40 kelime bilgisini ve Google/E-posta seçeneklerini gösterir',
-        (tester) async {
+  group('PromoInterstitialDialog (5 saniye geri sayım)', () {
+    testWidgets('0. saniyede geçilemez, 5 saniye sonra geçilebilir', (
+      tester,
+    ) async {
       final localeController =
           AppLocaleController(store: _InMemoryLanguageStore());
-      final authController = AuthController(
-        backend: _FakeAuthBackend(),
-        localStore: _InMemoryAuthLocalStore(),
-      );
-      await authController.initialize();
 
       await tester.pumpWidget(
         AppLocaleScope(
           controller: localeController,
           child: MaterialApp(
-            home: AuthScreen(controller: authController),
+            home: Builder(
+              builder: (context) => Scaffold(
+                body: ElevatedButton(
+                  onPressed: () => PromoInterstitialDialog.show(context),
+                  child: const Text('Aç'),
+                ),
+              ),
+            ),
           ),
         ),
       );
+
+      await tester.tap(find.text('Aç'));
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const ValueKey<String>('auth_google_button')), findsOneWidget);
-      expect(find.byKey(const ValueKey<String>('auth_email_field')), findsOneWidget);
-      expect(find.byKey(const ValueKey<String>('auth_guest_button')), findsOneWidget);
-      expect(find.textContaining('40 kelime'), findsOneWidget);
+      expect(find.text('Geliştirme Aşamasındayız'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey<String>('promo_countdown_pill')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey<String>('promo_skip_button')),
+        findsNothing,
+      );
 
-      final guestButton = find.byKey(const ValueKey<String>('auth_guest_button'));
-      await tester.ensureVisible(guestButton);
+      // 5 saniye ilerlet
+      await tester.pump(const Duration(seconds: 5));
       await tester.pumpAndSettle();
-      await tester.tap(guestButton);
-      await tester.pumpAndSettle();
-      expect(authController.isGuest, isTrue);
 
-      authController.dispose();
+      expect(
+        find.byKey(const ValueKey<String>('promo_skip_button')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey<String>('promo_skip_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Geliştirme Aşamasındayız'), findsNothing);
       localeController.dispose();
     });
+  });
 
-    testWidgets('SettingsScreen dil değiştirince arayüz anında İngilizceye geçer ve kaydeder',
-        (tester) async {
-      final langStore = _InMemoryLanguageStore();
-      final localeController = AppLocaleController(store: langStore);
-      final authController = AuthController(
-        backend: _FakeAuthBackend(),
-        localStore: _InMemoryAuthLocalStore(),
-      );
-      await authController.initialize();
-      await authController.continueAsGuest();
+  group('AuthScreen & SettingsScreen & Kod Kullan UI', () {
+    testWidgets(
+      'AuthScreen misafir 40 kelime bilgisini ve Google/E-posta seçeneklerini gösterir',
+      (tester) async {
+        final localeController =
+            AppLocaleController(store: _InMemoryLanguageStore());
+        final authController = AuthController(
+          backend: _FakeAuthBackend(),
+          localStore: _InMemoryAuthLocalStore(),
+          entitlementClient: _FakeEntitlementClient(),
+        );
+        await authController.initialize();
 
-      final apiKeyController = ApiKeyController(
-        SettingsRepository(AppDatabase.instance),
-      );
+        await tester.pumpWidget(
+          AppLocaleScope(
+            controller: localeController,
+            child: MaterialApp(
+              home: AuthScreen(controller: authController),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
 
-      await tester.pumpWidget(
-        AppLocaleScope(
-          controller: localeController,
-          child: ListenableBuilder(
-            listenable: localeController,
-            builder: (context, _) {
-              return MaterialApp(
-                home: SettingsScreen(
-                  apiKeyController: apiKeyController,
-                  localeController: localeController,
-                  authController: authController,
-                ),
-              );
-            },
+        expect(
+          find.byKey(const ValueKey<String>('auth_google_button')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey<String>('auth_email_field')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey<String>('auth_guest_button')),
+          findsOneWidget,
+        );
+        expect(find.textContaining('40 kelime'), findsOneWidget);
+
+        final guestButton =
+            find.byKey(const ValueKey<String>('auth_guest_button'));
+        await tester.ensureVisible(guestButton);
+        await tester.pumpAndSettle();
+        await tester.tap(guestButton);
+        await tester.pumpAndSettle();
+        expect(authController.isGuest, isTrue);
+
+        authController.dispose();
+        localeController.dispose();
+      },
+    );
+
+    testWidgets(
+      'SettingsScreen dil değiştirince arayüz anında İngilizceye geçer ve kaydeder',
+      (tester) async {
+        final langStore = _InMemoryLanguageStore();
+        final localeController = AppLocaleController(store: langStore);
+        final authController = AuthController(
+          backend: _FakeAuthBackend(),
+          localStore: _InMemoryAuthLocalStore(),
+          entitlementClient: _FakeEntitlementClient(),
+        );
+        await authController.initialize();
+        await authController.continueAsGuest();
+
+        final apiKeyController = ApiKeyController(
+          SettingsRepository(AppDatabase.instance),
+        );
+
+        await tester.pumpWidget(
+          AppLocaleScope(
+            controller: localeController,
+            child: ListenableBuilder(
+              listenable: localeController,
+              builder: (context, _) {
+                return MaterialApp(
+                  home: SettingsScreen(
+                    apiKeyController: apiKeyController,
+                    localeController: localeController,
+                    authController: authController,
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Ayarlar'), findsOneWidget);
+        expect(find.text('Misafir Modu'), findsOneWidget);
+        expect(find.textContaining('40 / 40'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey<String>('settings_auto_translation_tile')),
+          findsOneWidget,
+        );
+        expect(find.text('Gemini API Anahtarı'), findsNothing);
+
+        await tester.tap(find.text('English'));
+        await tester.pumpAndSettle();
+
+        expect(langStore.saved, AppLanguage.en);
+        expect(find.text('Settings'), findsOneWidget);
+        expect(find.text('Guest Mode'), findsOneWidget);
+
+        apiKeyController.dispose();
+        authController.dispose();
+        localeController.dispose();
+      },
+    );
+
+    testWidgets(
+      'SettingsScreen standart hesapta Kod Kullan gösterir ve AYAZ2026 sonrası Sınırsız olur',
+      (tester) async {
+        final localeController =
+            AppLocaleController(store: _InMemoryLanguageStore());
+        final authController = AuthController(
+          backend: _FakeAuthBackend(),
+          localStore: _InMemoryAuthLocalStore(),
+          entitlementClient: _FakeEntitlementClient(),
+        );
+        await authController.initialize();
+        await authController.signInWithGoogle();
+
+        final apiKeyController = ApiKeyController(
+          SettingsRepository(AppDatabase.instance),
+        );
+
+        await tester.pumpWidget(
+          AppLocaleScope(
+            controller: localeController,
+            child: MaterialApp(
+              home: SettingsScreen(
+                apiKeyController: apiKeyController,
+                localeController: localeController,
+                authController: authController,
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Standart Hesap'), findsOneWidget);
+        expect(find.textContaining('80 / 80'), findsOneWidget);
+        final codeField =
+            find.byKey(const ValueKey<String>('settings_redeem_code_field'));
+        final applyBtn =
+            find.byKey(const ValueKey<String>('settings_redeem_code_button'));
+        expect(codeField, findsOneWidget);
+        expect(applyBtn, findsOneWidget);
+
+        await tester.enterText(codeField, 'AYAZ2026');
+        await tester.tap(applyBtn);
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey<String>('settings_unlimited_badge')),
+          findsOneWidget,
+        );
+        expect(find.text('Sınırsız Hesap (Yetkili)'), findsOneWidget);
+        expect(find.textContaining('AYAZ2026'), findsOneWidget);
+
+        apiKeyController.dispose();
+        authController.dispose();
+        localeController.dispose();
+      },
+    );
+  });
+
+  group('AppUpdateController • Zorunlu Minimum Sürüm (min_version_code)', () {
+    test('currentBuildNumber < min_version_code olduğunda zorunlu güncelleme tetiklenir',
+        () async {
+      final info = AppUpdateInfo.fromJson(<String, Object?>{
+        'latest_version': '0.1.16',
+        'version_code': 17,
+        'min_version_code': 16,
+        'apk_url': 'https://example.com/app-release.apk',
+        'release_notes': 'Performans iyileştirmeleri.',
+      });
+      expect(info.minVersionCode, 16);
+
+      final mandatoryController = AppUpdateController(
+        service: _FakeAppUpdateService(
+          AppUpdateCheckResult(
+            currentVersion: '0.1.14',
+            currentBuildNumber: 15,
+            remoteInfo: info,
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await mandatoryController.checkForUpdates();
+      expect(mandatoryController.hasUpdate, isTrue);
+      expect(mandatoryController.requiresMandatoryUpdate, isTrue);
+      mandatoryController.dispose();
 
-      expect(find.text('Ayarlar'), findsOneWidget);
-      expect(find.text('Misafir Modu'), findsOneWidget);
-      expect(find.textContaining('40 / 40'), findsOneWidget);
-      expect(find.byKey(const ValueKey<String>('settings_api_key_tile')), findsOneWidget);
-
-      await tester.tap(find.text('English'));
-      await tester.pumpAndSettle();
-
-      expect(langStore.saved, AppLanguage.en);
-      expect(find.text('Settings'), findsOneWidget);
-      expect(find.text('Guest Mode'), findsOneWidget);
-
-      apiKeyController.dispose();
-      authController.dispose();
-      localeController.dispose();
+      final optionalController = AppUpdateController(
+        service: _FakeAppUpdateService(
+          AppUpdateCheckResult(
+            currentVersion: '0.1.15',
+            currentBuildNumber: 16,
+            remoteInfo: info,
+          ),
+        ),
+      );
+      await optionalController.checkForUpdates();
+      expect(optionalController.hasUpdate, isTrue);
+      expect(optionalController.requiresMandatoryUpdate, isFalse);
+      optionalController.dispose();
     });
   });
 }

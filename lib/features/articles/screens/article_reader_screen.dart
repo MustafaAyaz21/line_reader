@@ -7,6 +7,7 @@ import '../../../core/database/app_database.dart';
 import '../../../core/localization/app_strings.dart';
 import '../../../core/tts/tts_service.dart';
 import '../../../core/utils/word_sanitizer.dart';
+import '../../ads/widgets/promo_interstitial_dialog.dart';
 import '../../auth/controllers/auth_controller.dart';
 import '../../browser/browser_screen.dart';
 import '../../browser/widgets/word_preview_sheet.dart';
@@ -21,6 +22,7 @@ import '../data/article_reader_repository.dart';
 import '../models/article.dart';
 import '../models/article_level.dart';
 import '../models/article_reader_models.dart';
+import '../services/article_word_translation_service.dart';
 import '../utils/article_text_parser.dart';
 
 /// WebView kullanmadan kitap / PDF belgesi temizliğinde yerel okuma deneyimi
@@ -60,6 +62,7 @@ class ArticleReaderScreen extends StatefulWidget {
 
 class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
   late final ArticleReaderStore _readerStore;
+  late final WordTranslationService _baseTranslationService;
   late final WordTranslationService _translationService;
   late final bool _ownsTranslationService;
   late final List<String> _paragraphs;
@@ -80,10 +83,16 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
     _readerStore =
         widget.readerStore ?? ArticleReaderRepository(AppDatabase.instance);
     _ownsTranslationService = widget.translationService == null;
-    _translationService = widget.translationService ??
+    _baseTranslationService = widget.translationService ??
         CachedTranslationService(
           cacheRepository: TranslationCacheRepository(AppDatabase.instance),
         );
+    // Makale içinde dokunulan/seçilen kelimede önce açık makalenin word_meanings
+    // haritasına (tam kelime + kök formu) bakar; yoksa standart/yerel servise geçer.
+    _translationService = ArticleWordTranslationService(
+      article: widget.article,
+      fallbackService: _baseTranslationService,
+    );
 
     final effectiveBody = widget.article.content.trim().isNotEmpty
         ? widget.article.content
@@ -96,7 +105,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
   @override
   void dispose() {
     if (_ownsTranslationService) {
-      _translationService.dispose();
+      _baseTranslationService.dispose();
     }
     super.dispose();
   }
@@ -312,6 +321,14 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
     _isWordSheetOpen = true;
 
     try {
+      final auth = widget.authController;
+      if (auth != null &&
+          !auth.hasReachedDailyLimit &&
+          auth.recordWordLookupAndShouldShowPromo()) {
+        await PromoInterstitialDialog.show(context);
+        if (!mounted) return;
+      }
+
       await WordPreviewSheet.show(
         context,
         word: word,

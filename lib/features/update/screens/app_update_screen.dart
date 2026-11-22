@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/localization/app_strings.dart';
 import '../controllers/app_update_controller.dart';
 
 /// Sağ üstteki güncelleme ikonuna tıklandığında `Navigator.push` ile açılan
-/// bağımsız güncelleme sayfası. Mevcut/yeni sürüm, sürüm notları, canlı APK
-/// indirme ilerleme çubuğu (%) ve otomatik Android kurulum akışını sunar.
+/// bağımsız güncelleme sayfası. `isMandatory: true` olduğunda geri tuşu ve
+/// kapatma engellenir; kullanıcı yeni sürümü indirip kurmadan devam edemez.
 class AppUpdateScreen extends StatefulWidget {
   const AppUpdateScreen({
     super.key,
     required this.controller,
+    this.isMandatory = false,
   });
 
   final AppUpdateController controller;
+  final bool isMandatory;
 
   @override
   State<AppUpdateScreen> createState() => _AppUpdateScreenState();
@@ -24,7 +27,7 @@ class _AppUpdateScreenState extends State<AppUpdateScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       // Sayfa açıldığında indirme yoksa her zaman en güncel sürümü tazele.
-      if (!widget.controller.isDownloading) {
+      if (!widget.controller.isDownloading && !widget.isMandatory) {
         widget.controller.checkForUpdates();
       }
     });
@@ -40,26 +43,33 @@ class _AppUpdateScreenState extends State<AppUpdateScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final s = context.l10n;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Güncellemeler'),
-        actions: [
-          ListenableBuilder(
-            listenable: widget.controller,
-            builder: (context, _) {
-              final busy =
-                  widget.controller.isChecking || widget.controller.isDownloading;
-              return IconButton(
-                onPressed: busy ? null : () => widget.controller.checkForUpdates(),
-                tooltip: 'Yeniden Kontrol Et',
-                icon: const Icon(Icons.refresh_rounded),
-              );
-            },
+    return PopScope(
+      canPop: !widget.isMandatory,
+      child: Scaffold(
+        appBar: AppBar(
+          automaticallyImplyLeading: !widget.isMandatory,
+          title: Text(
+            widget.isMandatory ? s.mandatoryUpdateTitle : s.updatesTitle,
           ),
-        ],
-      ),
-      body: ListenableBuilder(
+          actions: [
+            ListenableBuilder(
+              listenable: widget.controller,
+              builder: (context, _) {
+                final busy = widget.controller.isChecking ||
+                    widget.controller.isDownloading;
+                return IconButton(
+                  onPressed:
+                      busy ? null : () => widget.controller.checkForUpdates(),
+                  tooltip: s.t('Yeniden Kontrol Et', 'Check Again'),
+                  icon: const Icon(Icons.refresh_rounded),
+                );
+              },
+            ),
+          ],
+        ),
+        body: ListenableBuilder(
         listenable: widget.controller,
         builder: (context, _) {
           final controller = widget.controller;
@@ -149,7 +159,9 @@ class _AppUpdateScreenState extends State<AppUpdateScreen> {
                             isChecking
                                 ? 'Güncellemeler kontrol ediliyor...'
                                 : hasUpdate
-                                    ? 'Yeni güncelleme hazır'
+                                    ? (widget.isMandatory
+                                        ? s.mandatoryUpdateTitle
+                                        : 'Yeni güncelleme hazır')
                                     : 'Uygulamanız güncel',
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w700,
@@ -163,7 +175,11 @@ class _AppUpdateScreenState extends State<AppUpdateScreen> {
                             isChecking
                                 ? 'GitHub üzerinden en son sürüm sorgulanıyor.'
                                 : hasUpdate
-                                    ? 'Line Reader v${remote!.latestVersion} indirilmeye hazır.'
+                                    ? (widget.isMandatory
+                                        ? s.mandatoryUpdateSubtitle(
+                                            remote!.latestVersion,
+                                          )
+                                        : 'Line Reader v${remote!.latestVersion} indirilmeye hazır.')
                                     : 'Şu anda Line Reader\'ın en son sürümünü kullanıyorsunuz.',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: hasUpdate
@@ -377,6 +393,7 @@ class _AppUpdateScreenState extends State<AppUpdateScreen> {
             ],
           );
         },
+      ),
       ),
     );
   }

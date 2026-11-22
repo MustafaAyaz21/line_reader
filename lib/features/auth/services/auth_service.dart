@@ -33,6 +33,9 @@ abstract class AuthBackend {
 
   Future<AuthActionResult> sendPasswordResetEmail(String email);
 
+  /// Kayıtlı kullanıcı için kısa ömürlü imzalı Firebase ID Token döndürür.
+  Future<String?> getIdToken();
+
   Future<void> signOut();
 }
 
@@ -287,6 +290,19 @@ class FirebaseAuthBackend implements AuthBackend {
         errorCode: 'unknown',
         message: 'Şifre sıfırlama isteği gönderilemedi.',
       );
+    }
+  }
+
+  @override
+  Future<String?> getIdToken() async {
+    if (!_isConfigured) return null;
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return null;
+      return await user.getIdToken();
+    } catch (error) {
+      debugPrint('[FirebaseAuthBackend] ID token alma hatasi: $error');
+      return null;
     }
   }
 

@@ -47,8 +47,9 @@ app.*.map.json
 # Widget Preview related
 .widget_preview/
 
-# Android release signing secrets
+# Android release signing & local admin secrets
 android/key.properties
 android/app/google-services.json
+tools/article_studio/admin_config.local.json
 *.jks
 *.keystore
