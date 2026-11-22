@@ -132,20 +132,55 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
           ),
           body: Stack(
             children: <Widget>[
-              RefreshIndicator(
-                onRefresh: _handlePullToRefresh,
-                child: ListView.separated(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
-                  itemCount: ArticleLevel.values.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final level = ArticleLevel.values[index];
-                    final count = countsByLevel[level] ?? 0;
-                    return _ArticleLevelCard(
-                      level: level,
-                      articleCount: count,
-                      onTap: () => _openLevel(level),
+              SafeArea(
+                top: false,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    const topPadding = 12.0;
+                    const bottomPadding = 16.0;
+                    const spacing = 12.0;
+                    const minCardHeight = 88.0;
+                    final count = ArticleLevel.values.length;
+                    final minTotalHeight =
+                        count * minCardHeight + (count - 1) * spacing;
+                    final viewportHeight =
+                        constraints.maxHeight - topPadding - bottomPadding;
+                    final targetHeight = viewportHeight > minTotalHeight
+                        ? viewportHeight
+                        : minTotalHeight;
+
+                    return RefreshIndicator(
+                      onRefresh: _handlePullToRefresh,
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(
+                          16,
+                          topPadding,
+                          16,
+                          bottomPadding,
+                        ),
+                        child: SizedBox(
+                          height: targetHeight,
+                          child: Column(
+                            children: <Widget>[
+                              for (var i = 0; i < count; i++) ...<Widget>[
+                                Expanded(
+                                  child: _ArticleLevelCard(
+                                    level: ArticleLevel.values[i],
+                                    articleCount:
+                                        countsByLevel[ArticleLevel.values[i]] ??
+                                            0,
+                                    onTap: () =>
+                                        _openLevel(ArticleLevel.values[i]),
+                                  ),
+                                ),
+                                if (i < count - 1)
+                                  const SizedBox(height: spacing),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
                     );
                   },
                 ),
@@ -188,74 +223,78 @@ class _ArticleLevelCard extends StatelessWidget {
         key: ValueKey<String>('article_level_card_${level.code}'),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          child: Row(
-            children: <Widget>[
-              Container(
-                width: 54,
-                height: 54,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: level.accentColor.withAlpha(28),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Text(
-                  level.code,
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.4,
-                    color: level.accentColor,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Center(
+            child: Row(
+              children: <Widget>[
+                Container(
+                  width: 58,
+                  height: 58,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: level.accentColor.withAlpha(28),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    level.code,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.4,
+                      color: level.accentColor,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      level.label,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: colorScheme.onSurface,
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        level.label,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: colorScheme.onSurface,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      level.subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
+                      const SizedBox(height: 4),
+                      Text(
+                        level.subtitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          height: 1.3,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  '$articleCount makale',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: colorScheme.onSurfaceVariant,
+                    ],
                   ),
                 ),
-              ),
-              const SizedBox(width: 4),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ],
+                const SizedBox(width: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '$articleCount makale',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ],
+            ),
           ),
         ),
       ),

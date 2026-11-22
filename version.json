@@ -1,6 +1,6 @@
 {
-    "latest_version":  "0.1.12",
-    "version_code":  13,
-    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.12/app-release.apk",
-    "release_notes":  "Makale canlı yenileme kaynağı Cloudflare Pages CDN (https://line-reader.pages.dev/articles.json) üzerine bağlandı; birincil CDN erişilemez olursa otomatik GitHub raw yedeği devreye girer."
+    "latest_version":  "0.1.13",
+    "version_code":  14,
+    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.13/app-release.apk",
+    "release_notes":  "Arayüz ve performans iyileştirmeleri."
 }
