@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-11-22T22:05:07.613Z",
+  "updated_at": "2026-11-22T22:06:11.828Z",
   "articles": [
     {
       "id": "a2-why-love-can-sometimes-include-negative-feelings",
@@ -90,145 +90,145 @@
           "p": 0,
           "s": 0,
           "start_ms": 0,
-          "end_ms": 6880
+          "end_ms": 7060
         },
         {
           "p": 0,
           "s": 1,
-          "start_ms": 6880,
-          "end_ms": 13320
+          "start_ms": 7060,
+          "end_ms": 12300
         },
         {
           "p": 0,
           "s": 2,
-          "start_ms": 13320,
-          "end_ms": 18320
+          "start_ms": 12300,
+          "end_ms": 18140
         },
         {
           "p": 0,
           "s": 3,
-          "start_ms": 18320,
-          "end_ms": 23540
+          "start_ms": 18140,
+          "end_ms": 23000
         },
         {
           "p": 0,
           "s": 4,
-          "start_ms": 23540,
-          "end_ms": 29100
+          "start_ms": 23000,
+          "end_ms": 27620
         },
         {
           "p": 1,
           "s": 5,
-          "start_ms": 29100,
-          "end_ms": 31340
+          "start_ms": 27620,
+          "end_ms": 30500
         },
         {
           "p": 1,
           "s": 6,
-          "start_ms": 31340,
-          "end_ms": 39500
+          "start_ms": 30500,
+          "end_ms": 36460
         },
         {
           "p": 1,
           "s": 7,
-          "start_ms": 39500,
-          "end_ms": 46580
+          "start_ms": 36460,
+          "end_ms": 43980
         },
         {
           "p": 1,
           "s": 8,
-          "start_ms": 46580,
-          "end_ms": 53880
+          "start_ms": 43980,
+          "end_ms": 51900
         },
         {
           "p": 1,
           "s": 9,
-          "start_ms": 53880,
-          "end_ms": 61420
+          "start_ms": 51900,
+          "end_ms": 57420
         },
         {
           "p": 2,
           "s": 10,
-          "start_ms": 61420,
-          "end_ms": 68120
+          "start_ms": 57420,
+          "end_ms": 65620
         },
         {
           "p": 2,
           "s": 11,
-          "start_ms": 68120,
-          "end_ms": 71880
+          "start_ms": 65620,
+          "end_ms": 68940
         },
         {
           "p": 2,
           "s": 12,
-          "start_ms": 71880,
-          "end_ms": 77740
+          "start_ms": 68940,
+          "end_ms": 75300
         },
         {
           "p": 2,
           "s": 13,
-          "start_ms": 77740,
-          "end_ms": 83380
+          "start_ms": 75300,
+          "end_ms": 79840
         },
         {
           "p": 2,
           "s": 14,
-          "start_ms": 83380,
-          "end_ms": 90820
+          "start_ms": 79840,
+          "end_ms": 87000
         },
         {
           "p": 3,
           "s": 15,
-          "start_ms": 90820,
-          "end_ms": 97040
+          "start_ms": 87000,
+          "end_ms": 93420
         },
         {
           "p": 3,
           "s": 16,
-          "start_ms": 97040,
-          "end_ms": 104360
+          "start_ms": 93420,
+          "end_ms": 98920
         },
         {
           "p": 3,
           "s": 17,
-          "start_ms": 104360,
-          "end_ms": 110900
+          "start_ms": 98920,
+          "end_ms": 104000
         },
         {
           "p": 3,
           "s": 18,
-          "start_ms": 110900,
-          "end_ms": 116580
+          "start_ms": 104000,
+          "end_ms": 109880
         },
         {
           "p": 3,
           "s": 19,
-          "start_ms": 116580,
-          "end_ms": 121200
+          "start_ms": 109880,
+          "end_ms": 116100
         },
         {
           "p": 4,
           "s": 20,
-          "start_ms": 121200,
-          "end_ms": 126640
+          "start_ms": 116100,
+          "end_ms": 119420
         },
         {
           "p": 4,
           "s": 21,
-          "start_ms": 126640,
-          "end_ms": 132060
+          "start_ms": 119420,
+          "end_ms": 127040
         },
         {
           "p": 4,
           "s": 22,
-          "start_ms": 132060,
-          "end_ms": 138880
+          "start_ms": 127040,
+          "end_ms": 133380
         },
         {
           "p": 4,
           "s": 23,
-          "start_ms": 138880,
-          "end_ms": 146131
+          "start_ms": 133380,
+          "end_ms": 139771
         }
       ]
     },
