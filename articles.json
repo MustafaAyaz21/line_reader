@@ -1,20 +1,7 @@
 {
   "version": 1,
-  "updated_at": "2026-11-22T17:35:48.435Z",
+  "updated_at": "2026-11-22T17:36:40.072Z",
   "articles": [
-    {
-      "id": "a1-genc-kiz-ume",
-      "level": "A1",
-      "title": "Genç Kız ume",
-      "description": "Genç Kız ume",
-      "reading_time": "1 - 2 dk",
-      "reading_time_minutes": 1,
-      "language": "en",
-      "content": "Genç Kız ume",
-      "published_at": "2026-11-22T17:25:14.286Z",
-      "category": "Genç Kız ume",
-      "author": "Genç Kız ume"
-    },
     {
       "id": "b1-strange-rules-that-make-sense-once-you-look-clos",
       "level": "B1",
