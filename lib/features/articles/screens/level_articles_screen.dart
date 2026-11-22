@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/localization/app_strings.dart';
 import '../../../core/tts/tts_service.dart';
+import '../../auth/controllers/auth_controller.dart';
 import '../../browser/browser_screen.dart';
 import '../../translation/services/word_translation_service.dart';
 import '../../words/models/word_list.dart';
@@ -22,6 +24,7 @@ class LevelArticlesScreen extends StatefulWidget {
     this.readerStore,
     this.translationService,
     this.ttsService,
+    this.authController,
     this.onAddWord,
     this.loadWordLists,
   });
@@ -31,6 +34,7 @@ class LevelArticlesScreen extends StatefulWidget {
   final ArticleReaderStore? readerStore;
   final WordTranslationService? translationService;
   final TtsService? ttsService;
+  final AuthController? authController;
   final AddWordCallback? onAddWord;
   final Future<List<WordList>> Function()? loadWordLists;
 
@@ -44,10 +48,17 @@ class _LevelArticlesScreenState extends State<LevelArticlesScreen> {
     if (!mounted) return;
 
     if (result.isOfflineFallback) {
+      final s = context.l10n;
       final hasCached = result.articles.isNotEmpty;
       final message = hasCached
-          ? 'İnternet bağlantısı yok. Önbellekteki makaleler korunuyor.'
-          : 'Güncel makaleler kontrol edilemedi; çevrimdışı önbellek korunuyor.';
+          ? s.t(
+              'İnternet bağlantısı yok. Önbellekteki makaleler korunuyor.',
+              'No internet connection. Cached articles are preserved.',
+            )
+          : s.t(
+              'Güncel makaleler kontrol edilemedi; çevrimdışı önbellek korunuyor.',
+              'Could not check for new articles; offline cache preserved.',
+            );
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
@@ -68,6 +79,7 @@ class _LevelArticlesScreenState extends State<LevelArticlesScreen> {
           readerStore: widget.readerStore,
           translationService: widget.translationService,
           ttsService: widget.ttsService,
+          authController: widget.authController,
           onAddWord: widget.onAddWord,
           loadWordLists: widget.loadWordLists,
         ),
@@ -77,6 +89,7 @@ class _LevelArticlesScreenState extends State<LevelArticlesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = context.l10n;
     final level = widget.level;
 
     return ListenableBuilder(
@@ -89,7 +102,7 @@ class _LevelArticlesScreenState extends State<LevelArticlesScreen> {
 
         return Scaffold(
           appBar: AppBar(
-            title: Text('${level.code} • ${level.label}'),
+            title: Text('${level.code} • ${s.levelLabel(level.code)}'),
           ),
           body: Stack(
             children: <Widget>[
@@ -127,8 +140,10 @@ class _LevelArticlesScreenState extends State<LevelArticlesScreen> {
   }
 
   Widget _buildEmptyState(BuildContext context, ArticleLevel level) {
+    final s = context.l10n;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final levelLabel = s.levelLabel(level.code);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -162,7 +177,10 @@ class _LevelArticlesScreenState extends State<LevelArticlesScreen> {
                       ),
                       const SizedBox(height: 20),
                       Text(
-                        'Bu seviyede henüz makale yok',
+                        s.t(
+                          'Bu seviyede henüz makale yok',
+                          'No articles in this level yet',
+                        ),
                         textAlign: TextAlign.center,
                         style: theme.textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.w700,
@@ -171,7 +189,10 @@ class _LevelArticlesScreenState extends State<LevelArticlesScreen> {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        '${level.code} (${level.label}) seviyesi için yeni makaleler eklendiğinde burada otomatik olarak listelenecektir. Aşağı çekerek yenileyebilirsiniz.',
+                        s.t(
+                          '${level.code} ($levelLabel) seviyesi için yeni makaleler eklendiğinde burada otomatik olarak listelenecektir. Aşağı çekerek yenileyebilirsiniz.',
+                          'New articles for ${level.code} ($levelLabel) will appear here automatically once published. Pull down to refresh.',
+                        ),
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: colorScheme.onSurfaceVariant,

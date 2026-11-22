@@ -274,6 +274,7 @@ void main() {
           title: 'A Day in Kyoto',
           summary: 'A gentle walk through historic temples.',
           level: 'A2',
+          author: 'Mustafa Ayaz',
           readingTimeLabel: '5 - 8 dk',
           content: 'Reading books brings calm. Quiet gardens inspire deep focus.',
         );
@@ -290,6 +291,19 @@ void main() {
         );
         await tester.pumpAndSettle();
 
+        // Yazar profil ikonu görünmeli ve başlık/açıklama font boyutu sabit kalmalı.
+        expect(find.byKey(const ValueKey<String>('reader_author_icon')), findsOneWidget);
+        expect(find.text('Mustafa Ayaz'), findsOneWidget);
+
+        final initialTitleSize = tester
+            .widget<Text>(find.byKey(const ValueKey<String>('reader_article_title')))
+            .style!
+            .fontSize;
+        final initialDescSize = tester
+            .widget<Text>(find.byKey(const ValueKey<String>('reader_article_description')))
+            .style!
+            .fontSize;
+
         // 1) Görünüm ayarlarını aç -> Beyaz ton ve A+ seç -> yerel depoya kaydedilsin.
         await tester.tap(find.byKey(const ValueKey<String>('reader_appearance_button')));
         await tester.pumpAndSettle();
@@ -305,6 +319,18 @@ void main() {
         // Ayar alt panelini kapat
         Navigator.of(tester.element(find.byKey(const ValueKey<String>('reader_tone_white')))).pop();
         await tester.pumpAndSettle();
+
+        // Başlık ve açıklama yazı boyutu A+ sonrası değişmemeli.
+        final afterTitleSize = tester
+            .widget<Text>(find.byKey(const ValueKey<String>('reader_article_title')))
+            .style!
+            .fontSize;
+        final afterDescSize = tester
+            .widget<Text>(find.byKey(const ValueKey<String>('reader_article_description')))
+            .style!
+            .fontSize;
+        expect(afterTitleSize, initialTitleSize);
+        expect(afterDescSize, initialDescSize);
 
         // 2) Altını çizme kalemini aç -> "Reading" kelimesine dokun -> kaydedilsin.
         await tester.tap(find.byKey(const ValueKey<String>('reader_underline_pen_button')));

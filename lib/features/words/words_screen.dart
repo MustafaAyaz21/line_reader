@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../core/localization/app_locale.dart';
+import '../../core/localization/app_strings.dart';
 import '../../core/settings/api_key_controller.dart';
 import '../../core/tts/tts_service.dart';
+import '../auth/controllers/auth_controller.dart';
 import '../settings/widgets/api_key_dialog.dart';
+import '../settings/widgets/settings_action_button.dart';
 import '../update/controllers/app_update_controller.dart';
 import '../update/widgets/update_action_button.dart';
 import 'controllers/words_controller.dart';
@@ -18,6 +22,8 @@ class WordsScreen extends StatelessWidget {
     super.key,
     required this.controller,
     this.apiKeyController,
+    this.localeController,
+    this.authController,
     this.updateController,
     this.ttsService,
     this.onClearCache,
@@ -25,6 +31,8 @@ class WordsScreen extends StatelessWidget {
 
   final WordsController controller;
   final ApiKeyController? apiKeyController;
+  final AppLocaleController? localeController;
+  final AuthController? authController;
   final AppUpdateController? updateController;
   final TtsService? ttsService;
   final Future<void> Function()? onClearCache;
@@ -132,13 +140,24 @@ class WordsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = context.l10n;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Kelimelerim'),
+        title: Text(s.myWordsTitle),
         actions: [
           if (updateController != null)
             UpdateActionButton(controller: updateController!),
-          if (apiKeyController != null) ...[
+          if (apiKeyController != null &&
+              localeController != null &&
+              authController != null) ...[
+            SettingsActionButton(
+              apiKeyController: apiKeyController!,
+              localeController: localeController!,
+              authController: authController!,
+              onClearCache: onClearCache,
+            ),
+            const SizedBox(width: 4),
+          ] else if (apiKeyController != null) ...[
             ApiKeyActionButton(
               controller: apiKeyController!,
               onClearCache: onClearCache,
@@ -149,7 +168,7 @@ class WordsScreen extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _handleCreateList(context),
-        tooltip: 'Yeni Liste Oluştur',
+        tooltip: s.t('Yeni Liste Oluştur', 'Create New List'),
         child: const Icon(Icons.add_rounded),
       ),
       body: ListenableBuilder(

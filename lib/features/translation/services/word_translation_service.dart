@@ -4,6 +4,7 @@ import '../models/word_meaning.dart';
 enum TranslationErrorType {
   unauthorized,
   rateLimited,
+  guestLimitReached,
   network,
   invalidResponse,
   unknown,

@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 
 import '../../core/database/app_database.dart';
+import '../../core/localization/app_locale.dart';
+import '../../core/localization/app_strings.dart';
 import '../../core/settings/api_key_controller.dart';
 import '../../core/settings/settings_repository.dart';
 import '../../core/tts/tts_service.dart';
 import '../articles/controllers/articles_controller.dart';
 import '../articles/data/articles_cache_repository.dart';
 import '../articles/services/articles_sync_service.dart';
+import '../auth/controllers/auth_controller.dart';
+import '../auth/screens/auth_screen.dart';
 import '../browser/browser_screen.dart';
 import '../translation/data/translation_cache_repository.dart';
 import '../translation/models/word_meaning.dart';
@@ -47,6 +51,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   TtsService? _ttsService;
   AppUpdateController? _updateController;
   ArticlesController? _articlesController;
+  AuthController? _authController;
+  AppLocaleController? _fallbackLocaleController;
   BrowserBackController? _browserBackController;
 
   @override
@@ -87,6 +93,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _apiKeyController = controller;
     }
 
+    if (_authController == null) {
+      final controller = AuthController();
+      controller.initialize();
+      _authController = controller;
+    }
+
     _translationService ??= CachedTranslationService(
       cacheRepository: TranslationCacheRepository(AppDatabase.instance),
       geminiApiKeyProvider: () => _apiKeyController?.apiKey,
@@ -95,6 +107,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       onGeminiVerified: () => _apiKeyController?.markVerified(),
       onGeminiUnauthorized: (message) =>
           _apiKeyController?.markInvalid(message),
+      beforeLookupQuotaCheck: () =>
+          _authController?.consumeTranslationQuotaIfGuest() ??
+          Future<bool>.value(true),
     );
 
     _ttsService ??= TtsService(
@@ -143,6 +158,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _ttsService?.dispose();
     _updateController?.dispose();
     _articlesController?.dispose();
+    _authController?.dispose();
+    _fallbackLocaleController?.dispose();
     super.dispose();
   }
 
@@ -226,75 +243,109 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return _isBrowserOpen ? _stackBrowserIndex : _stackMainMenuIndex;
   }
 
+  AppLocaleController _resolveLocaleController(BuildContext context) {
+    return AppLocaleScope.maybeOf(context) ??
+        (_fallbackLocaleController ??= AppLocaleController()..load());
+  }
+
   @override
   Widget build(BuildContext context) {
     _ensureInitialized();
+    final localeController = _resolveLocaleController(context);
+    final authController = _authController!;
 
-    final canPopNormally =
-        !(_selectedIndex == _mainMenuTabIndex && _isBrowserOpen);
-
-    return PopScope(
-      canPop: canPopNormally,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && _selectedIndex == _mainMenuTabIndex && _isBrowserOpen) {
-          _handleBrowserSystemBack();
+    return ListenableBuilder(
+      listenable: authController,
+      builder: (context, _) {
+        if (authController.isLoading) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
         }
+
+        if (authController.needsOnboarding) {
+          return AuthScreen(
+            controller: authController,
+            canPop: false,
+            initialSignUpTab: true,
+          );
+        }
+
+        final s = context.l10n;
+        final canPopNormally =
+            !(_selectedIndex == _mainMenuTabIndex && _isBrowserOpen);
+
+        return PopScope(
+          canPop: canPopNormally,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop &&
+                _selectedIndex == _mainMenuTabIndex &&
+                _isBrowserOpen) {
+              _handleBrowserSystemBack();
+            }
+          },
+          child: Scaffold(
+            body: IndexedStack(
+              index: _activeStackIndex,
+              children: <Widget>[
+                MainMenuScreen(
+                  key: const ValueKey<String>('main_menu_screen'),
+                  onOpenBrowser: _openBrowser,
+                  apiKeyController: _apiKeyController!,
+                  localeController: localeController,
+                  authController: authController,
+                  updateController: _updateController!,
+                  articlesController: _articlesController!,
+                  translationService: _translationService!,
+                  ttsService: _ttsService,
+                  onAddWord: _handleAddWord,
+                  loadWordLists: _handleLoadWordLists,
+                  onClearCache: _handleClearTranslationCache,
+                ),
+                if ((_hasOpenedBrowser ?? false) || _isBrowserOpen)
+                  BrowserScreen(
+                    key: const ValueKey<String>('browser_screen'),
+                    onAddWord: _handleAddWord,
+                    loadWordLists: _handleLoadWordLists,
+                    translationService: _translationService!,
+                    ttsService: _ttsService,
+                    authController: authController,
+                    onReturnToMenu: _returnToMainMenu,
+                    backController: _browserBackController,
+                  )
+                else
+                  const SizedBox.shrink(),
+                WordsScreen(
+                  key: const ValueKey<String>('words_screen'),
+                  controller: _wordsController!,
+                  apiKeyController: _apiKeyController!,
+                  localeController: localeController,
+                  authController: authController,
+                  updateController: _updateController!,
+                  ttsService: _ttsService,
+                  onClearCache: _handleClearTranslationCache,
+                ),
+              ],
+            ),
+            bottomNavigationBar: NavigationBar(
+              selectedIndex: _selectedIndex,
+              onDestinationSelected: _onDestinationSelected,
+              destinations: <NavigationDestination>[
+                NavigationDestination(
+                  icon: const Icon(Icons.home_outlined),
+                  selectedIcon: const Icon(Icons.home),
+                  label: s.mainMenuTitle,
+                ),
+                NavigationDestination(
+                  icon: const Icon(Icons.bookmarks_outlined),
+                  selectedIcon: const Icon(Icons.bookmarks),
+                  label: s.myWordsTitle,
+                ),
+              ],
+            ),
+          ),
+        );
       },
-      child: Scaffold(
-        body: IndexedStack(
-          index: _activeStackIndex,
-          children: <Widget>[
-            MainMenuScreen(
-              key: const ValueKey<String>('main_menu_screen'),
-              onOpenBrowser: _openBrowser,
-              apiKeyController: _apiKeyController!,
-              updateController: _updateController!,
-              articlesController: _articlesController!,
-              translationService: _translationService!,
-              ttsService: _ttsService,
-              onAddWord: _handleAddWord,
-              loadWordLists: _handleLoadWordLists,
-              onClearCache: _handleClearTranslationCache,
-            ),
-            if ((_hasOpenedBrowser ?? false) || _isBrowserOpen)
-              BrowserScreen(
-                key: const ValueKey<String>('browser_screen'),
-                onAddWord: _handleAddWord,
-                loadWordLists: _handleLoadWordLists,
-                translationService: _translationService!,
-                ttsService: _ttsService,
-                onReturnToMenu: _returnToMainMenu,
-                backController: _browserBackController,
-              )
-            else
-              const SizedBox.shrink(),
-            WordsScreen(
-              key: const ValueKey<String>('words_screen'),
-              controller: _wordsController!,
-              apiKeyController: _apiKeyController!,
-              updateController: _updateController!,
-              ttsService: _ttsService,
-              onClearCache: _handleClearTranslationCache,
-            ),
-          ],
-        ),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: _selectedIndex,
-          onDestinationSelected: _onDestinationSelected,
-          destinations: const <NavigationDestination>[
-            NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home),
-              label: 'Ana Menü',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.bookmarks_outlined),
-              selectedIcon: Icon(Icons.bookmarks),
-              label: 'Kelimelerim',
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

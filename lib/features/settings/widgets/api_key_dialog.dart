@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/localization/app_strings.dart';
 import '../../../core/settings/api_key_controller.dart';
 import '../../translation/services/gemini_translation_service.dart';
 
@@ -263,6 +264,7 @@ class _ApiKeyDialogState extends State<ApiKeyDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final s = context.l10n;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final status = widget.controller.status;
@@ -270,35 +272,47 @@ class _ApiKeyDialogState extends State<ApiKeyDialog> {
 
     final (String statusText, Color bgColor, Color fgColor) = switch (status) {
       ApiKeyStatus.valid => (
-          'Doğrulandı — Gemini aktif olarak kullanılıyor.',
+          s.t(
+            'Doğrulandı — Gemini aktif olarak kullanılıyor.',
+            'Verified — Gemini is actively used.',
+          ),
           colorScheme.primaryContainer,
           colorScheme.onPrimaryContainer,
         ),
       ApiKeyStatus.invalid => (
           widget.controller.lastErrorMessage ??
-              'Kayıtlı anahtar geçersiz — ücretsiz varsayılan servis kullanılıyor.',
+              s.t(
+                'Kayıtlı anahtar geçersiz — ücretsiz varsayılan servis kullanılıyor.',
+                'Saved key is invalid — free default service is active.',
+              ),
           colorScheme.errorContainer,
           colorScheme.onErrorContainer,
         ),
       ApiKeyStatus.unverified => (
-          'Kayıtlı anahtar henüz doğrulanmadı — test edip doğrulayabilirsiniz.',
+          s.t(
+            'Kayıtlı anahtar henüz doğrulanmadı — test edip doğrulayabilirsiniz.',
+            'Saved key is not verified yet — test to verify.',
+          ),
           colorScheme.secondaryContainer,
           colorScheme.onSecondaryContainer,
         ),
       ApiKeyStatus.none => (
-          'Anahtar girilmedi — ücretsiz varsayılan servis aktif.',
+          s.t(
+            'Anahtar girilmedi — ücretsiz varsayılan servis aktif.',
+            'No key set — free default service is active.',
+          ),
           colorScheme.surfaceContainerHighest,
           colorScheme.onSurfaceVariant,
         ),
     };
 
     return AlertDialog(
-      title: const Row(
+      title: Row(
         children: [
-          Icon(Icons.key_rounded, size: 22),
-          SizedBox(width: 8),
+          const Icon(Icons.key_rounded, size: 22),
+          const SizedBox(width: 8),
           Expanded(
-            child: Text('Gemini API Anahtarı'),
+            child: Text(s.t('Gemini API Anahtarı', 'Gemini API Key')),
           ),
         ],
       ),
@@ -320,7 +334,10 @@ class _ApiKeyDialogState extends State<ApiKeyDialog> {
             ),
             const SizedBox(height: 12),
             Text(
-              'İsteğe bağlı olarak Google AI Studio üzerinden aldığınız ücretsiz Gemini API anahtarını girip doğrulayabilirsiniz.',
+              s.t(
+                'İsteğe bağlı olarak Google AI Studio üzerinden aldığınız ücretsiz Gemini API anahtarını girip doğrulayabilirsiniz.',
+                'Optionally enter and verify your free Gemini API key from Google AI Studio.',
+              ),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
@@ -339,7 +356,7 @@ class _ApiKeyDialogState extends State<ApiKeyDialog> {
               },
               onSubmitted: (_) => _isBusy ? null : _handleSave(),
               decoration: InputDecoration(
-                labelText: 'API Anahtarı',
+                labelText: s.t('API Anahtarı', 'API Key'),
                 hintText: 'AIza...',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -355,7 +372,9 @@ class _ApiKeyDialogState extends State<ApiKeyDialog> {
                         : Icons.visibility_off_outlined,
                     size: 20,
                   ),
-                  tooltip: _obscureText ? 'Göster' : 'Gizle',
+                  tooltip: _obscureText
+                      ? s.t('Göster', 'Show')
+                      : s.t('Gizle', 'Hide'),
                 ),
               ),
             ),
@@ -369,7 +388,7 @@ class _ApiKeyDialogState extends State<ApiKeyDialog> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.network_check_rounded, size: 18),
-              label: const Text('Bağlantıyı Test Et'),
+              label: Text(s.t('Bağlantıyı Test Et', 'Test Connection')),
               style: OutlinedButton.styleFrom(
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -404,7 +423,9 @@ class _ApiKeyDialogState extends State<ApiKeyDialog> {
                 child: TextButton.icon(
                   onPressed: _isBusy ? null : _handleClearCache,
                   icon: const Icon(Icons.cleaning_services_outlined, size: 16),
-                  label: const Text('Çeviri Önbelleğini Temizle'),
+                  label: Text(
+                    s.t('Çeviri Önbelleğini Temizle', 'Clear Translation Cache'),
+                  ),
                   style: TextButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
@@ -426,15 +447,15 @@ class _ApiKeyDialogState extends State<ApiKeyDialog> {
             style: TextButton.styleFrom(
               foregroundColor: colorScheme.error,
             ),
-            child: const Text('Sil'),
+            child: Text(s.delete),
           ),
         TextButton(
           onPressed: _isBusy ? null : () => Navigator.of(context).pop(),
-          child: const Text('İptal'),
+          child: Text(s.cancel),
         ),
         FilledButton(
           onPressed: _isBusy ? null : _handleSave,
-          child: const Text('Kaydet'),
+          child: Text(s.save),
         ),
       ],
     );

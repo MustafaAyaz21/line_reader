@@ -16,12 +16,12 @@ class SettingsRepository {
     return db;
   }
 
-  Future<String?> getGeminiApiKey() async {
+  Future<String?> getString(String key) async {
     final db = await _getReadyDatabase();
     final rows = await db.query(
       AppDatabase.settingsTable,
       where: '"key" = ?',
-      whereArgs: <Object>[_geminiApiKeyName],
+      whereArgs: <Object>[key],
       limit: 1,
     );
     if (rows.isEmpty) return null;
@@ -29,10 +29,10 @@ class SettingsRepository {
     return (value != null && value.isNotEmpty) ? value : null;
   }
 
-  Future<void> saveGeminiApiKey(String apiKey) async {
-    final trimmed = apiKey.trim();
+  Future<void> saveString(String key, String value) async {
+    final trimmed = value.trim();
     if (trimmed.isEmpty) {
-      await deleteGeminiApiKey();
+      await deleteKey(key);
       return;
     }
 
@@ -40,19 +40,26 @@ class SettingsRepository {
     await db.insert(
       AppDatabase.settingsTable,
       <String, Object?>{
-        'key': _geminiApiKeyName,
+        'key': key,
         'value': trimmed,
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
 
-  Future<void> deleteGeminiApiKey() async {
+  Future<void> deleteKey(String key) async {
     final db = await _getReadyDatabase();
     await db.delete(
       AppDatabase.settingsTable,
       where: '"key" = ?',
-      whereArgs: <Object>[_geminiApiKeyName],
+      whereArgs: <Object>[key],
     );
   }
+
+  Future<String?> getGeminiApiKey() => getString(_geminiApiKeyName);
+
+  Future<void> saveGeminiApiKey(String apiKey) =>
+      saveString(_geminiApiKeyName, apiKey);
+
+  Future<void> deleteGeminiApiKey() => deleteKey(_geminiApiKeyName);
 }

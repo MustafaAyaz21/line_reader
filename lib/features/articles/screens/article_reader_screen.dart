@@ -4,8 +4,10 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/localization/app_strings.dart';
 import '../../../core/tts/tts_service.dart';
 import '../../../core/utils/word_sanitizer.dart';
+import '../../auth/controllers/auth_controller.dart';
 import '../../browser/browser_screen.dart';
 import '../../browser/widgets/word_preview_sheet.dart';
 import '../../translation/data/translation_cache_repository.dart';
@@ -39,6 +41,7 @@ class ArticleReaderScreen extends StatefulWidget {
     this.readerStore,
     this.translationService,
     this.ttsService,
+    this.authController,
     this.onAddWord,
     this.loadWordLists,
   });
@@ -47,6 +50,7 @@ class ArticleReaderScreen extends StatefulWidget {
   final ArticleReaderStore? readerStore;
   final WordTranslationService? translationService;
   final TtsService? ttsService;
+  final AuthController? authController;
   final AddWordCallback? onAddWord;
   final Future<List<WordList>> Function()? loadWordLists;
 
@@ -314,6 +318,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
         contextSentence: contextSentence,
         translationService: _translationService,
         ttsService: widget.ttsService,
+        authController: widget.authController,
         loadWordLists: widget.loadWordLists,
         onAddWord: _handleAddWord,
       );
@@ -396,14 +401,14 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
-                    'Okuma Görünümü',
+                    context.l10n.readerAppearanceTitle,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Arka Plan Tonu',
+                    context.l10n.backgroundToneLabel,
                     style: theme.textTheme.labelLarge?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
@@ -432,7 +437,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                   Row(
                     children: <Widget>[
                       Text(
-                        'Yazı Boyutu',
+                        context.l10n.fontSizeLabel,
                         style: theme.textTheme.labelLarge?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),
@@ -579,8 +584,8 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Tooltip(
                 message: _isUnderlineMode
-                    ? 'Altını Çizme Kalemi Açık'
-                    : 'Altını Çizme Kalemi',
+                    ? context.l10n.underlinePenActiveTooltip
+                    : context.l10n.underlinePenTooltip,
                 child: Material(
                   color: _isUnderlineMode
                       ? tone.underlineColor.withAlpha(38)
@@ -617,7 +622,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                           if (_isUnderlineMode) ...<Widget>[
                             const SizedBox(width: 5),
                             Text(
-                              'Çiz',
+                              context.l10n.underlinePenShort,
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
@@ -636,7 +641,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
             // Görünüm ve yazı boyutu ayarları ("Aa")
             IconButton(
               key: const ValueKey<String>('reader_appearance_button'),
-              tooltip: 'Arka Plan Tonu ve Yazı Boyutu',
+              tooltip: context.l10n.readerAppearanceTooltip,
               onPressed: _openAppearanceSheet,
               icon: Text(
                 'Aa',
@@ -673,7 +678,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Çizmek için kelimeye dokunun veya seçin; kaldırmak için çizili alana tekrar dokunun.',
+                            context.l10n.underlineBannerHint,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -707,13 +712,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         _buildDocumentHeader(tone, parsedLevel),
-                        const SizedBox(height: 22),
-                        Divider(
-                          height: 1,
-                          thickness: 1,
-                          color: tone.dividerColor,
-                        ),
-                        const SizedBox(height: 26),
+                        const SizedBox(height: 24),
                         if (_paragraphs.isEmpty)
                           Padding(
                             padding: const EdgeInsets.symmetric(vertical: 32),
@@ -828,89 +827,151 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
     ArticleLevel? parsedLevel,
   ) {
     final article = widget.article;
+    final accentColor = parsedLevel?.accentColor ?? tone.underlineColor;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Wrap(
-          spacing: 10,
-          runSpacing: 6,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: <Widget>[
-            if (parsedLevel != null)
-              Text(
-                '${parsedLevel.code} • ${parsedLevel.label}',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.3,
-                  color: parsedLevel.accentColor,
+    // Başlık, açıklama ve yazar alanları sabit boyutlarda tutulur;
+    // yazı boyutu (A- / A+) ayarı yalnızca okuma metnini etkiler.
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      decoration: BoxDecoration(
+        color: tone.surfaceColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: tone.dividerColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Wrap(
+            spacing: 10,
+            runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: <Widget>[
+              if (parsedLevel != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: parsedLevel.accentColor.withAlpha(28),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '${parsedLevel.code} • ${context.l10n.levelLabel(parsedLevel.code)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.25,
+                      color: parsedLevel.accentColor,
+                    ),
+                  ),
+                ),
+              if (article.category.isNotEmpty)
+                Text(
+                  article.category,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: tone.secondaryTextColor,
+                  ),
+                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Icon(
+                    Icons.schedule_rounded,
+                    size: 14,
+                    color: tone.secondaryTextColor,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    article.formattedReadingTime,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w500,
+                      color: tone.secondaryTextColor,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            article.title,
+            key: const ValueKey<String>('reader_article_title'),
+            style: TextStyle(
+              fontSize: 23,
+              fontWeight: FontWeight.w800,
+              height: 1.28,
+              letterSpacing: -0.25,
+              color: tone.textColor,
+            ),
+          ),
+          if (article.description.isNotEmpty &&
+              article.content.trim().isNotEmpty) ...<Widget>[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.only(left: 12, top: 2, bottom: 2),
+              decoration: BoxDecoration(
+                border: Border(
+                  left: BorderSide(
+                    color: accentColor.withAlpha(160),
+                    width: 3,
+                  ),
                 ),
               ),
-            if (article.category.isNotEmpty)
-              Text(
-                article.category,
+              child: Text(
+                article.description,
+                key: const ValueKey<String>('reader_article_description'),
                 style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
+                  fontSize: 14.5,
+                  height: 1.55,
                   color: tone.secondaryTextColor,
                 ),
               ),
+            ),
+          ],
+          if (article.author.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 14),
+            Divider(height: 1, thickness: 1, color: tone.dividerColor),
+            const SizedBox(height: 11),
             Row(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                Icon(
-                  Icons.schedule_rounded,
-                  size: 14,
-                  color: tone.secondaryTextColor,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  article.formattedReadingTime,
-                  style: TextStyle(
-                    fontSize: 13,
+                Container(
+                  width: 26,
+                  height: 26,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: tone.dividerColor.withAlpha(150),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.person_rounded,
+                    key: const ValueKey<String>('reader_author_icon'),
+                    size: 15,
                     color: tone.secondaryTextColor,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    article.author,
+                    key: const ValueKey<String>('reader_article_author'),
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      color: tone.textColor.withAlpha(215),
+                    ),
                   ),
                 ),
               ],
             ),
           ],
-        ),
-        const SizedBox(height: 12),
-        Text(
-          article.title,
-          style: TextStyle(
-            fontSize: (_preferences.fontSize + 7).clamp(22.0, 34.0),
-            fontWeight: FontWeight.w700,
-            height: 1.28,
-            letterSpacing: -0.2,
-            color: tone.textColor,
-          ),
-        ),
-        if (article.description.isNotEmpty &&
-            article.content.trim().isNotEmpty) ...<Widget>[
-          const SizedBox(height: 10),
-          Text(
-            article.description,
-            style: TextStyle(
-              fontSize: (_preferences.fontSize - 1.5).clamp(14.0, 22.0),
-              height: 1.55,
-              color: tone.secondaryTextColor,
-            ),
-          ),
         ],
-        if (article.author.isNotEmpty) ...<Widget>[
-          const SizedBox(height: 12),
-          Text(
-            article.author,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: tone.secondaryTextColor,
-            ),
-          ),
-        ],
-      ],
+      ),
     );
   }
 }
@@ -1026,10 +1087,11 @@ class _ReaderParagraphViewState extends State<_ReaderParagraphView> {
         final items = <ContextMenuButtonItem>[];
 
         if (selected.isNotEmpty) {
+          final s = context.l10n;
           if (widget.isUnderlineMode) {
             items.add(
               ContextMenuButtonItem(
-                label: 'Altını Çiz',
+                label: s.underlineAction,
                 onPressed: () {
                   selectableRegionState.hideToolbar();
                   widget.onUnderlineSelection(selected);
@@ -1039,7 +1101,7 @@ class _ReaderParagraphViewState extends State<_ReaderParagraphView> {
             if (widget.hasUnderlineInSelection(selected)) {
               items.add(
                 ContextMenuButtonItem(
-                  label: 'Çizgiyi Kaldır',
+                  label: s.removeUnderlineAction,
                   onPressed: () {
                     selectableRegionState.hideToolbar();
                     widget.onRemoveSelectionUnderline(selected);
@@ -1050,7 +1112,7 @@ class _ReaderParagraphViewState extends State<_ReaderParagraphView> {
           } else {
             items.add(
               ContextMenuButtonItem(
-                label: 'Anlamına Bak',
+                label: s.lookupMeaningAction,
                 onPressed: () {
                   selectableRegionState.hideToolbar();
                   widget.onLookupSelection(selected);
@@ -1087,7 +1149,13 @@ class _ToneOptionChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = context.l10n;
     final colorScheme = Theme.of(context).colorScheme;
+    final toneLabel = switch (tone) {
+      ArticleReaderTone.white => s.toneWhite,
+      ArticleReaderTone.paper => s.tonePaper,
+      ArticleReaderTone.dark => s.toneDark,
+    };
 
     return Material(
       color: tone.backgroundColor,
@@ -1118,7 +1186,7 @@ class _ToneOptionChip extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                tone.label,
+                toneLabel,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -1156,6 +1224,7 @@ class _SelectionFloatingBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = context.l10n;
     return Material(
       elevation: 4,
       color: tone.surfaceColor,
@@ -1178,7 +1247,7 @@ class _SelectionFloatingBar extends StatelessWidget {
                   color: tone.underlineColor,
                 ),
                 label: Text(
-                  'Altını Çiz',
+                  s.underlineAction,
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
                     color: tone.textColor,
@@ -1194,7 +1263,7 @@ class _SelectionFloatingBar extends StatelessWidget {
                     color: tone.secondaryTextColor,
                   ),
                   label: Text(
-                    'Kaldır',
+                    s.removeShort,
                     style: TextStyle(color: tone.secondaryTextColor),
                   ),
                 ),
@@ -1207,7 +1276,7 @@ class _SelectionFloatingBar extends StatelessWidget {
                   color: tone.underlineColor,
                 ),
                 label: Text(
-                  'Anlamına Bak',
+                  s.lookupMeaningAction,
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
                     color: tone.textColor,

@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/localization/app_locale.dart';
+import '../../../core/localization/app_strings.dart';
 import '../../../core/settings/api_key_controller.dart';
 import '../../../core/tts/tts_service.dart';
 import '../../articles/articles_screen.dart';
 import '../../articles/controllers/articles_controller.dart';
+import '../../auth/controllers/auth_controller.dart';
 import '../../browser/browser_screen.dart';
 import '../../settings/widgets/api_key_dialog.dart';
+import '../../settings/widgets/settings_action_button.dart';
 import '../../translation/services/word_translation_service.dart';
 import '../../update/controllers/app_update_controller.dart';
 import '../../update/widgets/update_action_button.dart';
@@ -13,12 +17,14 @@ import '../../words/models/word_list.dart';
 
 /// Uygulamanın sade Ana Menü ekranı.
 /// Ortada yan yana "Tarayıcı" ve "Makaleler" kısayol kartları, sağ üstte ise
-/// güncelleme ikonu (kırmızı göstergeli) ve Gemini API anahtarı ikonu yer alır.
+/// güncelleme ikonu (kırmızı göstergeli) ve Ayarlar ikonu yer alır.
 class MainMenuScreen extends StatelessWidget {
   const MainMenuScreen({
     super.key,
     required this.onOpenBrowser,
     required this.apiKeyController,
+    this.localeController,
+    this.authController,
     this.updateController,
     this.articlesController,
     this.translationService,
@@ -30,6 +36,8 @@ class MainMenuScreen extends StatelessWidget {
 
   final VoidCallback onOpenBrowser;
   final ApiKeyController apiKeyController;
+  final AppLocaleController? localeController;
+  final AuthController? authController;
   final AppUpdateController? updateController;
   final ArticlesController? articlesController;
   final WordTranslationService? translationService;
@@ -45,6 +53,7 @@ class MainMenuScreen extends StatelessWidget {
           controller: articlesController,
           translationService: translationService,
           ttsService: ttsService,
+          authController: authController,
           onAddWord: onAddWord,
           loadWordLists: loadWordLists,
         ),
@@ -54,19 +63,28 @@ class MainMenuScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = context.l10n;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Ana Menü'),
+        title: Text(s.mainMenuTitle),
         actions: [
           if (updateController != null)
             UpdateActionButton(controller: updateController!),
-          ApiKeyActionButton(
-            controller: apiKeyController,
-            onClearCache: onClearCache,
-          ),
+          if (localeController != null && authController != null)
+            SettingsActionButton(
+              apiKeyController: apiKeyController,
+              localeController: localeController!,
+              authController: authController!,
+              onClearCache: onClearCache,
+            )
+          else
+            ApiKeyActionButton(
+              controller: apiKeyController,
+              onClearCache: onClearCache,
+            ),
           const SizedBox(width: 4),
         ],
       ),
@@ -82,8 +100,8 @@ class MainMenuScreen extends StatelessWidget {
                   Expanded(
                     child: _MenuShortcutCard(
                       icon: Icons.public_rounded,
-                      title: 'Tarayıcı',
-                      subtitle: 'Web\'de oku ve anında çevir',
+                      title: s.browserTitle,
+                      subtitle: s.browserSubtitle,
                       containerColor: colorScheme.primaryContainer,
                       iconBackgroundColor: colorScheme.primary,
                       iconColor: colorScheme.onPrimary,
@@ -95,8 +113,8 @@ class MainMenuScreen extends StatelessWidget {
                   Expanded(
                     child: _MenuShortcutCard(
                       icon: Icons.menu_book_rounded,
-                      title: 'Makaleler',
-                      subtitle: 'Çevrimdışı okumalar',
+                      title: s.articlesTitle,
+                      subtitle: s.articlesSubtitle,
                       containerColor: colorScheme.secondaryContainer,
                       iconBackgroundColor: colorScheme.secondary,
                       iconColor: colorScheme.onSecondary,

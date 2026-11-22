@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/localization/app_strings.dart';
 import '../../../core/tts/tts_service.dart';
+import '../../auth/controllers/auth_controller.dart';
+import '../../auth/screens/auth_screen.dart';
 import '../../translation/models/word_meaning.dart';
 import '../../translation/services/word_translation_service.dart';
 import '../../words/models/saved_word.dart';
@@ -20,6 +23,7 @@ class WordPreviewSheet extends StatefulWidget {
     required this.onAddWord,
     this.contextSentence,
     this.ttsService,
+    this.authController,
   });
 
   final String word;
@@ -28,6 +32,7 @@ class WordPreviewSheet extends StatefulWidget {
   final List<WordList> wordLists;
   final Future<List<WordList>> Function()? loadWordLists;
   final TtsService? ttsService;
+  final AuthController? authController;
   final void Function(
     String word,
     String meaning,
@@ -51,6 +56,7 @@ class WordPreviewSheet extends StatefulWidget {
     ) onAddWord,
     String? contextSentence,
     TtsService? ttsService,
+    AuthController? authController,
   }) {
     return showModalBottomSheet<void>(
       context: context,
@@ -66,6 +72,7 @@ class WordPreviewSheet extends StatefulWidget {
           wordLists: wordLists,
           loadWordLists: loadWordLists,
           ttsService: ttsService,
+          authController: authController,
           onAddWord: (
             selectedWord,
             selectedMeaning,
@@ -94,6 +101,7 @@ class WordPreviewSheet extends StatefulWidget {
 class _WordPreviewSheetState extends State<WordPreviewSheet> {
   WordMeaning? _meaning;
   String? _errorMessage;
+  TranslationErrorType? _errorType;
   bool _isLoading = true;
   int? _selectedListId;
   late List<WordList> _wordLists;
@@ -181,6 +189,7 @@ class _WordPreviewSheetState extends State<WordPreviewSheet> {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _errorType = null;
     });
 
     try {
@@ -197,14 +206,32 @@ class _WordPreviewSheetState extends State<WordPreviewSheet> {
       if (!mounted) return;
       setState(() {
         _errorMessage = error.message;
+        _errorType = error.type;
         _isLoading = false;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = 'Anlam getirilirken beklenmeyen bir sorun oluştu.';
+        _errorMessage = context.l10n.t(
+          'Anlam getirilirken beklenmeyen bir sorun oluştu.',
+          'An unexpected error occurred while fetching meanings.',
+        );
+        _errorType = TranslationErrorType.unknown;
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _handleOpenAuthForQuota() async {
+    final authController = widget.authController;
+    if (authController == null) return;
+    final signedIn = await AuthScreen.show(
+      context,
+      controller: authController,
+      initialSignUpTab: true,
+    );
+    if (signedIn == true && mounted) {
+      await _fetchMeaning();
     }
   }
 
@@ -323,7 +350,9 @@ class _WordPreviewSheetState extends State<WordPreviewSheet> {
                       FilledButton.icon(
                         onPressed: _isLoading ? null : _handleAddPressed,
                         icon: const Icon(Icons.bookmark_add_outlined, size: 20),
-                        label: const Text('Kelimelerime Ekle'),
+                        label: Text(
+                          context.l10n.t('Kelimelerime Ekle', 'Add to My Words'),
+                        ),
                         style: FilledButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 13),
                           shape: RoundedRectangleBorder(
@@ -504,7 +533,7 @@ class _WordPreviewSheetState extends State<WordPreviewSheet> {
       value: _selectedListId,
       isExpanded: true,
       decoration: InputDecoration(
-        labelText: 'Liste Seç',
+        labelText: context.l10n.t('Liste Seç', 'Select List'),
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 12,
@@ -564,7 +593,10 @@ class _WordPreviewSheetState extends State<WordPreviewSheet> {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                'Bağlama göre anlamlar getiriliyor...',
+                context.l10n.t(
+                  'Bağlama göre anlamlar getiriliyor...',
+                  'Fetching contextual meanings...',
+                ),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),
@@ -638,6 +670,43 @@ class _WordPreviewSheetState extends State<WordPreviewSheet> {
       );
     }
 
+    if (_errorType == TranslationErrorType.guestLimitReached) {
+      final s = context.l10n;
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: colorScheme.errorContainer.withAlpha(180),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              s.guestQuotaReachedMessage(
+                AuthController.guestDailyTranslationLimit,
+              ),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onErrorContainer,
+                height: 1.4,
+              ),
+            ),
+            if (widget.authController != null) ...[
+              const SizedBox(height: 10),
+              FilledButton.icon(
+                key: const ValueKey<String>('sheet_guest_limit_signin_button'),
+                onPressed: _handleOpenAuthForQuota,
+                icon: const Icon(Icons.login_rounded, size: 18),
+                label: Text(
+                  s.t('Giriş Yap / Kayıt Ol', 'Sign In / Sign Up'),
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -658,7 +727,7 @@ class _WordPreviewSheetState extends State<WordPreviewSheet> {
           TextButton.icon(
             onPressed: _fetchMeaning,
             icon: const Icon(Icons.refresh_rounded, size: 18),
-            label: const Text('Tekrar Dene'),
+            label: Text(context.l10n.retry),
             style: TextButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               minimumSize: Size.zero,

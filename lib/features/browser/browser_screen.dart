@@ -7,6 +7,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../../core/database/app_database.dart';
 import '../../core/tts/tts_service.dart';
 import '../../core/utils/url_helper.dart';
+import '../auth/controllers/auth_controller.dart';
 import '../translation/data/translation_cache_repository.dart';
 import '../translation/models/word_meaning.dart';
 import '../translation/services/cached_translation_service.dart';
@@ -72,6 +73,7 @@ class BrowserScreen extends StatefulWidget {
     this.loadWordLists,
     this.translationService,
     this.ttsService,
+    this.authController,
     this.onReturnToMenu,
     this.backController,
   });
@@ -80,6 +82,7 @@ class BrowserScreen extends StatefulWidget {
   final Future<List<WordList>> Function()? loadWordLists;
   final WordTranslationService? translationService;
   final TtsService? ttsService;
+  final AuthController? authController;
   final VoidCallback? onReturnToMenu;
   final BrowserBackController? backController;
 
@@ -659,6 +662,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
         loadWordLists: widget.loadWordLists ??
             () => WordRepository(AppDatabase.instance).getAllLists(),
         ttsService: widget.ttsService,
+        authController: widget.authController,
         onAddWord: _handleAddWord,
       );
     } finally {

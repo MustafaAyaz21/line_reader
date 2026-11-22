@@ -22,6 +22,7 @@ class CachedTranslationService implements WordTranslationService {
     bool Function()? shouldAttemptGeminiProvider,
     VoidCallback? onGeminiVerified,
     void Function(String errorMessage)? onGeminiUnauthorized,
+    Future<bool> Function()? beforeLookupQuotaCheck,
     WordTranslationService? geminiService,
     WordTranslationService? primaryFreeService,
     WordTranslationService? fallbackFreeService,
@@ -30,6 +31,7 @@ class CachedTranslationService implements WordTranslationService {
         _shouldAttemptGeminiProvider = shouldAttemptGeminiProvider,
         _onGeminiVerified = onGeminiVerified,
         _onGeminiUnauthorized = onGeminiUnauthorized,
+        _beforeLookupQuotaCheck = beforeLookupQuotaCheck,
         _geminiService = geminiService ??
             (geminiApiKeyProvider != null
                 ? GeminiTranslationService(apiKeyProvider: geminiApiKeyProvider)
@@ -48,6 +50,7 @@ class CachedTranslationService implements WordTranslationService {
   final bool Function()? _shouldAttemptGeminiProvider;
   final VoidCallback? _onGeminiVerified;
   final void Function(String errorMessage)? _onGeminiUnauthorized;
+  final Future<bool> Function()? _beforeLookupQuotaCheck;
   final WordTranslationService? _geminiService;
   final WordTranslationService _primaryFreeService;
   final WordTranslationService _fallbackFreeService;
@@ -73,6 +76,18 @@ class CachedTranslationService implements WordTranslationService {
     required String word,
     String? contextSentence,
   }) async {
+    final quotaCheck = _beforeLookupQuotaCheck;
+    if (quotaCheck != null) {
+      final allowed = await quotaCheck();
+      if (!allowed) {
+        throw const TranslationException(
+          type: TranslationErrorType.guestLimitReached,
+          message:
+              'Misafir olarak günlük 40 kelime çeviri hakkınız doldu. Sınırsız çeviri için ücretsiz hesap oluşturun.',
+        );
+      }
+    }
+
     final useGemini = _canAttemptGemini;
     CachedTranslation? cached;
 

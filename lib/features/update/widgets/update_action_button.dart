@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/localization/app_strings.dart';
 import '../controllers/app_update_controller.dart';
 import '../screens/app_update_screen.dart';
 
@@ -31,9 +32,10 @@ class UpdateActionButton extends StatelessWidget {
       builder: (context, _) {
         final hasUpdate = controller.hasUpdate;
 
+        final s = context.l10n;
         return IconButton(
           onPressed: () => _openUpdateScreen(context),
-          tooltip: hasUpdate ? 'Yeni Güncelleme Mevcut' : 'Güncellemeler',
+          tooltip: hasUpdate ? s.newUpdateAvailable : s.updatesTitle,
           icon: Column(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,

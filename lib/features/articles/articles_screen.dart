@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../core/database/app_database.dart';
+import '../../core/localization/app_strings.dart';
 import '../../core/tts/tts_service.dart';
+import '../auth/controllers/auth_controller.dart';
 import '../browser/browser_screen.dart';
 import '../translation/services/word_translation_service.dart';
 import '../words/models/word_list.dart';
@@ -28,6 +30,7 @@ class ArticlesScreen extends StatefulWidget {
     this.readerStore,
     this.translationService,
     this.ttsService,
+    this.authController,
     this.onAddWord,
     this.loadWordLists,
   });
@@ -36,6 +39,7 @@ class ArticlesScreen extends StatefulWidget {
   final ArticleReaderStore? readerStore;
   final WordTranslationService? translationService;
   final TtsService? ttsService;
+  final AuthController? authController;
   final AddWordCallback? onAddWord;
   final Future<List<WordList>> Function()? loadWordLists;
 
@@ -76,10 +80,17 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
     if (!mounted) return;
 
     if (result.isOfflineFallback) {
+      final s = context.l10n;
       final hasCached = result.articles.isNotEmpty;
       final message = hasCached
-          ? 'İnternet bağlantısı yok. Önbellekteki makaleler korunuyor.'
-          : 'Güncel makaleler kontrol edilemedi; çevrimdışı önbellek korunuyor.';
+          ? s.t(
+              'İnternet bağlantısı yok. Önbellekteki makaleler korunuyor.',
+              'No internet connection. Cached articles are preserved.',
+            )
+          : s.t(
+              'Güncel makaleler kontrol edilemedi; çevrimdışı önbellek korunuyor.',
+              'Could not check for new articles; offline cache preserved.',
+            );
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
@@ -101,6 +112,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
           readerStore: widget.readerStore,
           translationService: widget.translationService,
           ttsService: widget.ttsService,
+          authController: widget.authController,
           onAddWord: widget.onAddWord,
           loadWordLists: widget.loadWordLists,
         ),
@@ -128,7 +140,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Makaleler'),
+            title: Text(context.l10n.articlesTitle),
           ),
           body: Stack(
             children: <Widget>[
@@ -213,6 +225,7 @@ class _ArticleLevelCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = context.l10n;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -251,7 +264,7 @@ class _ArticleLevelCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Text(
-                        level.label,
+                        s.levelLabel(level.code),
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w700,
                           color: colorScheme.onSurface,
@@ -259,7 +272,7 @@ class _ArticleLevelCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        level.subtitle,
+                        s.levelSubtitle(level.code),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall?.copyWith(
@@ -281,7 +294,7 @@ class _ArticleLevelCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
-                    '$articleCount makale',
+                    s.articleCountLabel(articleCount),
                     style: theme.textTheme.labelMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                       color: colorScheme.onSurfaceVariant,

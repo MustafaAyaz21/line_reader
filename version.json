@@ -1,6 +1,6 @@
 {
-    "latest_version":  "0.1.13",
-    "version_code":  14,
-    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.13/app-release.apk",
-    "release_notes":  "Arayüz ve performans iyileştirmeleri."
+    "latest_version":  "0.1.14",
+    "version_code":  15,
+    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.14/app-release.apk",
+    "release_notes":  "Yeni ayarlar, dil seçimi, hesap desteği ve arayüz iyileştirmeleri."
 }
