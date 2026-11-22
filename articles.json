@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-11-22T17:36:40.072Z",
+  "updated_at": "2026-11-22T17:42:37.449Z",
   "articles": [
     {
       "id": "b1-strange-rules-that-make-sense-once-you-look-clos",
@@ -13,7 +13,40 @@
       "content": "Every culture has habits that look a little funny from the outside. When you travel, you quickly notice that politeness is not a universal language. Something friendly in one place can feel surprising—or even rude—somewhere else.\n\nIn parts of Asia, slurping your noodles is not bad table manners. It shows the chef that you enjoy the food and helps cool down hot broth. Meanwhile, in many Western countries, loud eating still gets side-eye at dinner. Different rules, same hungry stomach.\n\nGreeting customs also keep travelers on their toes. In some cultures, a quick handshake does the job. In others, people kiss cheeks, bow, or press noses together. If you hesitate for half a second, nobody is quite sure who goes first, which can turn a simple hello into a small comedy routine.\n\nEven small daily choices carry hidden meaning. In several countries, leaving a tiny bit of food on your plate signals that your host gave you plenty. Finish every crumb, and they might worry you are still starving. Elsewhere, a clean plate is the highest compliment a cook can receive.\n\nLocal laws can sound just as unusual at first glance. In Singapore, chewing gum in public is heavily restricted to keep streets and trains clean. In parts of Venice, sitting on certain historic steps or feeding pigeons can bring a fine. Rules often start as practical answers to real problems, even if they sound odd to visitors.\n\nWhen we meet an unfamiliar tradition, our first reaction is often surprise. Yet behind most strange habits lies a story about care, respect, or shared history. Paying attention does not just help us avoid awkward moments. It reminds us that there is more than one good way to live.",
       "published_at": "2026-11-22T16:04:38.146Z",
       "category": "Culture",
-      "author": "Line Reader Editorial"
+      "author": "Line Reader Editorial",
+      "word_meanings": {
+        "habits (habit)": "alışkanlıklar",
+        "politeness": "nezaket, kibarlık",
+        "universal": "evrensel",
+        "surprising": "şaşırtıcı",
+        "rude": "kaba, saygısız",
+        "slurping (slurp)": "(sıvı veya erişteyi) şapırdatarak/sesli içme",
+        "manners (manner)": "görgü kuralları, tavırlar",
+        "chef": "şef, aşçı",
+        "broth": "et suyu, etli çorba",
+        "meanwhile": "bu arada, oysa",
+        "customs (custom)": "gelenekler, görenekler",
+        "travelers (traveler)": "gezginler, yolcular",
+        "hesitate": "tereddüt etmek, duraksamak",
+        "turn": "dönüştürmek, çevirmek",
+        "meaning": "anlam, mana",
+        "host": "ev sahibi",
+        "crumb": "kırıntı",
+        "starving (starve)": "açlıktan ölmek, çok acıkmış olmak",
+        "elsewhere": "başka yerlerde",
+        "compliment": "iltifat, övgü",
+        "unusual": "alışılmadık, olağandışı",
+        "restricted (restrict)": "kısıtlanmış, sınırlandırılmış",
+        "fine": "para cezası",
+        "odd": "garip, tuhaf",
+        "unfamiliar": "alışılmadık, yabancı",
+        "tradition": "gelenek",
+        "reaction": "tepki",
+        "respect": "saygı",
+        "shared (share)": "paylaşılan, ortak",
+        "avoid": "kaçınmak, önlemek",
+        "awkward": "garip, tuhaf, elverişsiz"
+      }
     }
   ]
 }
