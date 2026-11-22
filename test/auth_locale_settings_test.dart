@@ -77,7 +77,7 @@ class _InMemoryAuthLocalStore implements AuthLocalStore {
 class _FakeEntitlementClient implements EntitlementClient {
   bool remoteUnlimited = false;
   String? remoteCodeUsed;
-  final String validCode = 'AYAZ2026';
+  final String validCode = 'READER2026';
 
   @override
   Future<EntitlementStatus?> fetchEntitlement(String idToken) async {
@@ -134,8 +134,8 @@ class _FakeAuthBackend implements AuthBackend {
   Future<AuthActionResult> signInWithGoogle() async {
     _current = const AppAuthUser(
       uid: 'google-1',
-      email: 'mustafa@gmail.com',
-      displayName: 'Mustafa',
+      email: 'reader@example.com',
+      displayName: 'Reader User',
       provider: AuthProviderType.google,
     );
     _stream.add(_current);
@@ -246,15 +246,15 @@ void main() {
         expect(controller.hasReachedDailyLimit, isTrue);
         expect(await controller.consumeTranslationQuota(), isFalse);
 
-        // 3) Geçersiz kod reddedilir, doğru kod (AYAZ2026) sınırsız açar
+        // 3) Geçersiz kod reddedilir, doğru kod (READER2026) sınırsız açar
         final badRedeem = await controller.redeemAccessCode('YANLIS');
         expect(badRedeem.isSuccess, isFalse);
         expect(controller.isUnlimited, isFalse);
 
-        final goodRedeem = await controller.redeemAccessCode('ayaz2026');
+        final goodRedeem = await controller.redeemAccessCode('reader2026');
         expect(goodRedeem.isSuccess, isTrue);
         expect(controller.isUnlimited, isTrue);
-        expect(controller.entitlementCodeUsed, 'AYAZ2026');
+        expect(controller.entitlementCodeUsed, 'READER2026');
         expect(controller.hasReachedDailyLimit, isFalse);
 
         for (var i = 0; i < 120; i++) {
@@ -296,7 +296,7 @@ void main() {
         expect(standardTriggers, <int>[8, 16]);
 
         // Yetkili (kod kullanmış): hiç gösterilmez
-        await controller.redeemAccessCode('AYAZ2026');
+        await controller.redeemAccessCode('READER2026');
         final unlimitedTriggers = <int>[];
         for (var i = 1; i <= 20; i++) {
           if (controller.recordWordLookupAndShouldShowPromo()) {
@@ -471,7 +471,7 @@ void main() {
     );
 
     testWidgets(
-      'SettingsScreen standart hesapta Kod Kullan gösterir ve AYAZ2026 sonrası Sınırsız olur',
+      'SettingsScreen standart hesapta Kod Kullan gösterir ve READER2026 sonrası Sınırsız olur',
       (tester) async {
         final localeController =
             AppLocaleController(store: _InMemoryLanguageStore());
@@ -510,7 +510,7 @@ void main() {
         expect(codeField, findsOneWidget);
         expect(applyBtn, findsOneWidget);
 
-        await tester.enterText(codeField, 'AYAZ2026');
+        await tester.enterText(codeField, 'READER2026');
         await tester.tap(applyBtn);
         await tester.pumpAndSettle();
 
@@ -519,7 +519,7 @@ void main() {
           findsOneWidget,
         );
         expect(find.text('Sınırsız Hesap (Yetkili)'), findsOneWidget);
-        expect(find.textContaining('AYAZ2026'), findsOneWidget);
+        expect(find.textContaining('READER2026'), findsOneWidget);
 
         apiKeyController.dispose();
         authController.dispose();

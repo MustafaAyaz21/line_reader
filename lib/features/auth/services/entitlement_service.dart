@@ -50,7 +50,7 @@ abstract class EntitlementClient {
 }
 
 /// Cloudflare Worker + D1 üzerinden kullanıcının sınırsız yetkisini doğrulayan
-/// ve aktivasyon kodunu (`AYAZ2026` vb.) işleyen servis.
+/// ve aktivasyon kodunu (`READER2026` vb.) işleyen servis.
 class CloudflareEntitlementService implements EntitlementClient {
   CloudflareEntitlementService({
     String? baseUrl,

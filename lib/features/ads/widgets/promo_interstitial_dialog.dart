@@ -274,7 +274,7 @@ class _PromoInterstitialDialogState extends State<PromoInterstitialDialog> {
                                 ),
                                 const SizedBox(height: 14),
                                 Text(
-                                  'Line Apps • Developed by Mustafa Ayaz',
+                                  'Line Apps • Line Reader',
                                   textAlign: TextAlign.center,
                                   style: theme.textTheme.labelMedium?.copyWith(
                                     color: colorScheme.onSurfaceVariant,

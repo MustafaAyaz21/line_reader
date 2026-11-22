@@ -1111,11 +1111,11 @@
         <div class="admin-card">
           <div>
             <h3>Aktivasyon Kodları (Özel Kod Oluştur)</h3>
-            <p class="admin-sub">İstediğiniz adla (ör. <b>AYAZ2026</b>) ve istediğiniz kullanım adediyle kod oluşturun; kullanıcılar Ayarlar ekranından kodu girince anında sınırsız + reklamsız + Tarayıcı AI yetkisi kazanır.</p>
+            <p class="admin-sub">İstediğiniz adla (ör. <b>READER2026</b>) ve istediğiniz kullanım adediyle kod oluşturun; kullanıcılar Ayarlar ekranından kodu girince anında sınırsız + reklamsız + Tarayıcı AI yetkisi kazanır.</p>
           </div>
 
           <div class="admin-form-row">
-            <input type="text" id="newCodeInput" class="admin-input" style="flex:1;min-width:150px;text-transform:uppercase;font-weight:700;" placeholder="Örn: AYAZ2026" />
+            <input type="text" id="newCodeInput" class="admin-input" style="flex:1;min-width:150px;text-transform:uppercase;font-weight:700;" placeholder="Örn: READER2026" />
             <input type="number" id="newCodeMaxUses" class="admin-input" style="width:105px;" min="1" max="100000" value="1" title="Kullanım Sayısı" />
             <button class="btn btn-sm" id="randomCodeBtn" type="button">Rastgele</button>
           </div>
@@ -2496,7 +2496,7 @@
       const maxUses = Math.max(1, parseInt(accessEl.newCodeMaxUses.value, 10) || 1);
       const note = accessEl.newCodeNote.value.trim();
       if (!code || code.length < 3) {
-        showToast("En az 3 karakterli bir kod yazın (örn: AYAZ2026).", "error");
+        showToast("En az 3 karakterli bir kod yazın (örn: READER2026).", "error");
         return;
       }
       try {

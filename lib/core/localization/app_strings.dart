@@ -120,7 +120,7 @@ class AppStrings {
       t('Google (Gmail) ile Devam Et', 'Continue with Google (Gmail)');
   String get redeemCodeTitle => t('Kod Kullan', 'Redeem Code');
   String get redeemCodeApply => t('Kodu Uygula', 'Apply Code');
-  String get redeemCodeHint => t('Örn: AYAZ2026', 'e.g. AYAZ2026');
+  String get redeemCodeHint => t('Örn: READER2026', 'e.g. READER2026');
   String get mandatoryUpdateTitle => t('Zorunlu Güncelleme', 'Update Required');
   String mandatoryUpdateSubtitle(String latestVersion) => t(
         'Line Reader\'ı kullanmaya devam etmek için lütfen v$latestVersion sürümüne güncelleyin.',

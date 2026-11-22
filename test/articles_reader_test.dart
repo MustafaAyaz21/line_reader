@@ -274,7 +274,7 @@ void main() {
           title: 'A Day in Kyoto',
           summary: 'A gentle walk through historic temples.',
           level: 'A2',
-          author: 'Mustafa Ayaz',
+          author: 'Line Reader Editorial',
           readingTimeLabel: '5 - 8 dk',
           content: 'Reading books brings calm. Quiet gardens inspire deep focus.',
         );
@@ -293,7 +293,7 @@ void main() {
 
         // Yazar profil ikonu görünmeli ve başlık/açıklama font boyutu sabit kalmalı.
         expect(find.byKey(const ValueKey<String>('reader_author_icon')), findsOneWidget);
-        expect(find.text('Mustafa Ayaz'), findsOneWidget);
+        expect(find.text('Line Reader Editorial'), findsOneWidget);
 
         final initialTitleSize = tester
             .widget<Text>(find.byKey(const ValueKey<String>('reader_article_title')))

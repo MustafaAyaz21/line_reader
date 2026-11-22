@@ -197,7 +197,7 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  /// Kayıtlı kullanıcı için aktivasyon kodunu (`AYAZ2026` vb.) sunucuda doğrular.
+  /// Kayıtlı kullanıcı için aktivasyon kodunu (`READER2026` vb.) sunucuda doğrular.
   Future<RedeemCodeResult> redeemAccessCode(String rawCode) async {
     if (!isAuthenticated) {
       return const RedeemCodeResult(
