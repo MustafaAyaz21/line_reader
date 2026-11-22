@@ -1054,8 +1054,9 @@
               placeholder="Gemini API Anahtarınız (AIza...)"
             />
             <select id="geminiModelSelect" class="ai-select" title="Gemini Modeli">
-              <option value="gemini-2.5-flash">gemini-2.5-flash (Önerilen)</option>
-              <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite (Hızlı)</option>
+              <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite (Önerilen • En Hızlı)</option>
+              <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+              <option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite</option>
               <option value="gemini-2.0-flash">gemini-2.0-flash</option>
             </select>
             <button type="button" class="btn btn-primary btn-sm" id="saveGeminiConfigBtn">
@@ -1414,6 +1415,9 @@
       el.levelFilters.querySelectorAll(".filter-chip").forEach(btn => {
         btn.addEventListener("click", () => {
           state.filterLevel = btn.dataset.filter;
+          if (state.filterLevel !== "ALL" && typeof aiEl !== "undefined" && aiEl.levelSelect) {
+            aiEl.levelSelect.value = state.filterLevel;
+          }
           renderLevelFilters();
           renderArticleList();
         });

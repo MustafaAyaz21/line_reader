@@ -194,7 +194,7 @@ function Get-AdminConfig {
     $workerUrl = $DefaultWorkerUrl
     $adminSecret = ""
     $geminiApiKey = ""
-    $geminiModel = "gemini-2.5-flash"
+    $geminiModel = "gemini-2.5-flash-lite"
     if (Test-Path $AdminConfigPath) {
         try {
             $parsed = (Read-Utf8Text $AdminConfigPath) | ConvertFrom-Json
@@ -209,7 +209,7 @@ function Get-AdminConfig {
         workerUrl    = $workerUrl.Trim().TrimEnd("/")
         adminSecret  = $adminSecret.Trim()
         geminiApiKey = $geminiApiKey.Trim()
-        geminiModel  = if ([string]::IsNullOrWhiteSpace($geminiModel)) { "gemini-2.5-flash" } else { $geminiModel.Trim() }
+        geminiModel  = if ([string]::IsNullOrWhiteSpace($geminiModel)) { "gemini-2.5-flash-lite" } else { $geminiModel.Trim() }
     }
 }
 
@@ -374,145 +374,179 @@ Strict requirements:
     }
     $requestBody = $requestObj | ConvertTo-Json -Depth 8 -Compress
 
-    $modelsToTry = @($cfg.geminiModel, "gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest") | Select-Object -Unique
+    $modelsToTry = @(
+        $cfg.geminiModel,
+        "gemini-2.5-flash-lite",
+        "gemini-flash-lite-latest",
+        "gemini-2.5-flash",
+        "gemini-2.0-flash-lite",
+        "gemini-2.0-flash",
+        "gemini-flash-latest"
+    ) | Select-Object -Unique
     [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
 
     $lastErrorMsg = "Gemini API yanıt vermedi."
     $lastStatus = 502
+    $hadTransientOverload = $false
 
-    foreach ($modelName in $modelsToTry) {
-        $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=$([System.Uri]::EscapeDataString($cfg.geminiApiKey))"
-        $webReq = [System.Net.HttpWebRequest]::Create($endpoint)
-        $webReq.Method = "POST"
-        $webReq.Timeout = 60000
-        $webReq.Accept = "application/json"
-        $webReq.ContentType = "application/json; charset=utf-8"
-
-        $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($requestBody)
-        $webReq.ContentLength = $bodyBytes.Length
-        $reqStream = $webReq.GetRequestStream()
-        try {
-            $reqStream.Write($bodyBytes, 0, $bodyBytes.Length)
-        }
-        finally {
-            $reqStream.Dispose()
+    # Geçici 503 yoğunluklarında önce diğer stabil modellere geç, hepsi yoğun ise 1 kısa bekleme sonrası tekrar dene.
+    for ($attemptPass = 1; $attemptPass -le 2; $attemptPass++) {
+        $passModels = if ($attemptPass -eq 1) {
+            $modelsToTry
+        } else {
+            if (-not $hadTransientOverload) { break }
+            Start-Sleep -Milliseconds 1800
+            @("gemini-2.5-flash-lite", "gemini-flash-lite-latest", "gemini-2.5-flash") | Select-Object -Unique
         }
 
-        try {
-            $webRes = $webReq.GetResponse()
-            $reader = New-Object System.IO.StreamReader($webRes.GetResponseStream(), [System.Text.Encoding]::UTF8)
+        $abortAll = $false
+        foreach ($modelName in $passModels) {
+            Write-Host "[Gemini] Deneniyor (tur $attemptPass): $modelName ..." -ForegroundColor DarkCyan
+            $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=$([System.Uri]::EscapeDataString($cfg.geminiApiKey))"
+            $webReq = [System.Net.HttpWebRequest]::Create($endpoint)
+            $webReq.Method = "POST"
+            $webReq.Timeout = 60000
+            $webReq.Accept = "application/json"
+            $webReq.ContentType = "application/json; charset=utf-8"
+
+            $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($requestBody)
+            $webReq.ContentLength = $bodyBytes.Length
+            $reqStream = $webReq.GetRequestStream()
             try {
-                $resText = $reader.ReadToEnd()
+                $reqStream.Write($bodyBytes, 0, $bodyBytes.Length)
             }
             finally {
-                $reader.Dispose()
-                $webRes.Close()
+                $reqStream.Dispose()
             }
 
-            $parsedRes = $resText | ConvertFrom-Json
-            $rawModelText = ""
-            if ($null -ne $parsedRes.candidates -and $parsedRes.candidates.Count -gt 0) {
-                $parts = $parsedRes.candidates[0].content.parts
-                if ($null -ne $parts -and $parts.Count -gt 0) {
-                    $rawModelText = [string]$parts[0].text
-                }
-            }
-
-            if ([string]::IsNullOrWhiteSpace($rawModelText)) {
-                $lastErrorMsg = "Gemini boş yanıt döndürdü ($modelName)."
-                continue
-            }
-
-            $cleanedJson = $rawModelText.Trim()
-            if ($cleanedJson -match '(?s)^```(?:json)?\s*(.*?)\s*```$') {
-                $cleanedJson = $Matches[1].Trim()
-            }
-            $firstBrace = $cleanedJson.IndexOf('{')
-            $lastBrace = $cleanedJson.LastIndexOf('}')
-            if ($firstBrace -ge 0 -and $lastBrace -gt $firstBrace) {
-                $cleanedJson = $cleanedJson.Substring($firstBrace, $lastBrace - $firstBrace + 1)
-            }
-
-            $articleObj = $cleanedJson | ConvertFrom-Json
-            $genTitle = if ($articleObj.title) { ([string]$articleObj.title).Trim() } else { "" }
-            $genDesc = if ($articleObj.description) { ([string]$articleObj.description).Trim() } else { "" }
-            $genCat = if ($articleObj.category) { ([string]$articleObj.category).Trim() } else { "General" }
-            $genContent = if ($articleObj.content) { ([string]$articleObj.content).Replace("`r`n", "`n").Trim() } else { "" }
-
-            if ([string]::IsNullOrWhiteSpace($genTitle) -or [string]::IsNullOrWhiteSpace($genContent)) {
-                $lastErrorMsg = "Gemini çıktısında başlık veya içerik eksikti ($modelName)."
-                continue
-            }
-
-            $wmOrdered = [ordered]@{}
-            if ($null -ne $articleObj.PSObject.Properties["word_meanings"] -and $null -ne $articleObj.word_meanings) {
-                foreach ($prop in $articleObj.word_meanings.PSObject.Properties) {
-                    $k = ([string]$prop.Name).Trim().ToLowerInvariant()
-                    $v = ([string]$prop.Value).Trim()
-                    if (-not [string]::IsNullOrWhiteSpace($k) -and -not [string]::IsNullOrWhiteSpace($v)) {
-                        $wmOrdered[$k] = $v
-                    }
-                }
-            }
-
-            $payload = @{
-                ok      = $true
-                model   = $modelName
-                article = @{
-                    level         = $level
-                    title         = $genTitle
-                    description   = $genDesc
-                    category      = $genCat
-                    author        = "Line Reader"
-                    language      = "en"
-                    content       = $genContent
-                    word_meanings = $wmOrdered
-                }
-            }
-            return @{
-                StatusCode = 200
-                Body       = ($payload | ConvertTo-Json -Depth 8 -Compress)
-            }
-        }
-        catch [System.Net.WebException] {
-            $errRes = $_.Exception.Response
-            if ($null -ne $errRes) {
-                $code = [int]$errRes.StatusCode
-                $lastStatus = $code
-                $reader = New-Object System.IO.StreamReader($errRes.GetResponseStream(), [System.Text.Encoding]::UTF8)
+            try {
+                $webRes = $webReq.GetResponse()
+                $reader = New-Object System.IO.StreamReader($webRes.GetResponseStream(), [System.Text.Encoding]::UTF8)
                 try {
-                    $errBody = $reader.ReadToEnd()
+                    $resText = $reader.ReadToEnd()
                 }
                 finally {
                     $reader.Dispose()
-                    $errRes.Close()
-                }
-                try {
-                    $errJson = $errBody | ConvertFrom-Json
-                    if ($errJson.error -and $errJson.error.message) {
-                        $lastErrorMsg = "Gemini hatası ($modelName / HTTP $code): $($errJson.error.message)"
-                    } else {
-                        $lastErrorMsg = "Gemini hatası ($modelName / HTTP $code)."
-                    }
-                }
-                catch {
-                    $lastErrorMsg = "Gemini hatası ($modelName / HTTP $code)."
+                    $webRes.Close()
                 }
 
-                # API key geçersizse diğer modelleri denemeye gerek yok
-                if ($code -eq 400 -or $code -eq 401 -or $code -eq 403) {
+                $parsedRes = $resText | ConvertFrom-Json
+                $rawModelText = ""
+                if ($null -ne $parsedRes.candidates -and $parsedRes.candidates.Count -gt 0) {
+                    $parts = $parsedRes.candidates[0].content.parts
+                    if ($null -ne $parts -and $parts.Count -gt 0) {
+                        $rawModelText = [string]$parts[0].text
+                    }
+                }
+
+                if ([string]::IsNullOrWhiteSpace($rawModelText)) {
+                    $lastErrorMsg = "Gemini boş yanıt döndürdü ($modelName)."
+                    continue
+                }
+
+                $cleanedJson = $rawModelText.Trim()
+                if ($cleanedJson -match '(?s)^```(?:json)?\s*(.*?)\s*```$') {
+                    $cleanedJson = $Matches[1].Trim()
+                }
+                $firstBrace = $cleanedJson.IndexOf('{')
+                $lastBrace = $cleanedJson.LastIndexOf('}')
+                if ($firstBrace -ge 0 -and $lastBrace -gt $firstBrace) {
+                    $cleanedJson = $cleanedJson.Substring($firstBrace, $lastBrace - $firstBrace + 1)
+                }
+
+                $articleObj = $cleanedJson | ConvertFrom-Json
+                $genTitle = if ($articleObj.title) { ([string]$articleObj.title).Trim() } else { "" }
+                $genDesc = if ($articleObj.description) { ([string]$articleObj.description).Trim() } else { "" }
+                $genCat = if ($articleObj.category) { ([string]$articleObj.category).Trim() } else { "General" }
+                $genContent = if ($articleObj.content) { ([string]$articleObj.content).Replace("`r`n", "`n").Trim() } else { "" }
+
+                if ([string]::IsNullOrWhiteSpace($genTitle) -or [string]::IsNullOrWhiteSpace($genContent)) {
+                    $lastErrorMsg = "Gemini çıktısında başlık veya içerik eksikti ($modelName)."
+                    continue
+                }
+
+                $wmOrdered = [ordered]@{}
+                if ($null -ne $articleObj.PSObject.Properties["word_meanings"] -and $null -ne $articleObj.word_meanings) {
+                    foreach ($prop in $articleObj.word_meanings.PSObject.Properties) {
+                        $k = ([string]$prop.Name).Trim().ToLowerInvariant()
+                        $v = ([string]$prop.Value).Trim()
+                        if (-not [string]::IsNullOrWhiteSpace($k) -and -not [string]::IsNullOrWhiteSpace($v)) {
+                            $wmOrdered[$k] = $v
+                        }
+                    }
+                }
+
+                Write-Host "[Gemini] Basarili: $modelName -> $genTitle" -ForegroundColor Green
+                $payload = @{
+                    ok      = $true
+                    model   = $modelName
+                    article = @{
+                        level         = $level
+                        title         = $genTitle
+                        description   = $genDesc
+                        category      = $genCat
+                        author        = "Line Reader"
+                        language      = "en"
+                        content       = $genContent
+                        word_meanings = $wmOrdered
+                    }
+                }
+                return @{
+                    StatusCode = 200
+                    Body       = ($payload | ConvertTo-Json -Depth 8 -Compress)
+                }
+            }
+            catch [System.Net.WebException] {
+                $errRes = $_.Exception.Response
+                if ($null -ne $errRes) {
+                    $code = [int]$errRes.StatusCode
+                    $lastStatus = $code
+                    if ($code -eq 503 -or $code -eq 429 -or $code -eq 500) {
+                        $hadTransientOverload = $true
+                    }
+                    $reader = New-Object System.IO.StreamReader($errRes.GetResponseStream(), [System.Text.Encoding]::UTF8)
+                    try {
+                        $errBody = $reader.ReadToEnd()
+                    }
+                    finally {
+                        $reader.Dispose()
+                        $errRes.Close()
+                    }
+                    try {
+                        $errJson = $errBody | ConvertFrom-Json
+                        if ($errJson.error -and $errJson.error.message) {
+                            $lastErrorMsg = "Gemini hatası ($modelName / HTTP $code): $($errJson.error.message)"
+                        } else {
+                            $lastErrorMsg = "Gemini hatası ($modelName / HTTP $code)."
+                        }
+                    }
+                    catch {
+                        $lastErrorMsg = "Gemini hatası ($modelName / HTTP $code)."
+                    }
+                    Write-Host "[Gemini] $modelName -> HTTP $code" -ForegroundColor Yellow
+
+                    # API key geçersizse diğer modelleri denemeye gerek yok
+                    if ($code -eq 400 -or $code -eq 401 -or $code -eq 403) {
+                        $abortAll = $true
+                        break
+                    }
+                } else {
+                    $lastStatus = 502
+                    $lastErrorMsg = "Gemini sunucusuna bağlanılamadı: $($_.Exception.Message)"
+                    $abortAll = $true
                     break
                 }
-            } else {
-                $lastStatus = 502
-                $lastErrorMsg = "Gemini sunucusuna bağlanılamadı: $($_.Exception.Message)"
-                break
+            }
+            catch {
+                $lastStatus = 500
+                $lastErrorMsg = "Gemini çıktısı işlenemedi ($modelName): $($_.Exception.Message)"
             }
         }
-        catch {
-            $lastStatus = 500
-            $lastErrorMsg = "Gemini çıktısı işlenemedi ($modelName): $($_.Exception.Message)"
-        }
+        if ($abortAll) { break }
+    }
+
+    if ($lastStatus -eq 503) {
+        $lastErrorMsg = "Google Gemini sunucuları şu an geçici olarak çok yoğun (HTTP 503). 5-10 saniye sonra tekrar deneyin veya Gemini Ayarı'ndan 'gemini-2.5-flash-lite' seçin."
     }
 
     return @{

@@ -10,6 +10,7 @@ import '../controllers/articles_controller.dart';
 import '../data/article_reader_repository.dart';
 import '../models/article.dart';
 import '../models/article_level.dart';
+import '../widgets/new_articles_banner.dart';
 import 'article_reader_screen.dart';
 
 /// Seçilen CEFR seviyesine (A1–C2) ait makaleleri listeleyen ekran.
@@ -43,6 +44,18 @@ class LevelArticlesScreen extends StatefulWidget {
 }
 
 class _LevelArticlesScreenState extends State<LevelArticlesScreen> {
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.startLiveCheck();
+  }
+
+  @override
+  void dispose() {
+    widget.controller.stopLiveCheck();
+    super.dispose();
+  }
+
   Future<void> _handlePullToRefresh() async {
     final result = await widget.controller.refresh(silent: false, force: true);
     if (!mounted) return;
@@ -106,24 +119,39 @@ class _LevelArticlesScreenState extends State<LevelArticlesScreen> {
           ),
           body: Stack(
             children: <Widget>[
-              RefreshIndicator(
-                onRefresh: _handlePullToRefresh,
-                child: levelArticles.isEmpty
-                    ? _buildEmptyState(context, level)
-                    : ListView.separated(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
-                        itemCount: levelArticles.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 12),
-                        itemBuilder: (context, index) {
-                          final article = levelArticles[index];
-                          return _LevelArticleCard(
-                            article: article,
-                            accentColor: level.accentColor,
-                            onTap: () => _openArticleReader(article),
-                          );
-                        },
-                      ),
+              Column(
+                children: <Widget>[
+                  NewArticlesBanner(
+                    totalNewCount: widget.controller.pendingNewArticlesCount,
+                    level: level,
+                    levelNewCount:
+                        widget.controller.pendingNewCountForLevel(level),
+                    onRefreshPressed: widget.controller.applyPendingArticles,
+                  ),
+                  Expanded(
+                    child: RefreshIndicator(
+                      onRefresh: _handlePullToRefresh,
+                      child: levelArticles.isEmpty
+                          ? _buildEmptyState(context, level)
+                          : ListView.separated(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding:
+                                  const EdgeInsets.fromLTRB(16, 16, 16, 28),
+                              itemCount: levelArticles.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: 12),
+                              itemBuilder: (context, index) {
+                                final article = levelArticles[index];
+                                return _LevelArticleCard(
+                                  article: article,
+                                  accentColor: level.accentColor,
+                                  onTap: () => _openArticleReader(article),
+                                );
+                              },
+                            ),
+                    ),
+                  ),
+                ],
               ),
               if (isRefreshing)
                 const Positioned(

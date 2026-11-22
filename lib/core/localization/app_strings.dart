@@ -85,6 +85,15 @@ class AppStrings {
   String articleCountLabel(int count) => isEn
       ? (count == 1 ? '1 article' : '$count articles')
       : '$count makale';
+  String newArticlesAvailableLabel(int count) => isEn
+      ? (count == 1 ? '+1 new article loaded' : '+$count new articles loaded')
+      : '+$count yeni makale yüklendi';
+  String newLevelArticlesAvailableLabel(int count, String levelCode) => isEn
+      ? (count == 1
+          ? '+1 new $levelCode article loaded'
+          : '+$count new $levelCode articles loaded')
+      : '+$count yeni $levelCode makalesi yüklendi';
+  String get refreshAction => t('Yenile', 'Refresh');
 
   // Okuma ekranı
   String get underlinePenTooltip =>

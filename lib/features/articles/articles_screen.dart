@@ -13,6 +13,7 @@ import 'data/articles_cache_repository.dart';
 import 'models/article_level.dart';
 import 'screens/level_articles_screen.dart';
 import 'services/articles_sync_service.dart';
+import 'widgets/new_articles_banner.dart';
 
 /// Ana Menü'deki "Makaleler" kartından açılan A1–C2 seviye seçim ekranı.
 ///
@@ -65,12 +66,14 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      _controller.startLiveCheck();
       _controller.onScreenEntered();
     });
   }
 
   @override
   void dispose() {
+    _controller.stopLiveCheck();
     _ownedController?.dispose();
     super.dispose();
   }
@@ -146,55 +149,70 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
             children: <Widget>[
               SafeArea(
                 top: false,
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    const topPadding = 12.0;
-                    const bottomPadding = 16.0;
-                    const spacing = 12.0;
-                    const minCardHeight = 88.0;
-                    final count = ArticleLevel.values.length;
-                    final minTotalHeight =
-                        count * minCardHeight + (count - 1) * spacing;
-                    final viewportHeight =
-                        constraints.maxHeight - topPadding - bottomPadding;
-                    final targetHeight = viewportHeight > minTotalHeight
-                        ? viewportHeight
-                        : minTotalHeight;
+                child: Column(
+                  children: <Widget>[
+                    NewArticlesBanner(
+                      totalNewCount: _controller.pendingNewArticlesCount,
+                      onRefreshPressed: _controller.applyPendingArticles,
+                    ),
+                    Expanded(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          const topPadding = 12.0;
+                          const bottomPadding = 16.0;
+                          const spacing = 12.0;
+                          const minCardHeight = 88.0;
+                          final count = ArticleLevel.values.length;
+                          final minTotalHeight =
+                              count * minCardHeight + (count - 1) * spacing;
+                          final viewportHeight =
+                              constraints.maxHeight - topPadding - bottomPadding;
+                          final targetHeight = viewportHeight > minTotalHeight
+                              ? viewportHeight
+                              : minTotalHeight;
 
-                    return RefreshIndicator(
-                      onRefresh: _handlePullToRefresh,
-                      child: SingleChildScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(
-                          16,
-                          topPadding,
-                          16,
-                          bottomPadding,
-                        ),
-                        child: SizedBox(
-                          height: targetHeight,
-                          child: Column(
-                            children: <Widget>[
-                              for (var i = 0; i < count; i++) ...<Widget>[
-                                Expanded(
-                                  child: _ArticleLevelCard(
-                                    level: ArticleLevel.values[i],
-                                    articleCount:
-                                        countsByLevel[ArticleLevel.values[i]] ??
-                                            0,
-                                    onTap: () =>
-                                        _openLevel(ArticleLevel.values[i]),
-                                  ),
+                          return RefreshIndicator(
+                            onRefresh: _handlePullToRefresh,
+                            child: SingleChildScrollView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.fromLTRB(
+                                16,
+                                topPadding,
+                                16,
+                                bottomPadding,
+                              ),
+                              child: SizedBox(
+                                height: targetHeight,
+                                child: Column(
+                                  children: <Widget>[
+                                    for (var i = 0; i < count; i++) ...<Widget>[
+                                      Expanded(
+                                        child: _ArticleLevelCard(
+                                          level: ArticleLevel.values[i],
+                                          articleCount: countsByLevel[
+                                                  ArticleLevel.values[i]] ??
+                                              0,
+                                          pendingNewCount: _controller
+                                              .pendingNewCountForLevel(
+                                            ArticleLevel.values[i],
+                                          ),
+                                          onTap: () => _openLevel(
+                                            ArticleLevel.values[i],
+                                          ),
+                                        ),
+                                      ),
+                                      if (i < count - 1)
+                                        const SizedBox(height: spacing),
+                                    ],
+                                  ],
                                 ),
-                                if (i < count - 1)
-                                  const SizedBox(height: spacing),
-                              ],
-                            ],
-                          ),
-                        ),
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                    );
-                  },
+                    ),
+                  ],
                 ),
               ),
               if (isRefreshing)
@@ -216,11 +234,13 @@ class _ArticleLevelCard extends StatelessWidget {
   const _ArticleLevelCard({
     required this.level,
     required this.articleCount,
+    this.pendingNewCount = 0,
     required this.onTap,
   });
 
   final ArticleLevel level;
   final int articleCount;
+  final int pendingNewCount;
   final VoidCallback onTap;
 
   @override
@@ -284,6 +304,26 @@ class _ArticleLevelCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 10),
+                if (pendingNewCount > 0) ...<Widget>[
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      '+$pendingNewCount',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: colorScheme.onPrimary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                ],
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,

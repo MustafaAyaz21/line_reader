@@ -387,5 +387,96 @@ void main() {
 
       controller.dispose();
     });
+
+    testWidgets(
+      'arka planda yeni makale gelince üstte "+N yeni makale yüklendi | Yenile" gösterir ve basınca listeye düşer',
+      (tester) async {
+        final cacheStore = _InMemoryArticlesCacheStore()
+          ..seed(const <Article>[
+            Article(
+              id: 'b1-old',
+              title: 'Old B1 Story',
+              summary: 'Already cached.',
+              level: 'B1',
+            ),
+          ]);
+
+        final remoteClient = MockClient((_) async {
+          return http.Response(
+            jsonEncode(<String, Object?>{
+              'version': 2,
+              'articles': <Map<String, Object?>>[
+                <String, Object?>{
+                  'id': 'b1-old',
+                  'level': 'B1',
+                  'title': 'Old B1 Story',
+                  'description': 'Already cached.',
+                },
+                <String, Object?>{
+                  'id': 'b1-new-1',
+                  'level': 'B1',
+                  'title': 'Brand New B1 Story',
+                  'description': 'Freshly published.',
+                },
+                <String, Object?>{
+                  'id': 'a2-new-1',
+                  'level': 'A2',
+                  'title': 'Fresh A2 Passage',
+                  'description': 'Also newly published.',
+                },
+              ],
+            }),
+            200,
+          );
+        });
+
+        final controller = ArticlesController(
+          ArticlesSyncService(
+            cacheStore: cacheStore,
+            remoteService: ArticlesRemoteService(
+              httpClient: remoteClient,
+              remoteUrl: 'https://example.com/articles.json',
+            ),
+          ),
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: ArticlesScreen(controller: controller),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Önbellekte 1 makale vardı; 2 yeni makale indiği için üst şerit çıkmalı.
+        expect(
+          find.byKey(const ValueKey<String>('new_articles_banner')),
+          findsOneWidget,
+        );
+        expect(find.text('+2 yeni makale yüklendi'), findsOneWidget);
+        expect(find.text('1 makale'), findsOneWidget);
+
+        // "Yenile" butonuna basınca yeni makaleler anında düşmeli ve şerit kapanmalı.
+        await tester.tap(
+          find.byKey(const ValueKey<String>('new_articles_refresh_button')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey<String>('new_articles_banner')),
+          findsNothing,
+        );
+        expect(find.text('2 makale'), findsOneWidget);
+        expect(find.text('1 makale'), findsOneWidget);
+
+        // B1'e girince yeni makale görünmeli.
+        await tester.tap(
+          find.byKey(const ValueKey<String>('article_level_card_B1')),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Brand New B1 Story'), findsOneWidget);
+
+        controller.dispose();
+      },
+    );
   });
 }
