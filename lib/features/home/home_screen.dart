@@ -84,6 +84,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _checkForAppUpdateSilently();
       _refreshArticlesSilently();
       _authController?.refreshEntitlement();
+      _wordsController?.loadLists();
     }
   }
 

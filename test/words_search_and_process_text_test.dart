@@ -426,7 +426,7 @@ void main() {
   );
 
   test(
-    'ProcessTextChannel sanitizes external queries and AndroidManifest/MainActivity register "Line Reader ile arat"',
+    'ProcessTextChannel sanitizes external queries and AndroidManifest/Activities register "Line\'da Bak"',
     () {
       expect(
         ProcessTextChannel.sanitizeExternalQuery('  (take off!)  '),
@@ -445,14 +445,22 @@ void main() {
       final manifest = File('android/app/src/main/AndroidManifest.xml')
           .readAsStringSync();
       expect(manifest, contains('android.intent.action.PROCESS_TEXT'));
-      expect(manifest, contains('android:label="Line Reader ile arat"'));
+      expect(manifest, contains('android:name=".ProcessTextOverlayActivity"'));
+      expect(manifest, contains('android:label="Line&apos;da Bak"'));
       expect(manifest, contains('android:mimeType="text/plain"'));
+
+      final overlayActivity = File(
+        'android/app/src/main/kotlin/com/lineapps/linereader/ProcessTextOverlayActivity.kt',
+      ).readAsStringSync();
+      expect(overlayActivity, contains('BackgroundMode.transparent'));
+      expect(overlayActivity, contains('processTextOverlayMain'));
+      expect(overlayActivity, contains('com.lineapps.linereader/lookup_overlay'));
 
       final mainActivity = File(
         'android/app/src/main/kotlin/com/lineapps/linereader/MainActivity.kt',
       ).readAsStringSync();
       expect(mainActivity, contains('com.lineapps.linereader/process_text'));
-      expect(mainActivity, contains('Intent.ACTION_PROCESS_TEXT'));
+      expect(mainActivity, contains('ACTION_OPEN_WORD_SEARCH'));
       expect(mainActivity, contains('consumeInitialProcessText'));
       expect(mainActivity, contains('onProcessText'));
     },

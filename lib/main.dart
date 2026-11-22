@@ -3,12 +3,22 @@ import 'package:flutter/material.dart';
 import 'core/localization/app_locale.dart';
 import 'core/platform/process_text_channel.dart';
 import 'core/theme/app_theme.dart';
+import 'features/lookup_overlay/quick_lookup_overlay_app.dart';
 import 'features/splash/splash_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   ProcessTextChannel.ensureInitialized();
   runApp(const LineReaderApp());
+}
+
+/// Android'de başka bir uygulamada kelime seçilip "Line'da Bak" seçildiğinde
+/// `ProcessTextOverlayActivity` tarafından şeffaf mini kart olarak başlatılan
+/// hafif giriş noktası.
+@pragma('vm:entry-point')
+void processTextOverlayMain() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const QuickLookupOverlayApp());
 }
 
 class LineReaderApp extends StatefulWidget {

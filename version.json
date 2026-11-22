@@ -1,7 +1,7 @@
 {
-    "latest_version":  "0.1.18",
-    "version_code":  19,
+    "latest_version":  "0.1.19",
+    "version_code":  20,
     "min_version_code":  0,
-    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.18/app-release.apk",
-    "release_notes":  "Makale sesli okuma (Cihaz TTS + Podcast AI), sürükleyerek alt çizme ve fosforlu/üstü çizili vurgu stilleri, seçilen cümle/paragraf Türkçe çevirisi, Kelime Listeleri üst arama ve anında yeni liste oluşturma, uygulama dışı \u0027Line Reader ile arat\u0027 desteği."
+    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.19/app-release.apk",
+    "release_notes":  "Uygulama dışı Line\u0027da Bak şeffaf açılır mini kartı eklendi: bulunduğunuz uygulamadan çıkmadan kelime/cümle anlamını görün, sesli dinleyin, yeni liste oluşturup kaydedin veya detaylı inceleyin."
 }

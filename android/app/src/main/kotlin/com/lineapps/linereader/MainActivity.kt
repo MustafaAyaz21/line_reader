@@ -21,6 +21,10 @@ class MainActivity : FlutterActivity() {
             "com.lineapps.linereader/app_updater"
         private const val PROCESS_TEXT_CHANNEL =
             "com.lineapps.linereader/process_text"
+        const val ACTION_OPEN_WORD_SEARCH =
+            "com.lineapps.linereader.ACTION_OPEN_WORD_SEARCH"
+        const val EXTRA_SEARCH_WORD =
+            "com.lineapps.linereader.EXTRA_SEARCH_WORD"
     }
 
     private var isPenModeActive: Boolean = true
@@ -56,11 +60,16 @@ class MainActivity : FlutterActivity() {
 
     private fun extractProcessText(intent: Intent?): String? {
         if (intent == null) return null
-        if (intent.action != Intent.ACTION_PROCESS_TEXT) return null
-        val raw = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString()
-        } else {
-            intent.getStringExtra("android.intent.extra.PROCESS_TEXT")
+        val raw = when (intent.action) {
+            ACTION_OPEN_WORD_SEARCH -> intent.getStringExtra(EXTRA_SEARCH_WORD)
+            Intent.ACTION_PROCESS_TEXT -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString()
+                } else {
+                    intent.getStringExtra("android.intent.extra.PROCESS_TEXT")
+                }
+            }
+            else -> null
         }
         val cleaned = raw?.trim()
         return if (cleaned.isNullOrEmpty()) null else cleaned
