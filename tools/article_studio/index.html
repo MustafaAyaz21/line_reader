@@ -6,22 +6,31 @@
   <title>Line Reader — Makale Yönetim Paneli</title>
   <style>
     :root {
-      --bg: #f4f5f7;
-      --surface: #ffffff;
-      --surface-alt: #f8f9fb;
-      --border: #e2e6ee;
-      --text: #161922;
-      --text-muted: #5c6575;
-      --primary: #2563eb;
-      --primary-hover: #1d4ed8;
-      --success: #15803d;
-      --danger: #dc2626;
-      --warning: #b45309;
+      color-scheme: dark;
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface-alt: #1c2330;
+      --surface-hover: #252e3f;
+      --input-bg: #11161f;
+      --border: #2b3546;
+      --border-strong: #3d4b63;
+      --text: #edf2f7;
+      --text-muted: #9aa7bd;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --success: #4ade80;
+      --danger: #f87171;
+      --warning: #fbbf24;
       --radius: 14px;
-      --shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+      --shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
     }
 
     * { box-sizing: border-box; }
+    ::placeholder { color: #6e7d96; opacity: 1; }
+    ::-webkit-scrollbar { width: 9px; height: 9px; }
+    ::-webkit-scrollbar-track { background: #0d1117; }
+    ::-webkit-scrollbar-thumb { background: #2c3648; border-radius: 999px; border: 2px solid #0d1117; }
+    ::-webkit-scrollbar-thumb:hover { background: #3f4e68; }
     html, body {
       margin: 0;
       padding: 0;
@@ -86,15 +95,15 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      background: #ecfdf5;
-      color: #166534;
-      border: 1px solid #bbf7d0;
+      background: rgba(34, 197, 94, 0.15);
+      color: #86efac;
+      border: 1px solid rgba(74, 222, 128, 0.35);
     }
 
     .status-pill.dirty {
-      background: #fffbeb;
-      color: #92400e;
-      border-color: #fde68a;
+      background: rgba(245, 158, 11, 0.16);
+      color: #fde68a;
+      border-color: rgba(251, 191, 36, 0.38);
     }
 
     .status-dot {
@@ -108,7 +117,7 @@
 
     .btn {
       border: 1px solid var(--border);
-      background: var(--surface);
+      background: var(--surface-alt);
       color: var(--text);
       padding: 9px 15px;
       border-radius: 10px;
@@ -121,8 +130,11 @@
       transition: 0.15s ease;
     }
 
-    .btn:hover:not(:disabled) { background: var(--surface-alt); }
-    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    .btn:hover:not(:disabled) {
+      background: var(--surface-hover);
+      border-color: var(--border-strong);
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
     .btn-primary {
       background: var(--primary);
@@ -147,12 +159,15 @@
     }
 
     .btn-danger-ghost {
-      color: var(--danger);
-      border-color: #fecaca;
-      background: #fef2f2;
+      color: #fca5a5;
+      border-color: rgba(248, 113, 113, 0.38);
+      background: rgba(239, 68, 68, 0.14);
     }
 
-    .btn-danger-ghost:hover:not(:disabled) { background: #fee2e2; }
+    .btn-danger-ghost:hover:not(:disabled) {
+      background: rgba(239, 68, 68, 0.24);
+      border-color: rgba(248, 113, 113, 0.55);
+    }
 
     .btn-sm {
       padding: 6px 10px;
@@ -191,14 +206,15 @@
       border: 1px solid var(--border);
       border-radius: 10px;
       font-size: 13px;
-      background: var(--surface-alt);
+      background: var(--input-bg);
       color: var(--text);
       outline: none;
     }
 
     .search-input:focus {
       border-color: var(--primary);
-      background: #fff;
+      background: #0d121a;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
     }
 
     .level-filters {
@@ -221,10 +237,15 @@
       gap: 4px;
     }
 
+    .filter-chip:hover {
+      background: var(--surface-hover);
+      color: var(--text);
+    }
+
     .filter-chip.active {
-      background: var(--text);
+      background: var(--primary);
       color: #fff;
-      border-color: var(--text);
+      border-color: var(--primary);
     }
 
     .article-list {
@@ -240,16 +261,19 @@
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 11px 12px;
-      background: var(--surface);
+      background: var(--surface-alt);
       cursor: pointer;
       transition: 0.14s ease;
     }
 
-    .article-item:hover { border-color: #cbd5e1; background: var(--surface-alt); }
+    .article-item:hover {
+      border-color: var(--border-strong);
+      background: var(--surface-hover);
+    }
     .article-item.selected {
       border-color: var(--primary);
-      background: #eff6ff;
-      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+      background: rgba(59, 130, 246, 0.16);
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.22);
     }
 
     .article-item-head {
@@ -302,7 +326,7 @@
 
     .mini-btn {
       border: 1px solid var(--border);
-      background: #fff;
+      background: var(--input-bg);
       color: var(--text-muted);
       border-radius: 6px;
       padding: 3px 7px;
@@ -311,8 +335,8 @@
       cursor: pointer;
     }
 
-    .mini-btn:hover { background: var(--surface-alt); color: var(--text); }
-    .mini-btn.del:hover { background: #fee2e2; color: var(--danger); border-color: #fecaca; }
+    .mini-btn:hover { background: var(--surface-hover); color: var(--text); border-color: var(--border-strong); }
+    .mini-btn.del:hover { background: rgba(239, 68, 68, 0.22); color: #fca5a5; border-color: rgba(248, 113, 113, 0.45); }
 
     .empty-list {
       text-align: center;
@@ -331,7 +355,7 @@
     }
 
     .ai-studio-bar {
-      background: linear-gradient(180deg, #ffffff 0%, #f8faff 100%);
+      background: linear-gradient(180deg, #161b22 0%, #131924 100%);
       border-bottom: 1px solid var(--border);
       padding: 12px 20px;
       display: flex;
@@ -358,8 +382,13 @@
       font-family: inherit;
       font-size: 13px;
       color: var(--text);
-      background: #fff;
+      background: var(--input-bg);
       outline: none;
+    }
+
+    .ai-select option {
+      background: #161b22;
+      color: var(--text);
     }
 
     .ai-select {
@@ -370,7 +399,8 @@
     .ai-select:focus,
     .ai-input:focus {
       border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+      background: #0d121a;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
     }
 
     .btn-ai {
@@ -393,14 +423,14 @@
     }
 
     .ai-key-dot.ready {
-      background: #16a34a;
+      background: #22c55e;
     }
 
     .ai-settings-drawer {
       max-width: 780px;
       width: 100%;
       margin: 0 auto;
-      background: #f1f5f9;
+      background: #10151e;
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 11px 13px;
@@ -444,12 +474,12 @@
       margin: 64px auto;
       text-align: center;
       background: var(--surface);
-      border: 1px dashed #cbd5e1;
+      border: 1px dashed var(--border-strong);
       border-radius: 18px;
       padding: 40px 28px;
     }
 
-    .empty-editor h2 { margin: 0 0 8px; font-size: 20px; }
+    .empty-editor h2 { margin: 0 0 8px; font-size: 20px; color: var(--text); }
     .empty-editor p { margin: 0 0 20px; color: var(--text-muted); font-size: 14px; line-height: 1.55; }
 
     .field {
@@ -465,9 +495,12 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
     }
 
     .field input[type="text"],
+    .field input[type="datetime-local"],
     .field textarea {
       width: 100%;
       border: 1px solid var(--border);
@@ -476,16 +509,17 @@
       font-family: inherit;
       font-size: 14px;
       color: var(--text);
-      background: var(--surface-alt);
+      background: var(--input-bg);
       outline: none;
       transition: 0.14s ease;
     }
 
     .field input[type="text"]:focus,
+    .field input[type="datetime-local"]:focus,
     .field textarea:focus {
       border-color: var(--primary);
-      background: #fff;
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+      background: #0c111a;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
     }
 
     .field textarea.content-area {
@@ -497,7 +531,7 @@
 
     .field textarea.content-area.drag-over {
       border-color: var(--primary);
-      background: #eff6ff;
+      background: rgba(59, 130, 246, 0.14);
       border-style: dashed;
     }
 
@@ -512,9 +546,9 @@
     .wm-stats-badge {
       font-size: 12px;
       font-weight: 600;
-      color: #166534;
-      background: #ecfdf5;
-      border: 1px solid #bbf7d0;
+      color: #86efac;
+      background: rgba(34, 197, 94, 0.15);
+      border: 1px solid rgba(74, 222, 128, 0.35);
       padding: 3px 9px;
       border-radius: 999px;
     }
@@ -522,15 +556,15 @@
     .wm-stats-warn {
       font-size: 12px;
       font-weight: 600;
-      color: #92400e;
-      background: #fffbeb;
-      border: 1px solid #fde68a;
+      color: #fde68a;
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(251, 191, 36, 0.35);
       padding: 3px 9px;
       border-radius: 999px;
     }
 
     .wm-preview-box {
-      background: #fff;
+      background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 14px;
       padding: 12px 14px;
@@ -542,6 +576,7 @@
     .wm-preview-row {
       font-size: 12.5px;
       line-height: 1.4;
+      color: var(--text);
       border-bottom: 1px dashed var(--border);
       padding-bottom: 5px;
     }
@@ -553,7 +588,7 @@
 
     .wm-preview-key {
       font-weight: 700;
-      color: var(--primary);
+      color: #93c5fd;
     }
 
     .row-2 {
@@ -577,6 +612,7 @@
     .level-btn {
       border: 2px solid var(--border);
       background: var(--surface-alt);
+      color: var(--text);
       border-radius: 12px;
       padding: 8px 4px;
       cursor: pointer;
@@ -584,9 +620,15 @@
       transition: 0.14s ease;
     }
 
+    .level-btn:hover:not(.active) {
+      background: var(--surface-hover);
+      border-color: var(--border-strong);
+    }
+
     .level-btn strong {
       display: block;
       font-size: 15px;
+      color: inherit;
     }
 
     .level-btn span {
@@ -685,7 +727,7 @@
     }
 
     .phone-card-preview {
-      background: #fff;
+      background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 16px;
       padding: 15px;
@@ -696,6 +738,7 @@
       margin: 0 0 6px;
       font-size: 15px;
       line-height: 1.3;
+      color: var(--text);
     }
 
     .phone-card-preview p {
@@ -827,9 +870,9 @@
     }
 
     .mode-tab.active {
-      background: var(--surface);
-      color: var(--primary);
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+      background: var(--surface-hover);
+      color: #93c5fd;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
     }
 
     .access-view {
@@ -894,13 +937,14 @@
       font-family: inherit;
       font-size: 13.5px;
       color: var(--text);
-      background: var(--surface-alt);
+      background: var(--input-bg);
       outline: none;
     }
 
     .admin-input:focus {
       border-color: var(--primary);
-      background: #fff;
+      background: #0c111a;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
     }
 
     .admin-table {
@@ -926,15 +970,15 @@
       font-weight: 800;
       padding: 4px 10px;
       border-radius: 8px;
-      background: #eff6ff;
-      color: #1d4ed8;
-      border: 1px solid #bfdbfe;
+      background: rgba(59, 130, 246, 0.16);
+      color: #93c5fd;
+      border: 1px solid rgba(96, 165, 250, 0.35);
     }
 
     .code-badge.inactive {
-      background: #f3f4f6;
-      color: #6b7280;
-      border-color: #d1d5db;
+      background: rgba(148, 163, 184, 0.12);
+      color: #94a3b8;
+      border-color: var(--border);
       text-decoration: line-through;
     }
 
@@ -943,13 +987,13 @@
       font-weight: 700;
       padding: 3px 9px;
       border-radius: 999px;
-      background: #ecfdf5;
-      color: #166534;
+      background: rgba(34, 197, 94, 0.16);
+      color: #86efac;
     }
 
     .usage-pill.full {
-      background: #fef2f2;
-      color: #b91c1c;
+      background: rgba(239, 68, 68, 0.18);
+      color: #fca5a5;
     }
 
     @media (max-width: 1180px) {
@@ -1081,8 +1125,8 @@
       <div class="preview-header">
         <span>Canlı Önizleme</span>
         <button class="tone-btn" data-tone="white" style="background:#fff;color:#111;">Beyaz</button>
-        <button class="tone-btn active" data-tone="paper" style="background:#f7f0e2;color:#2b231a;">Kağıt</button>
-        <button class="tone-btn" data-tone="dark" style="background:#14171d;color:#eee;">Koyu</button>
+        <button class="tone-btn" data-tone="paper" style="background:#f7f0e2;color:#2b231a;">Kağıt</button>
+        <button class="tone-btn active" data-tone="dark" style="background:#14171d;color:#eee;">Koyu</button>
         <button class="mini-btn" id="prevFontDec">A-</button>
         <button class="mini-btn" id="prevFontInc">A+</button>
       </div>
@@ -1177,7 +1221,7 @@
       dirty: false,
       hasPendingPublish: false,
       busy: false,
-      previewTone: "paper",
+      previewTone: "dark",
       previewFontSize: 16
     };
 
@@ -1357,6 +1401,8 @@
       const audioSegments = Array.isArray(raw.audio_segments)
         ? raw.audio_segments
         : (Array.isArray(raw.audioSegments) ? raw.audioSegments : []);
+      const isHidden = Boolean(raw.is_hidden || raw.isHidden || raw.hidden);
+      const publishAt = String(raw.publish_at || raw.publishAt || raw.scheduled_at || raw.scheduledAt || "").trim();
       return {
         id: (raw.id || "").trim() || `article-${idx + 1}`,
         level,
@@ -1373,10 +1419,60 @@
         audio_url: audioUrl,
         audio_segments: audioSegments,
         _local_audio_preview: audioUrl ? `/audio/${audioUrl.split("/").pop()}` : "",
+        is_hidden: isHidden,
+        publish_at: publishAt,
         published_at: raw.published_at || new Date().toISOString(),
         _autoId: false,
         _autoReadTime: !(raw.reading_time || raw.reading_time_label)
       };
+    }
+
+    function toLocalDateTimeInputValue(isoStr) {
+      if (!isoStr) return "";
+      const d = new Date(isoStr);
+      if (Number.isNaN(d.getTime())) return "";
+      const pad = (n) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    function localDateTimeInputToIso(val) {
+      if (!val) return "";
+      const d = new Date(val);
+      if (Number.isNaN(d.getTime())) return "";
+      return d.toISOString();
+    }
+
+    function isFutureSchedule(isoStr) {
+      if (!isoStr) return false;
+      const d = new Date(isoStr);
+      if (Number.isNaN(d.getTime())) return false;
+      return d.getTime() > Date.now();
+    }
+
+    function formatShortScheduleLabel(isoStr) {
+      if (!isoStr) return "";
+      const d = new Date(isoStr);
+      if (Number.isNaN(d.getTime())) return "";
+      const pad = (n) => String(n).padStart(2, "0");
+      return `${pad(d.getDate())}.${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    function makePresetDateIso(preset) {
+      const d = new Date();
+      d.setSeconds(0, 0);
+      if (preset === "tomorrow12") {
+        d.setDate(d.getDate() + 1);
+        d.setHours(12, 0, 0, 0);
+      } else if (preset === "today20") {
+        d.setHours(20, 0, 0, 0);
+        if (d.getTime() <= Date.now()) {
+          d.setDate(d.getDate() + 1);
+        }
+      } else if (preset === "plus1h") {
+        d.setTime(Date.now() + 60 * 60 * 1000);
+        d.setSeconds(0, 0);
+      }
+      return d.toISOString();
     }
 
     function buildExportPayload() {
@@ -1407,6 +1503,8 @@
         if (Array.isArray(a.audio_segments) && a.audio_segments.length > 0) {
           obj.audio_segments = a.audio_segments;
         }
+        if (a.is_hidden) obj.is_hidden = true;
+        if ((a.publish_at || "").trim()) obj.publish_at = a.publish_at.trim();
         return obj;
       });
 
@@ -1520,18 +1618,23 @@
       el.articleList.innerHTML = filtered.map(({ article, index }) => {
         const meta = levelMeta(article.level);
         const isSel = index === state.selectedIndex;
+        const isHidden = Boolean(article.is_hidden);
+        const isScheduled = !isHidden && isFutureSchedule(article.publish_at);
         return `
-          <div class="article-item ${isSel ? "selected" : ""}" data-index="${index}">
-            <div class="article-item-head">
+          <div class="article-item ${isSel ? "selected" : ""}" data-index="${index}" style="${isHidden ? "opacity:0.65;border-style:dashed;" : ""}">
+            <div class="article-item-head" style="flex-wrap:wrap;gap:4px;">
               <span class="lvl-tag" style="background:${meta.color}">${meta.code}</span>
-              ${article.audio_url ? `<span title="Podcast AI sesi hazır" style="font-size:11px;font-weight:700;color:#2563eb;background:#eff6ff;padding:1px 6px;border-radius:6px;">🎙 Podcast</span>` : ""}
+              ${isHidden ? `<span title="Kullanıcılardan gizli" style="font-size:11px;font-weight:700;color:#fca5a5;background:rgba(239,68,68,0.18);border:1px solid rgba(248,113,113,0.35);padding:1px 6px;border-radius:6px;">🙈 Gizli</span>` : ""}
+              ${isScheduled ? `<span title="Planlı yayın zamanı" style="font-size:11px;font-weight:700;color:#fde68a;background:rgba(245,158,11,0.18);border:1px solid rgba(251,191,36,0.35);padding:1px 6px;border-radius:6px;">⏰ ${escapeHtml(formatShortScheduleLabel(article.publish_at))}</span>` : ""}
+              ${article.audio_url ? `<span title="Podcast AI sesi hazır" style="font-size:11px;font-weight:700;color:#93c5fd;background:rgba(59,130,246,0.18);border:1px solid rgba(96,165,250,0.35);padding:1px 6px;border-radius:6px;">🎙 Podcast</span>` : ""}
               <span class="article-item-time">${escapeHtml(article.reading_time || estimateReadingTime(article.content))}</span>
             </div>
             <div class="article-item-title">${escapeHtml(article.title || "(Başlıksız Makale)")}</div>
             <div class="article-item-desc">${escapeHtml(article.description || "Kısa açıklama yok")}</div>
             <div class="article-item-actions">
-              <button class="mini-btn" data-act="up" data-index="${index}" ${index === 0 ? "disabled" : ""}>↑ Yukarı</button>
-              <button class="mini-btn" data-act="down" data-index="${index}" ${index === state.articles.length - 1 ? "disabled" : ""}>↓ Aşağı</button>
+              <button class="mini-btn" data-act="up" data-index="${index}" ${index === 0 ? "disabled" : ""}>↑</button>
+              <button class="mini-btn" data-act="down" data-index="${index}" ${index === state.articles.length - 1 ? "disabled" : ""}>↓</button>
+              <button class="mini-btn" data-act="toggle-hide" data-index="${index}" title="${isHidden ? "Gizliliği kaldır" : "Makaleyi gizle"}">${isHidden ? "👁 Göster" : "🙈 Gizle"}</button>
               <button class="mini-btn del" data-act="delete" data-index="${index}" style="margin-left:auto;">Sil</button>
             </div>
           </div>
@@ -1569,6 +1672,16 @@
             else if (state.selectedIndex === idx + 1) state.selectedIndex = idx;
             state.dirty = true;
             renderAll();
+          } else if (act === "toggle-hide") {
+            const target = state.articles[idx];
+            target.is_hidden = !Boolean(target.is_hidden);
+            state.dirty = true;
+            renderAll();
+            showToast(
+              target.is_hidden
+                ? `"${target.title || "Makale"}" gizlendi. Uygulamak için 'Kaydet ve Yayınla'ya basın.`
+                : `"${target.title || "Makale"}" tekrar görünür yapıldı. Uygulamak için 'Kaydet ve Yayınla'ya basın.`
+            );
           } else if (act === "delete") {
             const title = state.articles[idx].title || "Bu makale";
             if (!confirm(`"${title}" makalesini listeden silmek istiyor musunuz?`)) return;
@@ -1627,6 +1740,46 @@
           </div>
 
           <div class="field">
+            <label>
+              <span>Görünürlük ve Yayın Zamanlaması</span>
+              <span style="font-weight:500;color:var(--text-muted);">Bilgisayar kapalıyken bile planlanan saatte otomatik açılır</span>
+            </label>
+            <div style="border:1px solid ${article.is_hidden ? "rgba(248,113,113,0.45)" : (isFutureSchedule(article.publish_at) ? "rgba(251,191,36,0.45)" : "var(--border)")};border-radius:12px;padding:12px;background:${article.is_hidden ? "rgba(239,68,68,0.12)" : (isFutureSchedule(article.publish_at) ? "rgba(245,158,11,0.12)" : "var(--surface-alt)")};display:flex;flex-direction:column;gap:10px;">
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;">
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                  <button type="button" class="btn btn-sm ${article.is_hidden ? "btn-primary" : ""}" id="toggleHideArticleBtn">
+                    ${article.is_hidden ? "👁 Gizliliği Kaldır (Göster)" : "🙈 Makaleyi Gizle"}
+                  </button>
+                  <span style="font-size:12px;font-weight:700;color:${article.is_hidden ? "#fca5a5" : "#86efac"};">
+                    ${article.is_hidden ? "Gizli • Kullanıcılarda görünmez" : "Görünür"}
+                  </span>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center;">
+                  <button type="button" class="btn btn-sm ${!article.publish_at ? "btn-primary" : ""}" id="publishModeNowBtn">
+                    Hemen Yayınla
+                  </button>
+                  <button type="button" class="btn btn-sm ${article.publish_at ? "btn-primary" : ""}" id="publishModeScheduleBtn">
+                    ⏰ Planla
+                  </button>
+                </div>
+              </div>
+              ${article.publish_at ? `
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding-top:6px;border-top:1px dashed var(--border);">
+                  <input type="datetime-local" id="fieldPublishAt" class="ai-input" value="${escapeHtml(toLocalDateTimeInputValue(article.publish_at))}" />
+                  <button type="button" class="mini-btn" data-preset="tomorrow12">Yarın 12:00</button>
+                  <button type="button" class="mini-btn" data-preset="today20">Bugün 20:00</button>
+                  <button type="button" class="mini-btn" data-preset="plus1h">+1 Saat</button>
+                  <span style="font-size:11.5px;color:#fde68a;font-weight:600;">
+                    ${isFutureSchedule(article.publish_at)
+                      ? `Planlı: ${escapeHtml(formatShortScheduleLabel(article.publish_at))} tarihinde otomatik yayınlanacak`
+                      : "Seçili zaman geçmişte — anında görünür"}
+                  </span>
+                </div>
+              ` : ""}
+            </div>
+          </div>
+
+          <div class="field">
             <label>Makale Başlığı *</label>
             <input type="text" id="fieldTitle" value="${escapeHtml(article.title)}" placeholder="Örn: A Morning Walk in Kyoto" />
           </div>
@@ -1662,7 +1815,7 @@
           <div class="field">
             <label>
               <span>Makale İçeriği * (Paragrafları boş satırla ayırın)</span>
-              <span style="font-weight:500;color:#64748b;">.txt / .md sürükle-bırak destekli</span>
+              <span style="font-weight:500;color:var(--text-muted);">.txt / .md sürükle-bırak destekli</span>
             </label>
             <div class="content-toolbar">
               <button type="button" class="btn btn-sm" id="importTxtBtn">Dosyadan Yükle (.txt / .md)</button>
@@ -1675,7 +1828,7 @@
           <div class="field">
             <label>
               <span>Makale Kelime Anlamları (word_meanings)</span>
-              <span style="font-weight:500;color:#64748b;">Her satır: kelime: cümledeki anlamı</span>
+              <span style="font-weight:500;color:var(--text-muted);">Her satır: kelime: cümledeki anlamı</span>
             </label>
             <div class="content-toolbar">
               <button type="button" class="btn btn-sm" id="formatMeaningsBtn">Satırları Düzenle</button>
@@ -1688,7 +1841,7 @@
           <div class="field">
             <label>
               <span>Hazır Paragraf Çevirileri (paragraph_translations)</span>
-              <span style="font-weight:500;color:#64748b;">Boş satırla ayrılmış Türkçe paragraflar • <b id="paraTrCountBadge">${parsedParaTrCount} / ${paragraphs}</b></span>
+              <span style="font-weight:500;color:var(--text-muted);">Boş satırla ayrılmış Türkçe paragraflar • <b id="paraTrCountBadge" style="color:var(--text);">${parsedParaTrCount} / ${paragraphs}</b></span>
             </label>
             <textarea id="fieldParagraphTranslations" class="meanings-area" style="min-height:110px;" placeholder="1. paragrafın Türkçe çevirisi...&#10;&#10;2. paragrafın Türkçe çevirisi...">${escapeHtml(article.paragraph_translations_text || "")}</textarea>
           </div>
@@ -1696,7 +1849,7 @@
           <div class="field">
             <label>
               <span>Hazır Cümle Çevirileri (sentence_translations)</span>
-              <span style="font-weight:500;color:#64748b;">Her satır: İngilizce cümle =&gt; Türkçe çevirisi • <b id="sentTrCountBadge">${parsedSentTr.count} cümle</b></span>
+              <span style="font-weight:500;color:var(--text-muted);">Her satır: İngilizce cümle =&gt; Türkçe çevirisi • <b id="sentTrCountBadge" style="color:var(--text);">${parsedSentTr.count} cümle</b></span>
             </label>
             <textarea id="fieldSentenceTranslations" class="meanings-area" style="min-height:110px;" placeholder="Reading books brings calm. => Kitap okumak huzur verir.&#10;Quiet gardens inspire deep focus. => Sessiz bahçeler derin odaklanmaya ilham verir.">${escapeHtml(article.sentence_translations_text || "")}</textarea>
           </div>
@@ -1704,7 +1857,7 @@
           <div class="field">
             <label>
               <span>🎙 Podcast Sesli Okuma (AI İnsan Sesi)</span>
-              <span style="font-weight:500;color:#64748b;">Cümle-cümle zaman eşlemeli • Cloudflare Pages'te yayınlanır</span>
+              <span style="font-weight:500;color:var(--text-muted);">Cümle-cümle zaman eşlemeli • Cloudflare Pages'te yayınlanır</span>
             </label>
             <div style="border:1px solid var(--border);border-radius:12px;padding:12px;background:var(--surface-alt);display:flex;flex-direction:column;gap:10px;">
               <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
@@ -1719,7 +1872,7 @@
                   ${article.audio_url ? "🎙 Podcast Sesini Yeniden Üret" : "🎙 Podcast Sesi Üret"}
                 </button>
                 ${article.audio_url ? `<button type="button" class="btn btn-danger-ghost btn-sm" id="removeAudioBtn">Sesi Kaldır</button>` : ""}
-                <span class="wm-stats-badge" id="audioStatusBadge" style="${article.audio_url ? "" : "background:#f1f5f9;color:#64748b;"}">
+                <span class="wm-stats-badge" id="audioStatusBadge" style="${article.audio_url ? "" : "background:rgba(148,163,184,0.14);color:var(--text-muted);border-color:var(--border);"}">
                   ${article.audio_url
                     ? `🎙 Hazır (${Array.isArray(article.audio_segments) ? article.audio_segments.length : 0} cümle eşleşti)`
                     : "Henüz ses yok (uygulamada cihaz sesiyle okunur)"}
@@ -1750,6 +1903,61 @@
           if (article._autoId && article.title) {
             article.id = uniqueIdFor(article.title, article.level, state.selectedIndex);
           }
+          state.dirty = true;
+          renderAll();
+        });
+      });
+
+      const toggleHideBtn = document.getElementById("toggleHideArticleBtn");
+      if (toggleHideBtn) {
+        toggleHideBtn.addEventListener("click", () => {
+          article.is_hidden = !Boolean(article.is_hidden);
+          state.dirty = true;
+          renderAll();
+          showToast(
+            article.is_hidden
+              ? "Makale gizlendi. Canlıya almak için 'Kaydet ve Yayınla'ya basın."
+              : "Makale tekrar görünür yapıldı. Canlıya almak için 'Kaydet ve Yayınla'ya basın."
+          );
+        });
+      }
+
+      const publishNowBtn = document.getElementById("publishModeNowBtn");
+      if (publishNowBtn) {
+        publishNowBtn.addEventListener("click", () => {
+          if (!article.publish_at) return;
+          article.publish_at = "";
+          state.dirty = true;
+          renderAll();
+          showToast("Planlama kaldırıldı — makale hemen yayınlanacak.");
+        });
+      }
+
+      const publishScheduleBtn = document.getElementById("publishModeScheduleBtn");
+      if (publishScheduleBtn) {
+        publishScheduleBtn.addEventListener("click", () => {
+          if (!article.publish_at) {
+            article.publish_at = makePresetDateIso("tomorrow12");
+            state.dirty = true;
+            renderAll();
+            showToast("Makale yarın 12:00 için planlandı (saati değiştirebilirsiniz).");
+          }
+        });
+      }
+
+      const publishAtInput = document.getElementById("fieldPublishAt");
+      if (publishAtInput) {
+        publishAtInput.addEventListener("change", () => {
+          const iso = localDateTimeInputToIso(publishAtInput.value);
+          article.publish_at = iso;
+          state.dirty = true;
+          renderAll();
+        });
+      }
+
+      el.editorPane.querySelectorAll("button[data-preset]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          article.publish_at = makePresetDateIso(btn.dataset.preset);
           state.dirty = true;
           renderAll();
         });
@@ -2066,6 +2274,8 @@
         language: "en",
         content: "",
         word_meanings_text: "",
+        is_hidden: false,
+        publish_at: "",
         published_at: new Date().toISOString(),
         _autoId: true,
         _autoReadTime: true
@@ -2109,6 +2319,8 @@
         language: "en",
         content: templateContent,
         word_meanings_text: templateMeanings,
+        is_hidden: false,
+        publish_at: "",
         published_at: new Date().toISOString(),
         _autoId: true,
         _autoReadTime: true
@@ -2491,10 +2703,10 @@
         await fetch("/api/shutdown", { method: "POST" });
       } catch (_) {}
       document.body.innerHTML = `
-        <div style="display:grid;place-items:center;height:100vh;text-align:center;color:#334155;">
+        <div style="display:grid;place-items:center;height:100vh;text-align:center;color:var(--text);background:var(--bg);">
           <div>
             <h2>Makale Yönetim Paneli Kapatıldı</h2>
-            <p>Bu sekmeyi kapatabilirsiniz.</p>
+            <p style="color:var(--text-muted);">Bu sekmeyi kapatabilirsiniz.</p>
           </div>
         </div>
       `;

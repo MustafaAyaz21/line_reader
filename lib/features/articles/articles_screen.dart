@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/database/app_database.dart';
 import '../../core/localization/app_strings.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_theme_backdrop.dart';
 import '../../core/tts/tts_service.dart';
 import '../auth/controllers/auth_controller.dart';
 import '../browser/browser_screen.dart';
@@ -33,6 +35,7 @@ class ArticlesScreen extends StatefulWidget {
     this.ttsService,
     this.authController,
     this.onAddWord,
+    this.onAddWordWithLexicon,
     this.loadWordLists,
     this.onCreateWordList,
   });
@@ -43,6 +46,7 @@ class ArticlesScreen extends StatefulWidget {
   final TtsService? ttsService;
   final AuthController? authController;
   final AddWordCallback? onAddWord;
+  final AddWordWithLexiconCallback? onAddWordWithLexicon;
   final Future<List<WordList>> Function()? loadWordLists;
   final CreateWordListCallback? onCreateWordList;
 
@@ -119,6 +123,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
           ttsService: widget.ttsService,
           authController: widget.authController,
           onAddWord: widget.onAddWord,
+          onAddWordWithLexicon: widget.onAddWordWithLexicon,
           loadWordLists: widget.loadWordLists,
           onCreateWordList: widget.onCreateWordList,
         ),
@@ -144,10 +149,14 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
           }
         }
 
-        return Scaffold(
-          appBar: AppBar(
-            title: Text(context.l10n.articlesTitle),
-          ),
+        final visuals = AppThemeVisuals.of(context);
+
+        return AppThemeBackdrop(
+          child: Scaffold(
+            backgroundColor: visuals.hasBackdrop ? Colors.transparent : null,
+            appBar: AppBar(
+              title: Text(context.l10n.articlesTitle),
+            ),
           body: Stack(
             children: <Widget>[
               SafeArea(
@@ -226,6 +235,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
                   child: LinearProgressIndicator(minHeight: 2),
                 ),
             ],
+          ),
           ),
         );
       },

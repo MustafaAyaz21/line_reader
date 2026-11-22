@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/settings/api_key_controller.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_theme_backdrop.dart';
 import '../../../core/tts/tts_service.dart';
 import '../../translation/models/word_meaning.dart';
 import '../../translation/services/word_translation_service.dart';
@@ -11,6 +13,7 @@ import '../models/saved_word.dart';
 import '../models/word_list.dart';
 import '../models/word_search_detail.dart';
 import '../services/word_dictionary_search_service.dart';
+import '../widgets/word_lexicon_widgets.dart';
 import '../widgets/word_list_editor_dialog.dart';
 
 enum _ExistingWordSaveAction {
@@ -63,6 +66,8 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
   WordSearchDetail? _detail;
   SavedWord? _matchedExistingWord;
   final Set<int> _selectedIndices = <int>{};
+  final Set<String> _selectedSynonyms = <String>{};
+  final Set<String> _selectedAntonyms = <String>{};
 
   bool get _hasInitialWord =>
       widget.initialWord != null && widget.initialWord!.trim().isNotEmpty;
@@ -152,6 +157,8 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
       _detail = null;
       _matchedExistingWord = null;
       _selectedIndices.clear();
+      _selectedSynonyms.clear();
+      _selectedAntonyms.clear();
     });
 
     try {
@@ -167,6 +174,18 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
 
       final detail = results[0] as WordSearchDetail;
       final existingList = results[1] as List<SavedWord>;
+
+      if (detail.isMisspelled) {
+        setState(() {
+          _detail = detail;
+          _matchedExistingWord = null;
+          _selectedIndices.clear();
+          _selectedSynonyms.clear();
+          _selectedAntonyms.clear();
+          _isLoading = false;
+        });
+        return;
+      }
 
       // Düzenleme ikonundan gelindiyse ve aranan kelime aynıysa o spesifik kaydı seç;
       // aksi halde aynı listedeki en güncel mevcut kaydı eşleştir.
@@ -227,16 +246,24 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
         }
       }
 
+      final lexicon = detail.lexiconInfo;
       setState(() {
         _detail = WordSearchDetail(
           word: detail.word,
           meanings: List<MeaningEntry>.unmodifiable(mergedMeanings),
           examples: detail.examples,
+          lexiconInfo: lexicon,
         );
         _matchedExistingWord = matched;
         _selectedIndices
           ..clear()
           ..addAll(preselected);
+        _selectedSynonyms
+          ..clear()
+          ..addAll(lexicon?.synonyms ?? const <String>[]);
+        _selectedAntonyms
+          ..clear()
+          ..addAll(lexicon?.antonyms ?? const <String>[]);
         _isLoading = false;
       });
     } on TranslationException catch (error) {
@@ -362,6 +389,7 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
         word: currentDetail.word,
         meanings: List<MeaningEntry>.unmodifiable(updatedMeanings),
         examples: currentDetail.examples,
+        lexiconInfo: currentDetail.lexiconInfo,
       );
       _selectedIndices
         ..clear()
@@ -516,8 +544,8 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
     if (_isSaving) return;
 
     final detail = _detail;
-    if (detail == null) {
-      _showSnack('Önce bir kelime arayıp anlam seçin.');
+    if (detail == null || detail.isMisspelled) {
+      _showSnack('Önce geçerli bir kelime arayıp anlam seçin.');
       return;
     }
 
@@ -527,6 +555,17 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
       for (final idx in sortedIndices)
         detail.meanings[idx].copyWith(isContextual: false),
     ];
+    final lexicon = detail.lexiconInfo;
+    final chosenSynonyms = lexicon == null
+        ? const <String>[]
+        : lexicon.synonyms
+            .where(_selectedSynonyms.contains)
+            .toList(growable: false);
+    final chosenAntonyms = lexicon == null
+        ? const <String>[]
+        : lexicon.antonyms
+            .where(_selectedAntonyms.contains)
+            .toList(growable: false);
 
     // Kelime listede henüz yoksa doğrudan yeni kayıt olarak ekle.
     if (existing == null) {
@@ -541,6 +580,10 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
           word: detail.word,
           meaning: selectedMeanings.first.baseFormatted,
           meanings: selectedMeanings,
+          ipaUs: lexicon?.ipaUs,
+          ipaUk: lexicon?.ipaUk,
+          synonyms: chosenSynonyms,
+          antonyms: chosenAntonyms,
           listId: _selectedListId,
           allowDuplicate: true,
         );
@@ -583,6 +626,10 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
           word: detail.word,
           meaning: selectedMeanings.first.baseFormatted,
           meanings: selectedMeanings,
+          ipaUs: lexicon?.ipaUs,
+          ipaUk: lexicon?.ipaUk,
+          synonyms: chosenSynonyms,
+          antonyms: chosenAntonyms,
           listId: _selectedListId,
           allowDuplicate: true,
         );
@@ -608,6 +655,10 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
       final status = await widget.controller.updateWordMeanings(
         existingWord: existing,
         meanings: selectedMeanings,
+        ipaUs: lexicon?.ipaUs,
+        ipaUk: lexicon?.ipaUk,
+        synonyms: chosenSynonyms,
+        antonyms: chosenAntonyms,
       );
       if (!mounted) return;
       if (status == SaveWordStatus.saved) {
@@ -640,9 +691,12 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
     final list = widget.controller.findListById(_selectedListId) ??
         (_selectedListId == widget.listId ? widget.wordList : null);
     final selectedCount = _selectedIndices.length;
+    final visuals = AppThemeVisuals.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
+    return AppThemeBackdrop(
+      child: Scaffold(
+        backgroundColor: visuals.hasBackdrop ? Colors.transparent : null,
+        appBar: AppBar(
         title: Row(
           children: [
             if (list != null) ...[
@@ -866,6 +920,7 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
           ),
         ],
       ),
+      ),
     );
   }
 
@@ -950,6 +1005,20 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
             ],
           ),
         ),
+      );
+    }
+
+    if (detail.isMisspelled) {
+      return DidYouMeanCard(
+        misspelledWord: detail.word,
+        suggestions: detail.suggestions,
+        onSelectSuggestion: (suggestion) {
+          _searchController.text = suggestion;
+          _searchController.selection = TextSelection.collapsed(
+            offset: suggestion.length,
+          );
+          _performSearch(suggestion, dismissKeyboard: true);
+        },
       );
     }
 
@@ -1074,24 +1143,31 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
                       ),
                     ],
                     const SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: OutlinedButton.icon(
-                        onPressed: _showAddCustomMeaningDialog,
-                        icon: const Icon(Icons.add_rounded, size: 17),
-                        label: const Text('Kendi Anlamını Ekle'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        if (detail.lexiconInfo != null &&
+                            detail.lexiconInfo!.hasAnyIpa)
+                          WordIpaBadge(lexiconInfo: detail.lexiconInfo),
+                        OutlinedButton.icon(
+                          onPressed: _showAddCustomMeaningDialog,
+                          icon: const Icon(Icons.add_rounded, size: 17),
+                          label: const Text('Kendi Anlamını Ekle'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                     ),
                   ],
                 ),
@@ -1099,13 +1175,53 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
               Expanded(
                 child: ListView.separated(
                   padding: const EdgeInsets.symmetric(vertical: 4),
-                  itemCount: detail.meanings.length,
+                  itemCount: detail.meanings.length +
+                      ((detail.lexiconInfo != null &&
+                              detail.lexiconInfo!.hasRelations)
+                          ? 1
+                          : 0),
                   separatorBuilder: (context, index) => Divider(
                     height: 1,
                     indent: 52,
                     color: colorScheme.outlineVariant.withAlpha(140),
                   ),
                   itemBuilder: (context, index) {
+                    if (index >= detail.meanings.length) {
+                      final info = detail.lexiconInfo!;
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                        child: WordRelationsSection(
+                          synonyms: info.synonyms,
+                          antonyms: info.antonyms,
+                          selectedSynonyms: _selectedSynonyms,
+                          selectedAntonyms: _selectedAntonyms,
+                          onToggleSynonym: (term) {
+                            setState(() {
+                              if (!_selectedSynonyms.remove(term)) {
+                                _selectedSynonyms.add(term);
+                              }
+                            });
+                          },
+                          onToggleAntonym: (term) {
+                            setState(() {
+                              if (!_selectedAntonyms.remove(term)) {
+                                _selectedAntonyms.add(term);
+                              }
+                            });
+                          },
+                          onToggleAll: (selectAll) {
+                            setState(() {
+                              _selectedSynonyms.clear();
+                              _selectedAntonyms.clear();
+                              if (selectAll) {
+                                _selectedSynonyms.addAll(info.synonyms);
+                                _selectedAntonyms.addAll(info.antonyms);
+                              }
+                            });
+                          },
+                        ),
+                      );
+                    }
                     final entry = detail.meanings[index];
                     final isChecked = _selectedIndices.contains(index);
 

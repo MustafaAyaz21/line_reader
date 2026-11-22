@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../core/settings/api_key_controller.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_theme_backdrop.dart';
 import '../../core/tts/tts_service.dart';
 import 'controllers/words_controller.dart';
 import 'models/saved_word.dart';
@@ -134,8 +136,12 @@ class _ListWordsScreenState extends State<ListWordsScreen> {
         final list = widget.controller.findListById(widget.listId);
         final words = widget.controller.wordsForList(widget.listId);
 
-        return Scaffold(
-          appBar: AppBar(
+        final visuals = AppThemeVisuals.of(context);
+
+        return AppThemeBackdrop(
+          child: Scaffold(
+            backgroundColor: visuals.hasBackdrop ? Colors.transparent : null,
+            appBar: AppBar(
             title: Row(
               children: [
                 if (list != null) ...[
@@ -253,6 +259,7 @@ class _ListWordsScreenState extends State<ListWordsScreen> {
                           ),
               ),
             ],
+          ),
           ),
         );
       },

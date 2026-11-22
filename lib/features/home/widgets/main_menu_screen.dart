@@ -3,9 +3,14 @@ import 'package:flutter/material.dart';
 import '../../../core/localization/app_locale.dart';
 import '../../../core/localization/app_strings.dart';
 import '../../../core/settings/api_key_controller.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/tts/tts_service.dart';
 import '../../articles/articles_screen.dart';
+import '../../articles/controllers/article_reading_progress_controller.dart';
 import '../../articles/controllers/articles_controller.dart';
+import '../../articles/models/article.dart';
+import '../../articles/models/article_reading_progress.dart';
+import '../../articles/screens/article_reader_screen.dart';
 import '../../auth/controllers/auth_controller.dart';
 import '../../browser/browser_screen.dart';
 import '../../settings/widgets/api_key_dialog.dart';
@@ -27,9 +32,11 @@ class MainMenuScreen extends StatelessWidget {
     this.authController,
     this.updateController,
     this.articlesController,
+    this.readingProgressController,
     this.translationService,
     this.ttsService,
     this.onAddWord,
+    this.onAddWordWithLexicon,
     this.loadWordLists,
     this.onCreateWordList,
     this.onClearCache,
@@ -41,9 +48,11 @@ class MainMenuScreen extends StatelessWidget {
   final AuthController? authController;
   final AppUpdateController? updateController;
   final ArticlesController? articlesController;
+  final ArticleReadingProgressController? readingProgressController;
   final WordTranslationService? translationService;
   final TtsService? ttsService;
   final AddWordCallback? onAddWord;
+  final AddWordWithLexiconCallback? onAddWordWithLexicon;
   final Future<List<WordList>> Function()? loadWordLists;
   final CreateWordListCallback? onCreateWordList;
   final Future<void> Function()? onClearCache;
@@ -57,6 +66,7 @@ class MainMenuScreen extends StatelessWidget {
           ttsService: ttsService,
           authController: authController,
           onAddWord: onAddWord,
+          onAddWordWithLexicon: onAddWordWithLexicon,
           loadWordLists: loadWordLists,
           onCreateWordList: onCreateWordList,
         ),
@@ -64,13 +74,54 @@ class MainMenuScreen extends StatelessWidget {
     );
   }
 
+  void _openResumeArticle(
+    BuildContext context,
+    Article article,
+    ArticleReadingProgressController progressController,
+  ) {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => ArticleReaderScreen(
+          article: article,
+          readingProgressController: progressController,
+          translationService: translationService,
+          ttsService: ttsService,
+          authController: authController,
+          onAddWord: onAddWord,
+          onAddWordWithLexicon: onAddWordWithLexicon,
+          loadWordLists: loadWordLists,
+          onCreateWordList: onCreateWordList,
+        ),
+      ),
+    );
+  }
+
+  Article? _findVisibleArticleById(String articleId) {
+    final controller = articlesController;
+    if (controller == null) return null;
+    for (final article in controller.articles) {
+      if (article.id == articleId) {
+        return article;
+      }
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = context.l10n;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final visuals = AppThemeVisuals.of(context);
+    final progressController =
+        readingProgressController ?? ArticleReadingProgressController.shared;
+    final listenables = <Listenable>[
+      progressController,
+      if (articlesController != null) articlesController!,
+    ];
 
     return Scaffold(
+      backgroundColor: visuals.hasBackdrop ? Colors.transparent : null,
       appBar: AppBar(
         title: Text(s.mainMenuTitle),
         actions: [
@@ -92,42 +143,218 @@ class MainMenuScreen extends StatelessWidget {
         ],
       ),
       body: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 440),
-            child: IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: _MenuShortcutCard(
-                      icon: Icons.public_rounded,
-                      title: s.browserTitle,
-                      subtitle: s.browserSubtitle,
-                      containerColor: colorScheme.primaryContainer,
-                      iconBackgroundColor: colorScheme.primary,
-                      iconColor: colorScheme.onPrimary,
-                      textColor: colorScheme.onPrimaryContainer,
-                      onTap: onOpenBrowser,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: _MenuShortcutCard(
+                          icon: Icons.public_rounded,
+                          title: s.browserTitle,
+                          subtitle: s.browserSubtitle,
+                          containerColor: colorScheme.primaryContainer,
+                          iconBackgroundColor: colorScheme.primary,
+                          iconColor: colorScheme.onPrimary,
+                          textColor: colorScheme.onPrimaryContainer,
+                          onTap: onOpenBrowser,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: _MenuShortcutCard(
+                          icon: Icons.menu_book_rounded,
+                          title: s.articlesTitle,
+                          subtitle: s.articlesSubtitle,
+                          containerColor: colorScheme.secondaryContainer,
+                          iconBackgroundColor: colorScheme.secondary,
+                          iconColor: colorScheme.onSecondary,
+                          textColor: colorScheme.onSecondaryContainer,
+                          onTap: () => _openArticles(context),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                ListenableBuilder(
+                  listenable: Listenable.merge(listenables),
+                  builder: (context, _) {
+                    final lastProgress = progressController.lastProgress;
+                    if (lastProgress == null) {
+                      return const SizedBox.shrink();
+                    }
+                    final article = _findVisibleArticleById(
+                      lastProgress.articleId,
+                    );
+                    if (article == null) {
+                      return const SizedBox.shrink();
+                    }
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 16),
+                      child: _ContinueReadingCard(
+                        article: article,
+                        progress: lastProgress,
+                        onTap: () => _openResumeArticle(
+                          context,
+                          article,
+                          progressController,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ContinueReadingCard extends StatelessWidget {
+  const _ContinueReadingCard({
+    required this.article,
+    required this.progress,
+    required this.onTap,
+  });
+
+  final Article article;
+  final ArticleReadingProgress progress;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final parsedLevel = article.parsedLevel;
+    final accent = parsedLevel?.accentColor ?? colorScheme.primary;
+    final percent = progress.progressPercent;
+
+    return Material(
+      key: const ValueKey<String>('main_menu_continue_reading_card'),
+      color: colorScheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(20),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withAlpha(150),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: accent.withAlpha(28),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.auto_stories_rounded,
+                      size: 16,
+                      color: accent,
                     ),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 8),
                   Expanded(
-                    child: _MenuShortcutCard(
-                      icon: Icons.menu_book_rounded,
-                      title: s.articlesTitle,
-                      subtitle: s.articlesSubtitle,
-                      containerColor: colorScheme.secondaryContainer,
-                      iconBackgroundColor: colorScheme.secondary,
-                      iconColor: colorScheme.onSecondary,
-                      textColor: colorScheme.onSecondaryContainer,
-                      onTap: () => _openArticles(context),
+                    child: Text(
+                      s.continueReadingTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
+                  ),
+                  if (parsedLevel != null) ...<Widget>[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: accent.withAlpha(30),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        parsedLevel.code,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: accent,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                article.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  height: 1.3,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  value: progress.clampedProgress,
+                  minHeight: 7,
+                  backgroundColor: colorScheme.surfaceContainerHighest,
+                  valueColor: AlwaysStoppedAnimation<Color>(accent),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      s.readingProgressCompletedLabel(percent),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    s.readingProgressPercent(percent),
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: accent,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.arrow_forward_rounded,
+                    size: 16,
+                    color: accent,
                   ),
                 ],
               ),
-            ),
+            ],
           ),
         ),
       ),

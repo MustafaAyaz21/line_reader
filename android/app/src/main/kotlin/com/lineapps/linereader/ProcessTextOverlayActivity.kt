@@ -62,6 +62,25 @@ class ProcessTextOverlayActivity : FlutterActivity() {
         return if (cleaned.isNullOrEmpty()) null else cleaned
     }
 
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        // Kullanıcı Ana Ekran tuşuna basıp veya başka uygulamaya geçerek mini kartı
+        // terk ettiğinde arka planda ikinci bir Line Reader görevi kalmasın.
+        dismissAndRemoveTask()
+    }
+
+    private fun dismissAndRemoveTask() {
+        if (!isFinishing) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                finishAndRemoveTask()
+            } else {
+                finish()
+            }
+            @Suppress("DEPRECATION")
+            overridePendingTransition(0, 0)
+        }
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
@@ -76,9 +95,7 @@ class ProcessTextOverlayActivity : FlutterActivity() {
                 }
                 "closeOverlay" -> {
                     result.success(null)
-                    finish()
-                    @Suppress("DEPRECATION")
-                    overridePendingTransition(0, 0)
+                    dismissAndRemoveTask()
                 }
                 "openInMainApp" -> {
                     val word = call.argument<String>("word")?.trim()
@@ -90,15 +107,12 @@ class ProcessTextOverlayActivity : FlutterActivity() {
                         }
                         addFlags(
                             Intent.FLAG_ACTIVITY_NEW_TASK or
-                                Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                                Intent.FLAG_ACTIVITY_SINGLE_TOP
+                                Intent.FLAG_ACTIVITY_CLEAR_TOP
                         )
                     }
                     startActivity(openIntent)
                     result.success(null)
-                    finish()
-                    @Suppress("DEPRECATION")
-                    overridePendingTransition(0, 0)
+                    dismissAndRemoveTask()
                 }
                 else -> result.notImplemented()
             }

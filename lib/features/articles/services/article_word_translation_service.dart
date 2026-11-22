@@ -5,12 +5,13 @@ import '../models/article.dart';
 
 /// Makale okuma ekranı için önceliklendirilmiş kelime çözümleme servisi:
 /// 1. Önce açık olan makalenin `word_meanings` haritasına (tam kelime ve
-///    kök/temel form üzerinden) bakar; bulunursa o cümledeki birebir anlamı
-///    anında (çevrimdışı ve kotadan düşmeden) döner.
-/// 2. Makalede tanımlı değilse uygulamanın mevcut çeviri servisini
-///    (`CachedTranslationService`) çağırır.
-/// 3. Ağ hatası / çevrimdışı durumda hafif yerel sözlük + kök çözümleyici
-///    (`LocalDictionaryService`) devreye girer.
+///    kök/temel form üzerinden) bakar; bulunursa 1. sırada o cümledeki birebir
+///    anlamı kesin olarak korur.
+/// 2. 2.–4. sıraları önce yerel sözlükten, 4 anlama ulaşmadıysa çevrimiçi /
+///    SQLite önbellekli sözlük servisinden (tekrarsız ve çevrimdışı güvenli
+///    biçimde) zenginleştirir.
+/// 3. Makalede tanımlı değilse doğrudan standart çeviri servisi + yerel sözlük
+///    yedeği çalışır.
 class ArticleWordTranslationService implements WordTranslationService {
   ArticleWordTranslationService({
     required Article article,
@@ -23,6 +24,8 @@ class ArticleWordTranslationService implements WordTranslationService {
   final Article _article;
   final WordTranslationService _fallbackService;
   final LocalDictionaryService _localDictionary;
+
+  String _normKey(String raw) => raw.trim().replaceAll('İ', 'i').toLowerCase();
 
   @override
   Future<WordMeaning> lookup({
@@ -38,32 +41,54 @@ class ArticleWordTranslationService implements WordTranslationService {
           isContextual: true,
         ),
       ];
+      final seen = <String>{_normKey(articleMatch.meaning)};
 
-      // 2-4. sıraları ağ isteği yapmadan varsa yerel sözlükten zenginleştir.
+      void appendExtra(List<MeaningEntry> extras) {
+        for (final extra in extras) {
+          if (entries.length >= WordMeaning.maxEntries) break;
+          final key = _normKey(extra.translation);
+          if (key.isEmpty) continue;
+          if (seen.add(key)) {
+            entries.add(
+              MeaningEntry(
+                translation: extra.translation,
+                partOfSpeech: extra.partOfSpeech,
+                isContextual: false,
+              ),
+            );
+          } else if (entries.first.partOfSpeech == null &&
+              key == _normKey(articleMatch.meaning) &&
+              extra.partOfSpeech != null) {
+            // 1. anlamın sözcük türü (fiil/isim/sıfat) bilgisi eksikse onu da tamamla.
+            entries[0] = entries[0].copyWith(partOfSpeech: extra.partOfSpeech);
+          }
+        }
+      }
+
+      // 2-4. sıraları önce yerel sözlükten zenginleştir.
       try {
         final localExtra = await _localDictionary.lookup(
           word,
           contextSentence: contextSentence,
         );
         if (localExtra != null) {
-          final seen = <String>{
-            articleMatch.meaning.replaceAll('İ', 'i').toLowerCase(),
-          };
-          for (final extra in localExtra.meaning.orderedEntries) {
-            if (entries.length >= 4) break;
-            final key = extra.translation.replaceAll('İ', 'i').toLowerCase();
-            if (seen.add(key)) {
-              entries.add(
-                MeaningEntry(
-                  translation: extra.translation,
-                  partOfSpeech: extra.partOfSpeech,
-                  isContextual: false,
-                ),
-              );
-            }
-          }
+          appendExtra(localExtra.meaning.orderedEntries);
         }
       } catch (_) {}
+
+      // Hâlâ 4 anlama ulaşmadıysa çevrimiçi / SQLite önbellekli sözlükten tamamla
+      // (ağ yoksa veya kota dolduysa sessizce eldeki 1-3 anlamla devam eder).
+      if (entries.length < WordMeaning.maxEntries) {
+        try {
+          final remoteExtra = await _fallbackService
+              .lookup(
+                word: word,
+                contextSentence: contextSentence,
+              )
+              .timeout(const Duration(seconds: 4));
+          appendExtra(remoteExtra.orderedEntries);
+        } catch (_) {}
+      }
 
       return WordMeaning.fromEntries(
         word: word,
@@ -79,7 +104,7 @@ class ArticleWordTranslationService implements WordTranslationService {
         contextSentence: contextSentence,
       );
     } on TranslationException catch (error) {
-      // Misafir 40 kelime sınırı aşıldıysa kotayı atlamadan kullanıcıya bildir.
+      // Misafir / standart günlük sınır aşıldıysa kotayı atlamadan kullanıcıya bildir.
       if (error.type == TranslationErrorType.guestLimitReached) {
         rethrow;
       }

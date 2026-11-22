@@ -3,6 +3,11 @@ import 'package:flutter/material.dart';
 import '../../../core/localization/app_locale.dart';
 import '../../../core/localization/app_strings.dart';
 import '../../../core/settings/api_key_controller.dart';
+import '../../../core/settings/ipa_accent_controller.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_theme_backdrop.dart';
+import '../../../core/theme/app_theme_controller.dart';
+import '../../../core/theme/app_theme_preset.dart';
 import '../../auth/controllers/auth_controller.dart';
 import '../../auth/models/auth_user.dart';
 import '../../auth/screens/auth_screen.dart';
@@ -32,28 +37,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final TextEditingController _codeController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    IpaAccentController.shared.load();
+    AppThemeController.shared.load();
+  }
+
+  @override
   void dispose() {
     _codeController.dispose();
     super.dispose();
-  }
-
-  Future<void> _handleClearCache(BuildContext context) async {
-    final callback = widget.onClearCache;
-    if (callback == null) return;
-    await callback();
-    if (!context.mounted) return;
-    final s = context.l10n;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            s.t('Çeviri önbelleği temizlendi.', 'Translation cache cleared.'),
-          ),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-        ),
-      );
   }
 
   Future<void> _handleRedeemCode(BuildContext context) async {
@@ -91,31 +84,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           content: Text(result.message),
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 3),
-        ),
-      );
-  }
-
-  Future<void> _handleRefreshEntitlement(BuildContext context) async {
-    await widget.authController.refreshEntitlement();
-    if (!context.mounted) return;
-    final s = context.l10n;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            widget.authController.isUnlimited
-                ? s.t(
-                    'Hesap yetkisi güncellendi: Sınırsız erişim aktif.',
-                    'Account status refreshed: Unlimited access active.',
-                  )
-                : s.t(
-                    'Hesap durumu güncellendi.',
-                    'Account status refreshed.',
-                  ),
-          ),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
         ),
       );
   }
@@ -166,12 +134,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final s = context.l10n;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final visuals = AppThemeVisuals.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(s.settingsTitle),
-      ),
-      body: ListView(
+    return AppThemeBackdrop(
+      child: Scaffold(
+        backgroundColor: visuals.hasBackdrop ? Colors.transparent : null,
+        appBar: AppBar(
+          title: Text(s.settingsTitle),
+        ),
+        body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
         children: <Widget>[
           // 1) Hesap / Yetki / Misafir Bölümü
@@ -260,68 +231,314 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 22),
 
-          // 3) Çeviri ve Önbellek Bölümü (son kullanıcıdan manuel API anahtarı istenmez)
+          // 3) Telaffuz / IPA Aksanı Seçimi (Amerikan US / İngiliz UK)
           _SectionTitle(
-            label: s.t('Çeviri ve Önbellek', 'Translation & Cache'),
+            label: s.t('Telaffuz ve IPA Aksanı', 'Pronunciation & IPA Accent'),
           ),
           const SizedBox(height: 8),
-          Card(
-            margin: EdgeInsets.zero,
-            clipBehavior: Clip.antiAlias,
-            child: Column(
+          ListenableBuilder(
+            listenable: IpaAccentController.shared,
+            builder: (context, _) {
+              return Card(
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      Row(
+                        children: <Widget>[
+                          Icon(
+                            Icons.record_voice_over_rounded,
+                            size: 20,
+                            color: colorScheme.primary,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              s.t('IPA Okunuş Aksanı', 'IPA Accent'),
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      SegmentedButton<IpaAccent>(
+                        key: const ValueKey<String>(
+                          'settings_ipa_accent_selector',
+                        ),
+                        segments: <ButtonSegment<IpaAccent>>[
+                          ButtonSegment<IpaAccent>(
+                            value: IpaAccent.us,
+                            label: Text(
+                              s.t('Amerikan (US)', 'American (US)'),
+                            ),
+                          ),
+                          ButtonSegment<IpaAccent>(
+                            value: IpaAccent.uk,
+                            label: Text(
+                              s.t('İngiliz (UK)', 'British (UK)'),
+                            ),
+                          ),
+                        ],
+                        selected: <IpaAccent>{
+                          IpaAccentController.shared.accent,
+                        },
+                        onSelectionChanged: (selected) {
+                          IpaAccentController.shared.setAccent(selected.first);
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        s.t(
+                          'Makalelerde, tarayıcıda, kelime aramada ve Line\'da Bak kartında gösterilen IPA okunuş aksanını belirler.',
+                          'Sets the IPA pronunciation accent shown across articles, browser, word search, and quick lookup.',
+                        ),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 22),
+
+          // 4) Uygulama Teması (Kod Tabanlı Gradyan Temalar + Varsayılan)
+          _SectionTitle(
+            label: s.t('Uygulama Teması', 'App Theme'),
+          ),
+          const SizedBox(height: 8),
+          ListenableBuilder(
+            listenable: AppThemeController.shared,
+            builder: (context, _) {
+              return _buildThemeSelectorCard(context, theme, colorScheme, s);
+            },
+          ),
+        ],
+      ),
+      ),
+    );
+  }
+
+  Widget _buildThemeSelectorCard(
+    BuildContext context,
+    ThemeData theme,
+    ColorScheme colorScheme,
+    AppStrings s,
+  ) {
+    final activePreset = AppThemeController.shared.preset;
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Row(
               children: <Widget>[
-                ListTile(
-                  key: const ValueKey<String>('settings_auto_translation_tile'),
-                  leading: Icon(
-                    Icons.auto_awesome_rounded,
-                    color: colorScheme.primary,
-                  ),
-                  title: Text(
-                    s.t(
-                      'Otomatik Bağlamsal Çeviri',
-                      'Automatic Contextual Translation',
-                    ),
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  subtitle: Text(
-                    s.t(
-                      'Yetkili (sınırsız) hesaplarda tarayıcıda cümle bağlamına göre yapay zeka çevirisi otomatik çalışır; manuel API anahtarı gerektirmez.',
-                      'Contextual AI translation runs automatically in the browser for entitled unlimited accounts; no manual API key needed.',
+                Icon(
+                  Icons.palette_outlined,
+                  size: 20,
+                  color: colorScheme.primary,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    s.t('Renk Teması ve Atmosfer', 'Color Theme & Atmosphere'),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
-                if (widget.onClearCache != null) ...<Widget>[
-                  Divider(
-                    height: 1,
-                    thickness: 1,
-                    color: colorScheme.outlineVariant.withAlpha(120),
-                  ),
-                  ListTile(
-                    key: const ValueKey<String>('settings_clear_cache_tile'),
-                    leading: Icon(
-                      Icons.cleaning_services_outlined,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                    title: Text(
-                      s.t(
-                        'Çeviri Önbelleğini Temizle',
-                        'Clear Translation Cache',
-                      ),
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    subtitle: Text(
-                      s.t(
-                        'Yerel SQLite kelime çeviri önbelleğini sıfırlar.',
-                        'Resets the local SQLite word translation cache.',
-                      ),
-                    ),
-                    onTap: () => _handleClearCache(context),
-                  ),
-                ],
               ],
             ),
-          ),
-        ],
+            const SizedBox(height: 6),
+            Text(
+              s.t(
+                'Ana menü, kartlar, kelime listeleri, tarayıcı çevresi ve makale okuma alanına anında uygulanır.',
+                'Applies instantly to Home, cards, word lists, browser chrome, and article reading areas.',
+              ),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 14),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                const spacing = 10.0;
+                final itemWidth = (constraints.maxWidth - spacing) / 2;
+                return Wrap(
+                  spacing: spacing,
+                  runSpacing: spacing,
+                  children: AppThemePreset.values.map((preset) {
+                    final isSelected = activePreset == preset;
+                    final title = preset.titleForLocale(isEnglish: s.isEn);
+                    final subtitle =
+                        preset.subtitleForLocale(isEnglish: s.isEn);
+                    final isFullWidth = preset == AppThemePreset.classic;
+
+                    return SizedBox(
+                      width: isFullWidth ? constraints.maxWidth : itemWidth,
+                      child: Material(
+                        color: isSelected
+                            ? colorScheme.primaryContainer.withAlpha(185)
+                            : colorScheme.surfaceContainerHighest.withAlpha(155),
+                        borderRadius: BorderRadius.circular(14),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          key: ValueKey<String>(
+                            'settings_theme_${preset.storageKey}',
+                          ),
+                          onTap: () =>
+                              AppThemeController.shared.setPreset(preset),
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: isSelected
+                                    ? colorScheme.primary
+                                    : colorScheme.outlineVariant,
+                                width: isSelected ? 2 : 1,
+                              ),
+                            ),
+                            child: isFullWidth
+                                ? Row(
+                                    children: <Widget>[
+                                      AppThemePreviewSwatch(
+                                        preset: preset,
+                                        width: 56,
+                                        height: 40,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: <Widget>[
+                                            Text(
+                                              title,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: theme.textTheme.labelLarge
+                                                  ?.copyWith(
+                                                fontWeight: FontWeight.w700,
+                                                color: isSelected
+                                                    ? colorScheme
+                                                        .onPrimaryContainer
+                                                    : colorScheme.onSurface,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              subtitle,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: theme.textTheme.bodySmall
+                                                  ?.copyWith(
+                                                fontSize: 11.5,
+                                                color: isSelected
+                                                    ? colorScheme
+                                                        .onPrimaryContainer
+                                                        .withAlpha(205)
+                                                    : colorScheme
+                                                        .onSurfaceVariant,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      if (isSelected)
+                                        Icon(
+                                          Icons.check_circle_rounded,
+                                          size: 20,
+                                          color: colorScheme.primary,
+                                        ),
+                                    ],
+                                  )
+                                : Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: <Widget>[
+                                      Stack(
+                                        children: <Widget>[
+                                          AppThemePreviewSwatch(
+                                            preset: preset,
+                                            width: double.infinity,
+                                            height: 58,
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                          ),
+                                          if (isSelected)
+                                            Positioned(
+                                              top: 6,
+                                              right: 6,
+                                              child: Container(
+                                                padding:
+                                                    const EdgeInsets.all(2),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.black
+                                                      .withAlpha(140),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: const Icon(
+                                                  Icons.check_rounded,
+                                                  size: 14,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: theme.textTheme.labelLarge
+                                            ?.copyWith(
+                                          fontWeight: FontWeight.w700,
+                                          color: isSelected
+                                              ? colorScheme.onPrimaryContainer
+                                              : colorScheme.onSurface,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        subtitle,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                          fontSize: 11,
+                                          height: 1.25,
+                                          color: isSelected
+                                              ? colorScheme.onPrimaryContainer
+                                                  .withAlpha(205)
+                                              : colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(growable: false),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -403,12 +620,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Container(
                   key: const ValueKey<String>('settings_unlimited_badge'),
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
+                    horizontal: 14,
+                    vertical: 12,
                   ),
                   decoration: BoxDecoration(
-                    color: colorScheme.primaryContainer.withAlpha(180),
-                    borderRadius: BorderRadius.circular(12),
+                    gradient: LinearGradient(
+                      colors: <Color>[
+                        colorScheme.primaryContainer,
+                        colorScheme.tertiaryContainer.withAlpha(210),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: colorScheme.primary.withAlpha(100),
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -416,23 +641,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Row(
                         children: <Widget>[
                           Icon(
-                            Icons.all_inclusive_rounded,
-                            size: 18,
+                            Icons.workspace_premium_rounded,
+                            size: 22,
                             color: colorScheme.primary,
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              s.unlimitedAccountBadge,
-                              style: theme.textTheme.titleSmall?.copyWith(
+                              s.t('Premium Üye', 'Premium Member'),
+                              style: theme.textTheme.titleMedium?.copyWith(
                                 color: colorScheme.onPrimaryContainer,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.2,
                               ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 5),
                       Text(
                         s.t(
                           'Sınırsız çeviri • Tarayıcı AI açık • Reklamsız',
@@ -440,6 +666,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: colorScheme.onPrimaryContainer,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                       if (codeUsed != null && codeUsed.isNotEmpty) ...<Widget>[
@@ -459,29 +686,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Row(
-                  children: <Widget>[
-                    TextButton.icon(
-                      onPressed: auth.isSyncingEntitlement
-                          ? null
-                          : () => _handleRefreshEntitlement(context),
-                      icon: auth.isSyncingEntitlement
-                          ? const SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.sync_rounded, size: 17),
-                      label: Text(s.t('Yetkiyi Yenile', 'Refresh Status')),
-                    ),
-                    const Spacer(),
-                    TextButton(
-                      onPressed: auth.isBusy
-                          ? null
-                          : () => _handleSignOut(context),
-                      child: Text(s.signOut),
-                    ),
-                  ],
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed:
+                        auth.isBusy ? null : () => _handleSignOut(context),
+                    icon: const Icon(Icons.logout_rounded, size: 17),
+                    label: Text(s.signOut),
+                  ),
                 ),
               ],
             ),
@@ -685,28 +897,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              Row(
-                children: <Widget>[
-                  TextButton.icon(
-                    onPressed: auth.isSyncingEntitlement
-                        ? null
-                        : () => _handleRefreshEntitlement(context),
-                    icon: auth.isSyncingEntitlement
-                        ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.sync_rounded, size: 17),
-                    label: Text(s.t('Yetkiyi Kontrol Et', 'Check Status')),
-                  ),
-                  const Spacer(),
-                  TextButton(
-                    onPressed:
-                        auth.isBusy ? null : () => _handleSignOut(context),
-                    child: Text(s.signOut),
-                  ),
-                ],
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed:
+                      auth.isBusy ? null : () => _handleSignOut(context),
+                  icon: const Icon(Icons.logout_rounded, size: 17),
+                  label: Text(s.signOut),
+                ),
               ),
             ],
           ),

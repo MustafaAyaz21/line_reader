@@ -120,6 +120,10 @@ class _InMemoryWordRepository implements WordRepository {
     required String word,
     required String meaning,
     List<MeaningEntry> meanings = const <MeaningEntry>[],
+    String? ipaUs,
+    String? ipaUk,
+    List<String> synonyms = const <String>[],
+    List<String> antonyms = const <String>[],
     bool allowDuplicate = false,
   }) async {
     if (!allowDuplicate &&
@@ -137,6 +141,10 @@ class _InMemoryWordRepository implements WordRepository {
         word: word.trim(),
         meaning: meaning,
         meanings: meanings,
+        ipaUs: ipaUs,
+        ipaUk: ipaUk,
+        synonyms: synonyms,
+        antonyms: antonyms,
         createdAt: DateTime.now(),
       ),
     );
@@ -147,6 +155,10 @@ class _InMemoryWordRepository implements WordRepository {
   Future<SaveWordStatus> updateWordMeanings({
     required SavedWord existingWord,
     required List<MeaningEntry> meanings,
+    String? ipaUs,
+    String? ipaUk,
+    List<String>? synonyms,
+    List<String>? antonyms,
   }) async {
     final idx = _words.indexWhere((w) => w.id == existingWord.id);
     if (idx < 0) return SaveWordStatus.error;
@@ -157,6 +169,10 @@ class _InMemoryWordRepository implements WordRepository {
     _words[idx] = _words[idx].copyWith(
       meaning: meanings.first.baseFormatted,
       meanings: meanings,
+      ipaUs: ipaUs ?? _words[idx].ipaUs,
+      ipaUk: ipaUk ?? _words[idx].ipaUk,
+      synonyms: synonyms ?? _words[idx].synonyms,
+      antonyms: antonyms ?? _words[idx].antonyms,
     );
     return SaveWordStatus.saved;
   }

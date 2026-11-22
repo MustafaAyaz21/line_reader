@@ -5,19 +5,24 @@ import '../../core/localization/app_locale.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/platform/lookup_overlay_channel.dart';
 import '../../core/platform/process_text_channel.dart';
+import '../../core/settings/ipa_accent_controller.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_theme_controller.dart';
 import '../../core/tts/tts_service.dart';
 import '../../core/utils/word_sanitizer.dart';
 import '../articles/models/article.dart';
 import '../articles/services/article_passage_translation_service.dart';
 import '../translation/data/translation_cache_repository.dart';
+import '../translation/models/word_lexicon_info.dart';
 import '../translation/models/word_meaning.dart';
 import '../translation/services/cached_translation_service.dart';
+import '../translation/services/word_lexicon_service.dart';
 import '../translation/services/word_translation_service.dart';
 import '../words/controllers/words_controller.dart';
 import '../words/data/word_repository.dart';
 import '../words/models/saved_word.dart';
 import '../words/models/word_list.dart';
+import '../words/widgets/word_lexicon_widgets.dart';
 import '../words/widgets/word_list_editor_dialog.dart';
 
 /// Başka bir uygulamada kelime veya cümle seçilip "Line'da Bak" seçildiğinde
@@ -27,6 +32,7 @@ class QuickLookupOverlayApp extends StatefulWidget {
     super.key,
     this.initialText,
     this.translationService,
+    this.lexiconService,
     this.passageTranslator,
     this.wordsController,
     this.ttsService,
@@ -37,6 +43,7 @@ class QuickLookupOverlayApp extends StatefulWidget {
 
   final String? initialText;
   final WordTranslationService? translationService;
+  final WordLexiconService? lexiconService;
   final ArticlePassageTranslator? passageTranslator;
   final WordsController? wordsController;
   final TtsService? ttsService;
@@ -57,6 +64,8 @@ class _QuickLookupOverlayAppState extends State<QuickLookupOverlayApp> {
     super.initState();
     _ownsLocaleController = widget.localeController == null;
     _localeController = widget.localeController ?? (AppLocaleController()..load());
+    IpaAccentController.shared.load();
+    AppThemeController.shared.load();
   }
 
   @override
@@ -72,21 +81,32 @@ class _QuickLookupOverlayAppState extends State<QuickLookupOverlayApp> {
     return AppLocaleScope(
       controller: _localeController,
       child: ListenableBuilder(
-        listenable: _localeController,
+        listenable: Listenable.merge(<Listenable>[
+          _localeController,
+          AppThemeController.shared,
+        ]),
         builder: (context, _) {
+          final preset = AppThemeController.shared.preset;
           return MaterialApp(
             title: "Line'da Bak",
             debugShowCheckedModeBanner: false,
-            theme: AppTheme.light().copyWith(
+            theme: AppTheme.forPreset(
+              preset,
+              classicBrightness: Brightness.light,
+            ).copyWith(
               scaffoldBackgroundColor: Colors.transparent,
             ),
-            darkTheme: AppTheme.dark().copyWith(
+            darkTheme: AppTheme.forPreset(
+              preset,
+              classicBrightness: Brightness.dark,
+            ).copyWith(
               scaffoldBackgroundColor: Colors.transparent,
             ),
-            themeMode: ThemeMode.system,
+            themeMode: preset.themeMode,
             home: _QuickLookupOverlayScreen(
               initialText: widget.initialText,
               translationService: widget.translationService,
+              lexiconService: widget.lexiconService,
               passageTranslator: widget.passageTranslator,
               wordsController: widget.wordsController,
               ttsService: widget.ttsService,
@@ -104,6 +124,7 @@ class _QuickLookupOverlayScreen extends StatefulWidget {
   const _QuickLookupOverlayScreen({
     this.initialText,
     this.translationService,
+    this.lexiconService,
     this.passageTranslator,
     this.wordsController,
     this.ttsService,
@@ -113,6 +134,7 @@ class _QuickLookupOverlayScreen extends StatefulWidget {
 
   final String? initialText;
   final WordTranslationService? translationService;
+  final WordLexiconService? lexiconService;
   final ArticlePassageTranslator? passageTranslator;
   final WordsController? wordsController;
   final TtsService? ttsService;
@@ -147,6 +169,9 @@ class _QuickLookupOverlayScreenState extends State<_QuickLookupOverlayScreen>
   String? _statusMessage;
   String? _errorMessage;
   WordMeaning? _wordMeaning;
+  WordLexiconInfo? _lexiconInfo;
+  final Set<String> _selectedSynonyms = <String>{};
+  final Set<String> _selectedAntonyms = <String>{};
   String? _passageTranslation;
   int? _selectedListId;
   int _lookupGeneration = 0;
@@ -280,8 +305,15 @@ class _QuickLookupOverlayScreenState extends State<_QuickLookupOverlayScreen>
       _statusMessage = null;
       _errorMessage = null;
       _wordMeaning = null;
+      _lexiconInfo = null;
+      _selectedSynonyms.clear();
+      _selectedAntonyms.clear();
       _passageTranslation = null;
     });
+
+    if (!isPassage) {
+      _fetchLexiconForWord(displayText, myGen);
+    }
 
     try {
       if (isPassage) {
@@ -329,6 +361,23 @@ class _QuickLookupOverlayScreenState extends State<_QuickLookupOverlayScreen>
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _fetchLexiconForWord(String word, int generation) async {
+    try {
+      final service = widget.lexiconService ?? WordLexiconService.shared;
+      final info = await service.lookup(word);
+      if (!mounted || generation != _lookupGeneration || info == null) return;
+      setState(() {
+        _lexiconInfo = info;
+        _selectedSynonyms
+          ..clear()
+          ..addAll(info.synonyms);
+        _selectedAntonyms
+          ..clear()
+          ..addAll(info.antonyms);
+      });
+    } catch (_) {}
   }
 
   Future<void> _closeOverlay() async {
@@ -409,10 +458,26 @@ class _QuickLookupOverlayScreenState extends State<_QuickLookupOverlayScreen>
     });
 
     try {
+      final lexicon = _lexiconInfo;
+      final chosenSyn = lexicon == null
+          ? const <String>[]
+          : lexicon.synonyms
+              .where(_selectedSynonyms.contains)
+              .toList(growable: false);
+      final chosenAnt = lexicon == null
+          ? const <String>[]
+          : lexicon.antonyms
+              .where(_selectedAntonyms.contains)
+              .toList(growable: false);
+
       final status = await _wordsController.addWord(
         word: _queryText,
         meaning: meaningText,
         meanings: entries,
+        ipaUs: lexicon?.ipaUs,
+        ipaUk: lexicon?.ipaUk,
+        synonyms: chosenSyn,
+        antonyms: chosenAnt,
         listId: targetList?.id,
       );
       if (!mounted) return;
@@ -623,17 +688,28 @@ class _QuickLookupOverlayScreenState extends State<_QuickLookupOverlayScreen>
               ),
               if (_queryText.isNotEmpty) ...[
                 const SizedBox(height: 4),
-                Text(
-                  _queryText,
-                  style: (_isPassageMode
-                          ? theme.textTheme.titleSmall
-                          : theme.textTheme.titleLarge)
-                      ?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: colorScheme.onSurface,
-                  ),
-                  maxLines: _isPassageMode ? 3 : 2,
-                  overflow: TextOverflow.ellipsis,
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: <Widget>[
+                    Text(
+                      _queryText,
+                      style: (_isPassageMode
+                              ? theme.textTheme.titleSmall
+                              : theme.textTheme.titleLarge)
+                          ?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: colorScheme.onSurface,
+                      ),
+                      maxLines: _isPassageMode ? 3 : 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (!_isPassageMode &&
+                        _lexiconInfo != null &&
+                        _lexiconInfo!.hasAnyIpa)
+                      WordIpaBadge(lexiconInfo: _lexiconInfo),
+                  ],
                 ),
               ],
             ],
@@ -643,7 +719,52 @@ class _QuickLookupOverlayScreenState extends State<_QuickLookupOverlayScreen>
         Flexible(
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(18, 6, 18, 12),
-            child: _buildResultBody(theme, colorScheme),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                _buildResultBody(theme, colorScheme),
+                if (!_isPassageMode &&
+                    _lexiconInfo != null &&
+                    _lexiconInfo!.hasRelations) ...<Widget>[
+                  const SizedBox(height: 10),
+                  WordRelationsSection(
+                    synonyms: _lexiconInfo!.synonyms,
+                    antonyms: _lexiconInfo!.antonyms,
+                    selectedSynonyms: _selectedSynonyms,
+                    selectedAntonyms: _selectedAntonyms,
+                    onToggleSynonym: (term) {
+                      setState(() {
+                        if (!_selectedSynonyms.remove(term)) {
+                          _selectedSynonyms.add(term);
+                        }
+                        _savedJustNow = false;
+                      });
+                    },
+                    onToggleAntonym: (term) {
+                      setState(() {
+                        if (!_selectedAntonyms.remove(term)) {
+                          _selectedAntonyms.add(term);
+                        }
+                        _savedJustNow = false;
+                      });
+                    },
+                    onToggleAll: (selectAll) {
+                      final info = _lexiconInfo;
+                      if (info == null) return;
+                      setState(() {
+                        _selectedSynonyms.clear();
+                        _selectedAntonyms.clear();
+                        if (selectAll) {
+                          _selectedSynonyms.addAll(info.synonyms);
+                          _selectedAntonyms.addAll(info.antonyms);
+                        }
+                        _savedJustNow = false;
+                      });
+                    },
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
         if (_statusMessage != null)

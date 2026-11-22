@@ -43,7 +43,7 @@ abstract class ArticleTtsEngine {
 
   Future<void> setLanguage(String language);
   Future<void> setSpeechRate(double rate);
-  Future<void> speak(String text);
+  Future<bool> speak(String text);
   Future<void> stop();
   void dispose();
 }
@@ -62,11 +62,23 @@ class _FlutterArticleTtsEngine implements ArticleTtsEngine {
     required void Function(String message) onError,
   }) async {
     _tts.setCompletionHandler(onCompleted);
+    _tts.setCancelHandler(() {});
     _tts.setErrorHandler((dynamic msg) => onError(msg?.toString() ?? 'error'));
     if (!_configured) {
       await _tts.awaitSpeakCompletion(false);
       await _tts.setVolume(1.0);
       await _tts.setPitch(1.0);
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+        try {
+          await _tts.setIosAudioCategory(
+            IosTextToSpeechAudioCategory.playback,
+            <IosTextToSpeechAudioCategoryOptions>[
+              IosTextToSpeechAudioCategoryOptions.mixWithOthers,
+              IosTextToSpeechAudioCategoryOptions.defaultToSpeaker,
+            ],
+          );
+        } catch (_) {}
+      }
       _configured = true;
     }
     await setLanguage(language);
@@ -75,13 +87,24 @@ class _FlutterArticleTtsEngine implements ArticleTtsEngine {
 
   @override
   Future<void> setLanguage(String language) async {
-    try {
-      await _tts.setLanguage(language);
-    } catch (_) {
+    final candidates = <String>[
+      language,
+      if (language != 'en-US') 'en-US',
+      if (language != 'en-GB') 'en-GB',
+      'en',
+    ];
+    for (final lang in candidates) {
       try {
-        await _tts.setLanguage('en-US');
+        final available = await _tts.isLanguageAvailable(lang);
+        if (available == true || available == 1) {
+          await _tts.setLanguage(lang);
+          return;
+        }
       } catch (_) {}
     }
+    try {
+      await _tts.setLanguage('en-US');
+    } catch (_) {}
   }
 
   @override
@@ -92,8 +115,17 @@ class _FlutterArticleTtsEngine implements ArticleTtsEngine {
   }
 
   @override
-  Future<void> speak(String text) async {
-    await _tts.speak(text);
+  Future<bool> speak(String text) async {
+    try {
+      final dynamic res = await _tts.speak(text);
+      if (res == 1 || res == true) return true;
+      // Android TTS servisi ilk bağlanmada 0 dönebilir; kısa bekleme ile 1 kez daha dene.
+      await Future<void>.delayed(const Duration(milliseconds: 220));
+      final dynamic retryRes = await _tts.speak(text);
+      return retryRes == 1 || retryRes == true || retryRes == null;
+    } catch (_) {
+      return false;
+    }
   }
 
   @override
@@ -131,7 +163,32 @@ class _AudioPlayersPodcastPlayer implements ArticlePodcastPlayer {
   _AudioPlayersPodcastPlayer([AudioPlayer? player])
       : _player = player ?? AudioPlayer();
 
+  static final AudioContext _speechAudioContext = AudioContext(
+    android: const AudioContextAndroid(
+      isSpeakerphoneOn: false,
+      stayAwake: true,
+      contentType: AndroidContentType.speech,
+      usageType: AndroidUsageType.media,
+      audioFocus: AndroidAudioFocus.gain,
+    ),
+    iOS: AudioContextIOS(
+      category: AVAudioSessionCategory.playback,
+    ),
+  );
+
   final AudioPlayer _player;
+  bool _audioContextConfigured = false;
+
+  Future<void> _ensurePlayerConfigured() async {
+    if (_audioContextConfigured) return;
+    _audioContextConfigured = true;
+    try {
+      await _player.setPlayerMode(PlayerMode.mediaPlayer);
+    } catch (_) {}
+    try {
+      await _player.setAudioContext(_speechAudioContext);
+    } catch (_) {}
+  }
 
   @override
   Stream<Duration> get onPositionChanged => _player.onPositionChanged;
@@ -144,11 +201,13 @@ class _AudioPlayersPodcastPlayer implements ArticlePodcastPlayer {
 
   @override
   Future<void> setSourceFile(String filePath) async {
+    await _ensurePlayerConfigured();
     await _player.setSource(DeviceFileSource(filePath));
   }
 
   @override
   Future<void> setSourceUrl(String url) async {
+    await _ensurePlayerConfigured();
     await _player.setSource(UrlSource(url));
   }
 
@@ -245,6 +304,12 @@ class ArticleAudioController extends ChangeNotifier {
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
   String? _statusNotice;
+  bool _hasAppliedCustomRate = false;
+
+  /// Yüksek frekanslı (~200 ms) konum güncellemelerini tüm makale metnini
+  /// yeniden çizmeden yalnızca alt oynatıcı çubuğuna iletir.
+  final ValueNotifier<Duration> positionNotifier =
+      ValueNotifier<Duration>(Duration.zero);
 
   List<ArticleSentenceSpan> get sentences => _sentences;
   bool get hasPlayableContent => _sentences.isNotEmpty;
@@ -300,11 +365,14 @@ class ArticleAudioController extends ChangeNotifier {
     _posSub = _podcastPlayer.onPositionChanged.listen((pos) {
       if (_isDisposed || _mode != ArticleAudioMode.podcastAudio) return;
       _position = pos;
+      positionNotifier.value = pos;
       final mapped = _sentenceIndexForPosition(pos);
       if (mapped != _currentSentenceIndex) {
         _currentSentenceIndex = mapped;
+        // Yalnızca aktif cümle değiştiğinde makale metnini yeniden çiz;
+        // her 200 ms konum güncellemesinde ana UI iş parçacığını yorma.
+        _safeNotify();
       }
-      _safeNotify();
     });
 
     _durSub = _podcastPlayer.onDurationChanged.listen((dur) {
@@ -319,6 +387,7 @@ class ArticleAudioController extends ChangeNotifier {
       if (_isDisposed || _mode != ArticleAudioMode.podcastAudio) return;
       _isPlaying = false;
       _position = _duration;
+      positionNotifier.value = _duration;
       if (_sentences.isNotEmpty) {
         _currentSentenceIndex = _sentences.length - 1;
       }
@@ -326,8 +395,9 @@ class ArticleAudioController extends ChangeNotifier {
     });
   }
 
-  /// AppBar'daki kulaklık butonuna basıldığında oynatıcıyı açar (kapalıysa
-  /// açıp hemen başlatır, açıksa kapatır ve durdurur).
+  /// AppBar'daki kulaklık butonuna basıldığında oynatıcıyı açar/kapatır.
+  /// Açıldığında otomatik başlatmaz; kullanıcı alttaki Oynat (Play) tuşuna
+  /// bastığında okuma başlar.
   Future<void> togglePlayerVisibility() async {
     if (!hasPlayableContent) return;
     if (_isVisible) {
@@ -337,7 +407,6 @@ class ArticleAudioController extends ChangeNotifier {
     _isVisible = true;
     _statusNotice = null;
     _safeNotify();
-    await play();
   }
 
   Future<void> closePlayer() async {
@@ -400,7 +469,10 @@ class ArticleAudioController extends ChangeNotifier {
     try {
       await _podcastPlayer.stop();
     } catch (_) {}
+    _podcastLoaded = false;
+    _hasAppliedCustomRate = false;
     _position = Duration.zero;
+    positionNotifier.value = Duration.zero;
     _currentSentenceIndex = 0;
     _safeNotify();
   }
@@ -462,6 +534,7 @@ class ArticleAudioController extends ChangeNotifier {
       final targetMs = _startMsForSentence(clamped);
       final targetDuration = Duration(milliseconds: targetMs);
       _position = targetDuration;
+      positionNotifier.value = targetDuration;
       _safeNotify();
       if (_podcastLoaded) {
         try {
@@ -495,9 +568,13 @@ class ArticleAudioController extends ChangeNotifier {
 
     if (_mode == ArticleAudioMode.podcastAudio) {
       if (_podcastLoaded) {
-        try {
-          await _podcastPlayer.setPlaybackRate(speed);
-        } catch (_) {}
+        final shouldCallRate = speed != 1.0 || _hasAppliedCustomRate;
+        if (shouldCallRate) {
+          try {
+            await _podcastPlayer.setPlaybackRate(speed);
+            _hasAppliedCustomRate = speed != 1.0;
+          } catch (_) {}
+        }
       }
       return;
     }
@@ -526,21 +603,47 @@ class ArticleAudioController extends ChangeNotifier {
   /// Podcast ses dosyası olan makalelerde kullanıcı isterse Podcast AI ↔ Cihaz
   /// Sesi arasında geçiş yapabilir.
   Future<void> toggleEngineMode() async {
-    if (!article.hasPodcastAudio) return;
-    final wasPlaying = _isPlaying;
+    if (!article.hasPodcastAudio || _isDisposed) return;
+    final wasPlaying = _isPlaying || _isLoading;
     final savedSentence = currentSentenceIndex;
-    await pause();
+    final switchingFromPodcast = _mode == ArticleAudioMode.podcastAudio;
 
-    _mode = _mode == ArticleAudioMode.podcastAudio
+    _isPlaying = false;
+    _isLoading = false;
+    _ttsGeneration++;
+
+    if (switchingFromPodcast) {
+      // Podcast'ten Cihaz Sesi'ne geçerken sadece pause() değil stop() çağır;
+      // böylece Android MediaPlayer ses odağını (AudioFocus) tamamen bırakır
+      // ve FlutterTts sessiz kalmadan konuşabilir.
+      try {
+        await _podcastPlayer.stop();
+      } catch (_) {}
+      _podcastLoaded = false;
+      _hasAppliedCustomRate = false;
+    } else {
+      await _ttsEngine.stop();
+    }
+
+    _mode = switchingFromPodcast
         ? ArticleAudioMode.deviceTts
         : ArticleAudioMode.podcastAudio;
     _statusNotice = null;
     _currentSentenceIndex = savedSentence;
+    if (_mode == ArticleAudioMode.podcastAudio) {
+      final startMs = _startMsForSentence(savedSentence);
+      final targetPos = Duration(milliseconds: startMs);
+      _position = targetPos;
+      positionNotifier.value = targetPos;
+    }
     _safeNotify();
 
     if (wasPlaying) {
-      await jumpToSentence(savedSentence);
-      await play();
+      if (_mode == ArticleAudioMode.deviceTts) {
+        await _playDeviceTtsAt(savedSentence);
+      } else {
+        await play();
+      }
     }
   }
 
@@ -578,7 +681,15 @@ class ArticleAudioController extends ChangeNotifier {
         }
 
         _podcastLoaded = true;
-        await _podcastPlayer.setPlaybackRate(_playbackSpeed);
+        // Android MediaPlayer'da 1.0x hızında setPlaybackRate çağırmak yazılımsal
+        // Sonic DSP yeniden örneklemeyi tetikleyip cızırtı/kesinti yapabilir;
+        // yalnızca 1.0x dışı bir hız seçildiyse uygula.
+        if (_playbackSpeed != 1.0) {
+          await _podcastPlayer.setPlaybackRate(_playbackSpeed);
+          _hasAppliedCustomRate = true;
+        } else {
+          _hasAppliedCustomRate = false;
+        }
       }
 
       final startMs = _startMsForSentence(currentSentenceIndex);
@@ -680,39 +791,30 @@ class ArticleAudioController extends ChangeNotifier {
     _safeNotify();
 
     try {
-      await _ttsEngine.stop();
-      if (_isDisposed || myGen != _ttsGeneration) return;
-
-      if (!_ttsConfigured) {
-        await _ttsEngine.configure(
-          language: _accent.localeCode,
-          speechRate: _mapSpeedToFlutterTtsRate(_playbackSpeed),
-          onCompleted: () => _handleTtsSentenceCompleted(myGen),
-          onError: (msg) {
-            if (_isDisposed || myGen != _ttsGeneration) return;
-            _isPlaying = false;
-            _statusNotice = 'Sesli okuma motoru başlatılamadı.';
-            _safeNotify();
-          },
-        );
-        _ttsConfigured = true;
-      } else {
-        // Güncel generation yakalaması için handler'ı yenile.
-        await _ttsEngine.configure(
-          language: _accent.localeCode,
-          speechRate: _mapSpeedToFlutterTtsRate(_playbackSpeed),
-          onCompleted: () => _handleTtsSentenceCompleted(myGen),
-          onError: (msg) {
-            if (_isDisposed || myGen != _ttsGeneration) return;
-            _isPlaying = false;
-            _statusNotice = 'Sesli okuma motoru başlatılamadı.';
-            _safeNotify();
-          },
-        );
+      await _ttsEngine.configure(
+        language: _accent.localeCode,
+        speechRate: _mapSpeedToFlutterTtsRate(_playbackSpeed),
+        onCompleted: () => _handleTtsSentenceCompleted(myGen),
+        onError: (msg) {
+          if (_isDisposed || myGen != _ttsGeneration) return;
+          _isPlaying = false;
+          _statusNotice = 'Sesli okuma motoru başlatılamadı.';
+          _safeNotify();
+        },
+      );
+      if (_ttsConfigured) {
+        await _ttsEngine.stop();
       }
+      _ttsConfigured = true;
 
       if (_isDisposed || myGen != _ttsGeneration) return;
-      await _ttsEngine.speak(_sentences[clamped].text);
+      final spoken = await _ttsEngine.speak(_sentences[clamped].text);
+      if (!spoken && !_isDisposed && myGen == _ttsGeneration) {
+        _isPlaying = false;
+        _statusNotice =
+            'Cihaz ses motoru başlatılamadı. Tekrar Oynat tuşuna basın.';
+        _safeNotify();
+      }
     } catch (error) {
       debugPrint('[ArticleAudioController] TTS okuma hatasi: $error');
       if (_isDisposed || myGen != _ttsGeneration) return;
@@ -816,6 +918,7 @@ class ArticleAudioController extends ChangeNotifier {
     _posSub?.cancel();
     _durSub?.cancel();
     _completeSub?.cancel();
+    positionNotifier.dispose();
     _ttsEngine.dispose();
     _podcastPlayer.dispose();
     if (_ownsHttpClient) {

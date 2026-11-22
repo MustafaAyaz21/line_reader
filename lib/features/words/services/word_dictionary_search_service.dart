@@ -6,8 +6,10 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../core/config/api_config.dart';
+import '../../translation/models/word_lexicon_info.dart';
 import '../../translation/models/word_meaning.dart';
 import '../../translation/services/local_dictionary_service.dart';
+import '../../translation/services/word_lexicon_service.dart';
 import '../../translation/services/word_translation_service.dart';
 import '../../translation/utils/turkish_infinitive_normalizer.dart';
 import '../models/word_search_detail.dart';
@@ -26,11 +28,13 @@ class WordDictionarySearchService {
     bool Function()? shouldAttemptGeminiProvider,
     http.Client? httpClient,
     LocalDictionaryService? localDictionary,
+    WordLexiconService? lexiconService,
   })  : _geminiApiKeyProvider = geminiApiKeyProvider,
         _shouldAttemptGeminiProvider = shouldAttemptGeminiProvider,
         _httpClient = httpClient ?? http.Client(),
         _ownsClient = httpClient == null,
-        _localDictionary = localDictionary ?? LocalDictionaryService();
+        _localDictionary = localDictionary ?? LocalDictionaryService(),
+        _lexiconService = lexiconService ?? WordLexiconService.shared;
 
   static const int _targetMinMeanings = 10;
   static const int _targetMaxMeanings = 15;
@@ -59,6 +63,7 @@ Respond ONLY with valid JSON:
   final http.Client _httpClient;
   final bool _ownsClient;
   final LocalDictionaryService _localDictionary;
+  final WordLexiconService _lexiconService;
   String? _activeGeminiModel;
 
   /// Verilen İngilizce kelime için 10–15 farklı anlam ve 3 kısa örnek cümle getirir.
@@ -134,6 +139,9 @@ Respond ONLY with valid JSON:
     }
 
     TranslationException? onlineError;
+    final isSingleWord = !normalizedWord.contains(' ') &&
+        RegExp(r'^[a-zA-Z]+$').hasMatch(normalizedWord);
+    WordLexiconInfo? lexiconInfo;
 
     // 2) Anlam sayısı < 10 veya örnek < 3 ise ücretsiz çoklu kaynaklardan tamamla.
     if (collectedMeanings.length < _targetMinMeanings ||
@@ -142,10 +150,47 @@ Respond ONLY with valid JSON:
         final freeResults = await Future.wait<Object?>(<Future<Object?>>[
           _fetchGoogleBilingualBundle(normalizedWord),
           _fetchFreeDictionaryBundle(normalizedWord),
+          if (isSingleWord) _localDictionary.lookup(normalizedWord) else Future<Object?>.value(null),
+          if (isSingleWord) _lexiconService.hasKnownEnglishWord(normalizedWord) else Future<Object?>.value(true),
         ]);
 
         final googleBundle = freeResults[0] as _GoogleDictionaryBundle?;
         final dictBundle = freeResults[1] as _EnglishDictBundle?;
+        final earlyLocal = freeResults[2] as LocalDictionaryLookupResult?;
+        final knownInLexicon = (freeResults[3] as bool?) ?? false;
+
+        // Tek kelimede yazım hatası / geçersiz kelime kontrolü ("elone" -> "alone"):
+        // Gerçek İngilizce sözlüklerin hiçbirinde yoksa veya Google açık yazım
+        // düzeltmesi (`dt=qca`) döndüyse uydurma çeviri üretme; "Bunu mu aratmak istediniz?" dön!
+        final googleSuggestion = googleBundle?.didYouMean;
+        final hasSuggestionFromGoogle = googleSuggestion != null &&
+            googleSuggestion.isNotEmpty &&
+            googleSuggestion != normalizedWord;
+        final hasBilingualDict = googleBundle?.hasBilingualDict ?? false;
+        final isValidKnownWord = dictBundle != null ||
+            hasBilingualDict ||
+            earlyLocal != null ||
+            knownInLexicon;
+
+        if (isSingleWord &&
+            (!isValidKnownWord ||
+                (hasSuggestionFromGoogle &&
+                    dictBundle == null &&
+                    !hasBilingualDict))) {
+          final suggestions = await _collectSpellingSuggestions(
+            query: normalizedWord,
+            googleSuggestion: googleSuggestion,
+          );
+          if (suggestions.isNotEmpty || !isValidKnownWord) {
+            return WordSearchDetail(
+              word: normalizedWord,
+              meanings: const <MeaningEntry>[],
+              examples: const <WordExampleSentence>[],
+              isMisspelled: true,
+              suggestions: suggestions,
+            );
+          }
+        }
 
         if (googleBundle != null) {
           for (final m in googleBundle.meanings) {
@@ -153,11 +198,12 @@ Respond ONLY with valid JSON:
           }
         }
 
-        // Hâlâ 10'dan az anlam varsa İngilizce eşanlamlılar ve sözcük türü varyasyonlarını çevir.
+        // Hâlâ 10'dan az anlam varsa İngilizce eşanlamlılar ve sözcük türü varyasyonlarını çevir
+        // (yalnızca geçerli olduğu doğrulanan kelimelerde!).
         if (collectedMeanings.length < _targetMinMeanings) {
           final extraTerms = <String>[
             if (dictBundle != null) ...dictBundle.synonyms,
-            if (!normalizedWord.contains(' ')) ...<String>[
+            if (!normalizedWord.contains(' ') && isValidKnownWord) ...<String>[
               'to $normalizedWord',
               'a $normalizedWord',
               'very $normalizedWord',
@@ -276,6 +322,21 @@ Respond ONLY with valid JSON:
     }
 
     if (collectedMeanings.isEmpty) {
+      if (isSingleWord) {
+        final offlineSuggestions = await _collectSpellingSuggestions(
+          query: normalizedWord,
+          googleSuggestion: null,
+        );
+        if (offlineSuggestions.isNotEmpty) {
+          return WordSearchDetail(
+            word: normalizedWord,
+            meanings: const <MeaningEntry>[],
+            examples: const <WordExampleSentence>[],
+            isMisspelled: true,
+            suggestions: offlineSuggestions,
+          );
+        }
+      }
       if (onlineError != null) {
         throw onlineError;
       }
@@ -285,11 +346,75 @@ Respond ONLY with valid JSON:
       );
     }
 
+    if (isSingleWord) {
+      try {
+        lexiconInfo = await _lexiconService.lookup(normalizedWord);
+      } catch (_) {}
+    }
+
     return WordSearchDetail(
       word: normalizedWord,
       meanings: List<MeaningEntry>.unmodifiable(collectedMeanings),
       examples: List<WordExampleSentence>.unmodifiable(collectedExamples),
+      lexiconInfo: lexiconInfo,
     );
+  }
+
+  Future<List<String>> _collectSpellingSuggestions({
+    required String query,
+    required String? googleSuggestion,
+  }) async {
+    final result = <String>[];
+    final seen = <String>{query.trim().toLowerCase()};
+
+    void addCandidate(String? raw) {
+      if (raw == null) return;
+      final clean = raw.trim().toLowerCase();
+      if (clean.length < 2 || clean.length > 26) return;
+      if (!RegExp(r'^[a-z]+(?: [a-z]+)?$').hasMatch(clean)) return;
+      if (seen.add(clean)) {
+        result.add(clean);
+      }
+    }
+
+    addCandidate(googleSuggestion);
+
+    final parallel = await Future.wait<List<String>>(<Future<List<String>>>[
+      _fetchDatamuseSpellingSuggestions(query),
+      _lexiconService.findOfflineSpellingSuggestions(query, maxSuggestions: 4),
+    ]);
+
+    for (final list in parallel) {
+      for (final item in list) {
+        addCandidate(item);
+        if (result.length >= 4) break;
+      }
+      if (result.length >= 4) break;
+    }
+
+    return List<String>.unmodifiable(result.take(4));
+  }
+
+  Future<List<String>> _fetchDatamuseSpellingSuggestions(String query) async {
+    try {
+      final uri = Uri.parse(
+        'https://api.datamuse.com/sug?s=${Uri.encodeQueryComponent(query)}&max=5',
+      );
+      final response =
+          await _httpClient.get(uri).timeout(const Duration(seconds: 4));
+      if (response.statusCode != 200) return const <String>[];
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      if (decoded is! List) return const <String>[];
+      final out = <String>[];
+      for (final item in decoded) {
+        if (item is Map && item['word'] is String) {
+          out.add(item['word'] as String);
+        }
+      }
+      return out;
+    } catch (_) {
+      return const <String>[];
+    }
   }
 
   String _normalizeEnglishQuery(String raw) {
@@ -484,6 +609,7 @@ Respond ONLY with valid JSON:
         'dt=bd',
         'dt=at',
         'dt=ex',
+        'dt=qca',
         'q=${Uri.encodeQueryComponent(word)}',
       ];
       final uri = Uri.parse(
@@ -516,9 +642,11 @@ Respond ONLY with valid JSON:
       }
 
       // 2) İki dilli sözlük bölümü (root[1] -> dt=bd) — genelde 10-25+ anlam içerir!
+      var hasBilingualDict = false;
       if (decoded.length > 1 && decoded[1] is List) {
         for (final group in decoded[1] as List) {
           if (group is! List || group.isEmpty) continue;
+          hasBilingualDict = true;
           final pos = WordPartOfSpeech.tryParse(group[0] as String?);
 
           // Önce detaylı liste (group[2])
@@ -578,7 +706,35 @@ Respond ONLY with valid JSON:
         }
       }
 
-      return _GoogleDictionaryBundle(meanings: meanings, examples: examples);
+      // 5) Yazım düzeltme önerisi (root[7] -> dt=qca, örn. "elone" -> "alone")
+      String? didYouMean;
+      if (decoded.length > 7 && decoded[7] is List) {
+        final spellBlock = decoded[7] as List;
+        if (spellBlock.length > 1 && spellBlock[1] is String) {
+          final cleaned = (spellBlock[1] as String)
+              .replaceAll(RegExp(r'<[^>]*>'), '')
+              .trim()
+              .toLowerCase();
+          if (cleaned.isNotEmpty) {
+            didYouMean = cleaned;
+          }
+        } else if (spellBlock.isNotEmpty && spellBlock[0] is String) {
+          final cleaned = (spellBlock[0] as String)
+              .replaceAll(RegExp(r'<[^>]*>'), '')
+              .trim()
+              .toLowerCase();
+          if (cleaned.isNotEmpty) {
+            didYouMean = cleaned;
+          }
+        }
+      }
+
+      return _GoogleDictionaryBundle(
+        meanings: meanings,
+        examples: examples,
+        hasBilingualDict: hasBilingualDict,
+        didYouMean: didYouMean,
+      );
     } on SocketException {
       throw const TranslationException(
         type: TranslationErrorType.network,
@@ -797,10 +953,14 @@ class _GoogleDictionaryBundle {
   const _GoogleDictionaryBundle({
     required this.meanings,
     required this.examples,
+    this.hasBilingualDict = false,
+    this.didYouMean,
   });
 
   final List<MeaningEntry> meanings;
   final List<String> examples;
+  final bool hasBilingualDict;
+  final String? didYouMean;
 }
 
 class _EnglishDictBundle {

@@ -72,6 +72,7 @@ class ArticlesSyncService {
           status: ArticleSyncStatus.notModified,
           articles: existingArticles,
           metadata: refreshedMeta,
+          serverTimeUtc: payload.serverTimeUtc,
         );
       }
 
@@ -91,6 +92,7 @@ class ArticlesSyncService {
         status: ArticleSyncStatus.updated,
         articles: payload.articles,
         metadata: updatedMeta,
+        serverTimeUtc: payload.serverTimeUtc,
       );
     } on ArticlesRemoteException catch (error) {
       debugPrint('[ArticlesSyncService] Uzak makale yenileme hatasi: $error');

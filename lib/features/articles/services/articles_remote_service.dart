@@ -135,9 +135,13 @@ class ArticlesRemoteService {
     }
 
     final responseEtag = response.headers['etag']?.trim();
+    final serverTimeUtc = _parseHttpDateHeader(response.headers['date']);
 
     if (response.statusCode == 304) {
-      return ArticleFeedPayload.notModified(etag: responseEtag ?? etag);
+      return ArticleFeedPayload.notModified(
+        etag: responseEtag ?? etag,
+        serverTimeUtc: serverTimeUtc,
+      );
     }
 
     if (response.statusCode != 200) {
@@ -148,7 +152,20 @@ class ArticlesRemoteService {
     }
 
     final decoded = _decodeJsonBody(response.bodyBytes);
-    return _parsePayload(decoded, etag: responseEtag);
+    return _parsePayload(
+      decoded,
+      etag: responseEtag,
+      serverTimeUtc: serverTimeUtc,
+    );
+  }
+
+  DateTime? _parseHttpDateHeader(String? rawDate) {
+    if (rawDate == null || rawDate.trim().isEmpty) return null;
+    try {
+      return HttpDate.parse(rawDate.trim()).toUtc();
+    } catch (_) {
+      return null;
+    }
   }
 
   Object? _decodeJsonBody(List<int> bodyBytes) {
@@ -167,7 +184,11 @@ class ArticlesRemoteService {
     }
   }
 
-  ArticleFeedPayload _parsePayload(Object? decoded, {String? etag}) {
+  ArticleFeedPayload _parsePayload(
+    Object? decoded, {
+    String? etag,
+    DateTime? serverTimeUtc,
+  }) {
     List<Object?> rawItems;
     String? remoteVersion;
     DateTime? updatedAt;
@@ -223,6 +244,7 @@ class ArticlesRemoteService {
       remoteVersion: remoteVersion,
       updatedAt: updatedAt,
       etag: etag,
+      serverTimeUtc: serverTimeUtc,
     );
   }
 

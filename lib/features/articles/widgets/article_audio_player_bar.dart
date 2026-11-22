@@ -34,8 +34,9 @@ class ArticleAudioPlayerBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = context.l10n;
+    final palette = tone.resolvePalette(context);
     final isPodcast = controller.mode == ArticleAudioMode.podcastAudio;
-    final accent = tone.underlineColor;
+    final accent = palette.underlineColor;
 
     final paragraphNum = controller.currentParagraphIndex + 1;
     final totalParagraphs =
@@ -48,12 +49,12 @@ class ArticleAudioPlayerBar extends StatelessWidget {
 
     return Material(
       key: const ValueKey<String>('article_audio_player_bar'),
-      color: tone.surfaceColor,
+      color: palette.surfaceColor,
       elevation: 8,
       child: Container(
         decoration: BoxDecoration(
           border: Border(
-            top: BorderSide(color: tone.dividerColor, width: 1),
+            top: BorderSide(color: palette.dividerColor, width: 1),
           ),
         ),
         child: SafeArea(
@@ -61,11 +62,18 @@ class ArticleAudioPlayerBar extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              LinearProgressIndicator(
-                value: controller.isLoading ? null : controller.progressFraction,
-                minHeight: 2.5,
-                color: accent,
-                backgroundColor: tone.dividerColor.withAlpha(110),
+              ValueListenableBuilder<Duration>(
+                valueListenable: controller.positionNotifier,
+                builder: (context, _, __) {
+                  return LinearProgressIndicator(
+                    value: controller.isLoading
+                        ? null
+                        : controller.progressFraction,
+                    minHeight: 2.5,
+                    color: accent,
+                    backgroundColor: palette.dividerColor.withAlpha(110),
+                  );
+                },
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
@@ -91,7 +99,7 @@ class ArticleAudioPlayerBar extends StatelessWidget {
                             decoration: BoxDecoration(
                               color: isPodcast
                                   ? accent.withAlpha(34)
-                                  : tone.dividerColor.withAlpha(120),
+                                  : palette.dividerColor.withAlpha(120),
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: Row(
@@ -104,7 +112,7 @@ class ArticleAudioPlayerBar extends StatelessWidget {
                                   size: 14,
                                   color: isPodcast
                                       ? accent
-                                      : tone.secondaryTextColor,
+                                      : palette.secondaryTextColor,
                                 ),
                                 const SizedBox(width: 5),
                                 Text(
@@ -116,7 +124,7 @@ class ArticleAudioPlayerBar extends StatelessWidget {
                                     fontWeight: FontWeight.w700,
                                     color: isPodcast
                                         ? accent
-                                        : tone.textColor,
+                                        : palette.textColor,
                                   ),
                                 ),
                               ],
@@ -125,22 +133,27 @@ class ArticleAudioPlayerBar extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Text(
-                            showTime
-                                ? '${_formatDuration(controller.position)} / ${_formatDuration(controller.duration)} • C$sentenceNum/$totalSentences'
-                                : s.audioPositionLabel(
-                                    paragraphNum,
-                                    totalParagraphs,
-                                    sentenceNum,
-                                    totalSentences,
-                                  ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w600,
-                              color: tone.secondaryTextColor,
-                            ),
+                          child: ValueListenableBuilder<Duration>(
+                            valueListenable: controller.positionNotifier,
+                            builder: (context, pos, _) {
+                              return Text(
+                                showTime
+                                    ? '${_formatDuration(pos)} / ${_formatDuration(controller.duration)} • C$sentenceNum/$totalSentences'
+                                    : s.audioPositionLabel(
+                                        paragraphNum,
+                                        totalParagraphs,
+                                        sentenceNum,
+                                        totalSentences,
+                                      ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: palette.secondaryTextColor,
+                                ),
+                              );
+                            },
                           ),
                         ),
                         IconButton(
@@ -149,7 +162,7 @@ class ArticleAudioPlayerBar extends StatelessWidget {
                           icon: Icon(
                             Icons.close_rounded,
                             size: 19,
-                            color: tone.secondaryTextColor,
+                            color: palette.secondaryTextColor,
                           ),
                           tooltip: s.close,
                           visualDensity: VisualDensity.compact,
@@ -172,7 +185,7 @@ class ArticleAudioPlayerBar extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 11,
-                            color: tone.secondaryTextColor,
+                            color: palette.secondaryTextColor,
                           ),
                         ),
                       ),
@@ -196,14 +209,14 @@ class ArticleAudioPlayerBar extends StatelessWidget {
                             ),
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: tone.dividerColor),
+                              border: Border.all(color: palette.dividerColor),
                             ),
                             child: Text(
                               _formatSpeed(controller.playbackSpeed),
                               style: TextStyle(
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.w800,
-                                color: tone.textColor,
+                                color: palette.textColor,
                               ),
                             ),
                           ),
@@ -219,7 +232,7 @@ class ArticleAudioPlayerBar extends StatelessWidget {
                           icon: Icon(
                             Icons.fast_rewind_rounded,
                             size: 22,
-                            color: tone.textColor,
+                            color: palette.textColor,
                           ),
                           visualDensity: VisualDensity.compact,
                         ),
@@ -237,8 +250,8 @@ class ArticleAudioPlayerBar extends StatelessWidget {
                             Icons.skip_previous_rounded,
                             size: 26,
                             color: controller.canGoPreviousSentence
-                                ? tone.textColor
-                                : tone.secondaryTextColor.withAlpha(110),
+                                ? palette.textColor
+                                : palette.secondaryTextColor.withAlpha(110),
                           ),
                           visualDensity: VisualDensity.compact,
                         ),
@@ -258,15 +271,21 @@ class ArticleAudioPlayerBar extends StatelessWidget {
                               padding: EdgeInsets.zero,
                               shape: const CircleBorder(),
                               backgroundColor: accent,
-                              foregroundColor: Colors.white,
+                              foregroundColor:
+                                  palette.brightness == Brightness.dark
+                                      ? const Color(0xFF0A1428)
+                                      : Colors.white,
                             ),
                             child: controller.isLoading
-                                ? const SizedBox(
+                                ? SizedBox(
                                     width: 20,
                                     height: 20,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2.2,
-                                      color: Colors.white,
+                                      color:
+                                          palette.brightness == Brightness.dark
+                                              ? const Color(0xFF0A1428)
+                                              : Colors.white,
                                     ),
                                   )
                                 : Icon(
@@ -291,8 +310,8 @@ class ArticleAudioPlayerBar extends StatelessWidget {
                             Icons.skip_next_rounded,
                             size: 26,
                             color: controller.canGoNextSentence
-                                ? tone.textColor
-                                : tone.secondaryTextColor.withAlpha(110),
+                                ? palette.textColor
+                                : palette.secondaryTextColor.withAlpha(110),
                           ),
                           visualDensity: VisualDensity.compact,
                         ),
@@ -310,8 +329,8 @@ class ArticleAudioPlayerBar extends StatelessWidget {
                             Icons.fast_forward_rounded,
                             size: 22,
                             color: controller.canGoNextParagraph
-                                ? tone.textColor
-                                : tone.secondaryTextColor.withAlpha(110),
+                                ? palette.textColor
+                                : palette.secondaryTextColor.withAlpha(110),
                           ),
                           visualDensity: VisualDensity.compact,
                         ),
@@ -329,7 +348,7 @@ class ArticleAudioPlayerBar extends StatelessWidget {
                               ),
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: tone.dividerColor),
+                                border: Border.all(color: palette.dividerColor),
                               ),
                               child: Text(
                                 controller.accent.shortLabel,
@@ -349,7 +368,7 @@ class ArticleAudioPlayerBar extends StatelessWidget {
                             icon: Icon(
                               Icons.replay_rounded,
                               size: 20,
-                              color: tone.secondaryTextColor,
+                              color: palette.secondaryTextColor,
                             ),
                             visualDensity: VisualDensity.compact,
                           ),

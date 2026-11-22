@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/localization/app_locale.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/settings/api_key_controller.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/tts/tts_service.dart';
 import '../auth/controllers/auth_controller.dart';
 import '../settings/widgets/api_key_dialog.dart';
@@ -19,6 +20,7 @@ import 'models/saved_word.dart';
 import 'models/word_list.dart';
 import 'models/word_search_detail.dart';
 import 'services/word_dictionary_search_service.dart';
+import 'widgets/word_lexicon_widgets.dart';
 import 'widgets/word_list_card.dart';
 import 'widgets/word_list_editor_dialog.dart';
 
@@ -95,6 +97,8 @@ class _WordsScreenState extends State<WordsScreen> {
   SavedWord? _matchedExistingWord;
   int? _selectedTargetListId;
   final Set<int> _selectedMeaningIndices = <int>{};
+  final Set<String> _selectedSynonyms = <String>{};
+  final Set<String> _selectedAntonyms = <String>{};
 
   bool get _isSearchPanelOpen =>
       _isSearchingWord || _searchDetail != null || _searchError != null;
@@ -185,6 +189,8 @@ class _WordsScreenState extends State<WordsScreen> {
       _searchDetail = null;
       _matchedExistingWord = null;
       _selectedMeaningIndices.clear();
+      _selectedSynonyms.clear();
+      _selectedAntonyms.clear();
     });
   }
 
@@ -223,6 +229,8 @@ class _WordsScreenState extends State<WordsScreen> {
       _searchDetail = null;
       _matchedExistingWord = null;
       _selectedMeaningIndices.clear();
+      _selectedSynonyms.clear();
+      _selectedAntonyms.clear();
     });
 
     try {
@@ -264,6 +272,18 @@ class _WordsScreenState extends State<WordsScreen> {
     WordSearchDetail detail,
     List<SavedWord> existingList,
   ) {
+    if (detail.isMisspelled) {
+      setState(() {
+        _searchDetail = detail;
+        _matchedExistingWord = null;
+        _selectedMeaningIndices.clear();
+        _selectedSynonyms.clear();
+        _selectedAntonyms.clear();
+        _isSearchingWord = false;
+      });
+      return;
+    }
+
     final matched = existingList.isNotEmpty ? existingList.first : null;
     final mergedMeanings = List<MeaningEntry>.from(detail.meanings);
     final preselected = <int>{};
@@ -308,16 +328,24 @@ class _WordsScreenState extends State<WordsScreen> {
       preselected.add(0);
     }
 
+    final lexicon = detail.lexiconInfo;
     setState(() {
       _searchDetail = WordSearchDetail(
         word: detail.word,
         meanings: List<MeaningEntry>.unmodifiable(mergedMeanings),
         examples: detail.examples,
+        lexiconInfo: lexicon,
       );
       _matchedExistingWord = matched;
       _selectedMeaningIndices
         ..clear()
         ..addAll(preselected);
+      _selectedSynonyms
+        ..clear()
+        ..addAll(lexicon?.synonyms ?? const <String>[]);
+      _selectedAntonyms
+        ..clear()
+        ..addAll(lexicon?.antonyms ?? const <String>[]);
       _isSearchingWord = false;
     });
   }
@@ -450,6 +478,18 @@ class _WordsScreenState extends State<WordsScreen> {
         detail.meanings[idx].copyWith(isContextual: false),
     ];
 
+    final lexicon = detail.lexiconInfo;
+    final chosenSynonyms = lexicon == null
+        ? const <String>[]
+        : lexicon.synonyms
+            .where(_selectedSynonyms.contains)
+            .toList(growable: false);
+    final chosenAntonyms = lexicon == null
+        ? const <String>[]
+        : lexicon.antonyms
+            .where(_selectedAntonyms.contains)
+            .toList(growable: false);
+
     final existing = _matchedExistingWord;
 
     if (existing == null) {
@@ -464,6 +504,10 @@ class _WordsScreenState extends State<WordsScreen> {
           word: detail.word,
           meaning: selectedMeanings.first.baseFormatted,
           meanings: selectedMeanings,
+          ipaUs: lexicon?.ipaUs,
+          ipaUk: lexicon?.ipaUk,
+          synonyms: chosenSynonyms,
+          antonyms: chosenAntonyms,
           listId: targetList?.id,
           allowDuplicate: true,
         );
@@ -501,6 +545,10 @@ class _WordsScreenState extends State<WordsScreen> {
           word: detail.word,
           meaning: selectedMeanings.first.baseFormatted,
           meanings: selectedMeanings,
+          ipaUs: lexicon?.ipaUs,
+          ipaUk: lexicon?.ipaUk,
+          synonyms: chosenSynonyms,
+          antonyms: chosenAntonyms,
           listId: targetList?.id,
           allowDuplicate: true,
         );
@@ -527,6 +575,10 @@ class _WordsScreenState extends State<WordsScreen> {
       final status = await widget.controller.updateWordMeanings(
         existingWord: existing,
         meanings: selectedMeanings,
+        ipaUs: lexicon?.ipaUs,
+        ipaUk: lexicon?.ipaUk,
+        synonyms: chosenSynonyms,
+        antonyms: chosenAntonyms,
       );
       if (!mounted) return;
       if (status == SaveWordStatus.saved) {
@@ -784,6 +836,20 @@ class _WordsScreenState extends State<WordsScreen> {
       return const SizedBox.shrink();
     }
 
+    if (detail.isMisspelled) {
+      return DidYouMeanCard(
+        misspelledWord: detail.word,
+        suggestions: detail.suggestions,
+        onSelectSuggestion: (suggestion) {
+          _searchController.text = suggestion;
+          _searchController.selection = TextSelection.collapsed(
+            offset: suggestion.length,
+          );
+          _performTopSearch(suggestion, dismissKeyboard: true);
+        },
+      );
+    }
+
     final resolvedTargetId = _resolveTargetListId(lists);
     final targetList = resolvedTargetId != null
         ? widget.controller.findListById(resolvedTargetId)
@@ -941,6 +1007,14 @@ class _WordsScreenState extends State<WordsScreen> {
                   ),
                 ],
               ),
+              if (detail.lexiconInfo != null &&
+                  detail.lexiconInfo!.hasAnyIpa) ...[
+                const SizedBox(height: 6),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: WordIpaBadge(lexiconInfo: detail.lexiconInfo),
+                ),
+              ],
               if (_matchedExistingWord != null) ...[
                 const SizedBox(height: 6),
                 Container(
@@ -1031,6 +1105,42 @@ class _WordsScreenState extends State<WordsScreen> {
                   ),
                 );
               }),
+              if (detail.lexiconInfo != null &&
+                  detail.lexiconInfo!.hasRelations) ...[
+                const SizedBox(height: 6),
+                WordRelationsSection(
+                  synonyms: detail.lexiconInfo!.synonyms,
+                  antonyms: detail.lexiconInfo!.antonyms,
+                  selectedSynonyms: _selectedSynonyms,
+                  selectedAntonyms: _selectedAntonyms,
+                  onToggleSynonym: (term) {
+                    setState(() {
+                      if (!_selectedSynonyms.remove(term)) {
+                        _selectedSynonyms.add(term);
+                      }
+                    });
+                  },
+                  onToggleAntonym: (term) {
+                    setState(() {
+                      if (!_selectedAntonyms.remove(term)) {
+                        _selectedAntonyms.add(term);
+                      }
+                    });
+                  },
+                  onToggleAll: (selectAll) {
+                    final info = detail.lexiconInfo;
+                    if (info == null) return;
+                    setState(() {
+                      _selectedSynonyms.clear();
+                      _selectedAntonyms.clear();
+                      if (selectAll) {
+                        _selectedSynonyms.addAll(info.synonyms);
+                        _selectedAntonyms.addAll(info.antonyms);
+                      }
+                    });
+                  },
+                ),
+              ],
               if (detail.examples.isNotEmpty) ...[
                 const SizedBox(height: 10),
                 Text(
@@ -1124,8 +1234,10 @@ class _WordsScreenState extends State<WordsScreen> {
     final s = context.l10n;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final visuals = AppThemeVisuals.of(context);
 
     return Scaffold(
+      backgroundColor: visuals.hasBackdrop ? Colors.transparent : null,
       appBar: AppBar(
         title: Text(s.myWordsTitle),
         actions: [

@@ -6,8 +6,12 @@ import '../../core/localization/app_locale.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/platform/process_text_channel.dart';
 import '../../core/settings/api_key_controller.dart';
+import '../../core/settings/ipa_accent_controller.dart';
 import '../../core/settings/settings_repository.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_theme_backdrop.dart';
 import '../../core/tts/tts_service.dart';
+import '../articles/controllers/article_reading_progress_controller.dart';
 import '../articles/controllers/articles_controller.dart';
 import '../articles/data/articles_cache_repository.dart';
 import '../articles/services/articles_sync_service.dart';
@@ -15,6 +19,7 @@ import '../auth/controllers/auth_controller.dart';
 import '../auth/screens/auth_screen.dart';
 import '../browser/browser_screen.dart';
 import '../translation/data/translation_cache_repository.dart';
+import '../translation/models/word_lexicon_info.dart';
 import '../translation/models/word_meaning.dart';
 import '../translation/services/browser_ai_translation_service.dart';
 import '../translation/services/cached_translation_service.dart';
@@ -66,6 +71,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _ensureInitialized();
+    IpaAccentController.shared.load();
+    ArticleReadingProgressController.shared.load();
     ProcessTextChannel.ensureInitialized();
     ProcessTextChannel.pendingTextNotifier
         .addListener(_handleExternalProcessTextReady);
@@ -249,11 +256,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     List<MeaningEntry> meanings,
     int? listId,
   ) {
+    return _handleAddWordWithLexicon(word, meaning, meanings, listId, null);
+  }
+
+  Future<SaveWordStatus> _handleAddWordWithLexicon(
+    String word,
+    String meaning,
+    List<MeaningEntry> meanings,
+    int? listId,
+    WordLexiconInfo? lexicon,
+  ) {
     _ensureInitialized();
     return _wordsController!.addWord(
       word: word,
       meaning: meaning,
       meanings: meanings,
+      ipaUs: lexicon?.ipaUs,
+      ipaUk: lexicon?.ipaUk,
+      synonyms: lexicon?.synonyms ?? const <String>[],
+      antonyms: lexicon?.antonyms ?? const <String>[],
       listId: listId,
     );
   }
@@ -374,6 +395,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         }
 
         final s = context.l10n;
+        final visuals = AppThemeVisuals.of(context);
         final canPopNormally =
             !(_selectedIndex == _mainMenuTabIndex && _isBrowserOpen);
 
@@ -386,8 +408,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               _handleBrowserSystemBack();
             }
           },
-          child: Scaffold(
-            body: IndexedStack(
+          child: AppThemeBackdrop(
+            child: Scaffold(
+              backgroundColor: visuals.hasBackdrop ? Colors.transparent : null,
+              body: IndexedStack(
               index: _activeStackIndex,
               children: <Widget>[
                 MainMenuScreen(
@@ -401,6 +425,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   translationService: _articleTranslationService!,
                   ttsService: _ttsService,
                   onAddWord: _handleAddWord,
+                  onAddWordWithLexicon: _handleAddWordWithLexicon,
                   loadWordLists: _handleLoadWordLists,
                   onCreateWordList: _handleCreateWordList,
                   onClearCache: _handleClearTranslationCache,
@@ -409,6 +434,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   BrowserScreen(
                     key: const ValueKey<String>('browser_screen'),
                     onAddWord: _handleAddWord,
+                    onAddWordWithLexicon: _handleAddWordWithLexicon,
                     loadWordLists: _handleLoadWordLists,
                     onCreateWordList: _handleCreateWordList,
                     translationService: _browserTranslationService!,
@@ -447,6 +473,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   label: s.myWordsTitle,
                 ),
               ],
+            ),
             ),
           ),
         );

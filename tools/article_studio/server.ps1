@@ -646,7 +646,7 @@ function Convert-WavBytesToM4aBytes([byte[]]$WavBytes) {
         $netSrc.Flush()
         $src.Seek(0)
 
-        $profile = [Windows.Media.MediaProperties.MediaEncodingProfile]::CreateM4a([Windows.Media.MediaProperties.AudioEncodingQuality]::Low)
+        $profile = [Windows.Media.MediaProperties.MediaEncodingProfile]::CreateM4a([Windows.Media.MediaProperties.AudioEncodingQuality]::Medium)
         $transcoder = New-Object Windows.Media.Transcoding.MediaTranscoder
         $prepTask = $asTaskGeneric.MakeGenericMethod([Windows.Media.Transcoding.PrepareTranscodeResult]).Invoke($null, @($transcoder.PrepareStreamTranscodeAsync($src, $dst, $profile)))
         $prepTask.Wait() | Out-Null

@@ -452,9 +452,11 @@ void main() {
         expect(find.text('Misafir Modu'), findsOneWidget);
         expect(find.textContaining('40 / 40'), findsOneWidget);
         expect(
-          find.byKey(const ValueKey<String>('settings_auto_translation_tile')),
+          find.byKey(const ValueKey<String>('settings_ipa_accent_selector')),
           findsOneWidget,
         );
+        expect(find.text('Çeviri ve Önbellek'), findsNothing);
+        expect(find.text('Çeviri Önbelleğini Temizle'), findsNothing);
         expect(find.text('Gemini API Anahtarı'), findsNothing);
 
         await tester.tap(find.text('English'));
@@ -518,7 +520,9 @@ void main() {
           find.byKey(const ValueKey<String>('settings_unlimited_badge')),
           findsOneWidget,
         );
-        expect(find.text('Sınırsız Hesap (Yetkili)'), findsOneWidget);
+        expect(find.text('Premium Üye'), findsOneWidget);
+        expect(find.text('Yetkiyi Yenile'), findsNothing);
+        expect(find.text('Çıkış Yap'), findsOneWidget);
         expect(find.textContaining('READER2026'), findsOneWidget);
 
         apiKeyController.dispose();

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -5,6 +7,8 @@ import 'package:flutter/services.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/localization/app_strings.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_theme_backdrop.dart';
 import '../../../core/tts/tts_service.dart';
 import '../../../core/utils/word_sanitizer.dart';
 import '../../ads/widgets/promo_interstitial_dialog.dart';
@@ -12,6 +16,7 @@ import '../../auth/controllers/auth_controller.dart';
 import '../../browser/browser_screen.dart';
 import '../../browser/widgets/word_preview_sheet.dart';
 import '../../translation/data/translation_cache_repository.dart';
+import '../../translation/models/word_lexicon_info.dart';
 import '../../translation/models/word_meaning.dart';
 import '../../translation/services/cached_translation_service.dart';
 import '../../translation/services/word_translation_service.dart';
@@ -19,6 +24,7 @@ import '../../words/data/word_repository.dart';
 import '../../words/models/saved_word.dart';
 import '../../words/models/word_list.dart';
 import '../controllers/article_audio_controller.dart';
+import '../controllers/article_reading_progress_controller.dart';
 import '../data/article_reader_repository.dart';
 import '../models/article.dart';
 import '../models/article_level.dart';
@@ -49,8 +55,10 @@ class ArticleReaderScreen extends StatefulWidget {
     this.passageTranslator,
     this.ttsService,
     this.audioController,
+    this.readingProgressController,
     this.authController,
     this.onAddWord,
+    this.onAddWordWithLexicon,
     this.loadWordLists,
     this.onCreateWordList,
   });
@@ -61,8 +69,10 @@ class ArticleReaderScreen extends StatefulWidget {
   final ArticlePassageTranslator? passageTranslator;
   final TtsService? ttsService;
   final ArticleAudioController? audioController;
+  final ArticleReadingProgressController? readingProgressController;
   final AuthController? authController;
   final AddWordCallback? onAddWord;
+  final AddWordWithLexiconCallback? onAddWordWithLexicon;
   final Future<List<WordList>> Function()? loadWordLists;
   final CreateWordListCallback? onCreateWordList;
 
@@ -81,6 +91,13 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
   late final List<GlobalKey> _paragraphKeys;
   late final ArticleAudioController _audioController;
   late final bool _ownsAudioController;
+  late final ArticleReadingProgressController _readingProgressController;
+  final ScrollController _scrollController = ScrollController();
+
+  Timer? _progressSaveTimer;
+  double _latestScrollProgress = 0.0;
+  double _latestScrollOffset = 0.0;
+  bool _hasRestoredScrollPosition = false;
 
   int? _lastAutoScrolledParagraph;
   ArticleReaderPreferences _preferences = ArticleReaderPreferences.defaults;
@@ -148,8 +165,82 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
           paragraphs: _paragraphs,
         );
     _audioController.addListener(_handleAudioStateChanged);
+    _readingProgressController =
+        widget.readingProgressController ??
+        ArticleReadingProgressController.shared;
+    _scrollController.addListener(_handleScrollChanged);
 
     _loadInitialReaderData();
+  }
+
+  void _handleScrollChanged() {
+    if (!_hasRestoredScrollPosition || !_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    final maxExtent = position.maxScrollExtent;
+    final clampedOffset =
+        maxExtent > 0 ? position.pixels.clamp(0.0, maxExtent).toDouble() : 0.0;
+    final progress = maxExtent <= 0
+        ? 1.0
+        : (clampedOffset / maxExtent).clamp(0.0, 1.0).toDouble();
+
+    _latestScrollProgress = progress;
+    _latestScrollOffset = clampedOffset;
+
+    _readingProgressController.recordProgress(
+      article: widget.article,
+      progress: progress,
+      scrollOffset: clampedOffset,
+      persist: false,
+    );
+
+    _progressSaveTimer?.cancel();
+    _progressSaveTimer = Timer(const Duration(milliseconds: 350), () {
+      _readingProgressController.recordProgress(
+        article: widget.article,
+        progress: _latestScrollProgress,
+        scrollOffset: _latestScrollOffset,
+        persist: true,
+      );
+    });
+  }
+
+  void _restoreSavedScrollPosition() {
+    if (!mounted || _hasRestoredScrollPosition) return;
+    _hasRestoredScrollPosition = true;
+
+    final saved = _readingProgressController.progressForArticle(
+      widget.article.id,
+    );
+
+    if (_scrollController.hasClients) {
+      final maxExtent = _scrollController.position.maxScrollExtent;
+      if (saved != null && saved.clampedProgress > 0) {
+        if (maxExtent > 0) {
+          final target = (saved.clampedProgress * maxExtent)
+              .clamp(0.0, maxExtent)
+              .toDouble();
+          _scrollController.jumpTo(target);
+          _latestScrollProgress = saved.clampedProgress;
+          _latestScrollOffset = target;
+        } else {
+          _latestScrollProgress = 1.0;
+          _latestScrollOffset = 0.0;
+        }
+      } else {
+        _latestScrollProgress = maxExtent <= 0 ? 1.0 : 0.0;
+        _latestScrollOffset = 0.0;
+      }
+    } else if (saved != null) {
+      _latestScrollProgress = saved.clampedProgress;
+      _latestScrollOffset = saved.scrollOffset;
+    }
+
+    _readingProgressController.recordProgress(
+      article: widget.article,
+      progress: _latestScrollProgress,
+      scrollOffset: _latestScrollOffset,
+      persist: true,
+    );
   }
 
   void _handleAudioStateChanged() {
@@ -177,6 +268,18 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
 
   @override
   void dispose() {
+    _progressSaveTimer?.cancel();
+    _progressSaveTimer = null;
+    _scrollController.removeListener(_handleScrollChanged);
+    if (_hasRestoredScrollPosition) {
+      _readingProgressController.recordProgress(
+        article: widget.article,
+        progress: _latestScrollProgress,
+        scrollOffset: _latestScrollOffset,
+        persist: true,
+      );
+    }
+    _scrollController.dispose();
     _audioController.removeListener(_handleAudioStateChanged);
     if (_ownsAudioController) {
       _audioController.dispose();
@@ -192,6 +295,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
 
   Future<void> _loadInitialReaderData() async {
     try {
+      await _readingProgressController.load();
       final results = await Future.wait<Object>(<Future<Object>>[
         _readerStore.loadPreferences(),
         _readerStore.getUnderlinesForArticle(widget.article.id),
@@ -205,6 +309,10 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
     } catch (error) {
       debugPrint('[ArticleReaderScreen] Okuma verileri yuklenemedi: $error');
     }
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _restoreSavedScrollPosition();
+    });
   }
 
   Future<void> _updatePreferences(ArticleReaderPreferences next) async {
@@ -591,6 +699,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
         loadWordLists: widget.loadWordLists,
         onCreateWordList: widget.onCreateWordList,
         onAddWord: _handleAddWord,
+        onAddWordWithLexicon: _handleAddWordWithLexicon,
       );
     } finally {
       _isWordSheetOpen = false;
@@ -603,10 +712,29 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
     List<MeaningEntry> meanings,
     int? listId,
     String? listName,
+  ) {
+    return _handleAddWordWithLexicon(word, meaning, meanings, listId, listName, null);
+  }
+
+  Future<void> _handleAddWordWithLexicon(
+    String word,
+    String meaning,
+    List<MeaningEntry> meanings,
+    int? listId,
+    String? listName,
+    WordLexiconInfo? selectedLexicon,
   ) async {
     SaveWordStatus status;
     try {
-      if (widget.onAddWord != null) {
+      if (widget.onAddWordWithLexicon != null) {
+        status = await widget.onAddWordWithLexicon!(
+          word,
+          meaning,
+          meanings,
+          listId,
+          selectedLexicon,
+        );
+      } else if (widget.onAddWord != null) {
         status = await widget.onAddWord!(word, meaning, meanings, listId);
       } else {
         final repo = WordRepository(AppDatabase.instance);
@@ -617,6 +745,10 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
           word: word,
           meaning: meaning,
           meanings: meanings,
+          ipaUs: selectedLexicon?.ipaUs,
+          ipaUk: selectedLexicon?.ipaUk,
+          synonyms: selectedLexicon?.synonyms ?? const <String>[],
+          antonyms: selectedLexicon?.antonyms ?? const <String>[],
         );
       }
     } catch (error) {
@@ -692,7 +824,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                       return Expanded(
                         child: Padding(
                           padding: EdgeInsets.only(
-                            right: tone == ArticleReaderTone.values.last ? 0 : 10,
+                            right: tone == ArticleReaderTone.values.last ? 0 : 8,
                           ),
                           child: _ToneOptionChip(
                             tone: tone,
@@ -945,8 +1077,13 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
   @override
   Widget build(BuildContext context) {
     final tone = _preferences.tone;
+    final palette = tone.resolvePalette(context);
+    final effectiveMarkAccent =
+        _preferences.markColor.accentForBrightness(palette.brightness);
+    final effectiveHighlightFill =
+        _preferences.markColor.highlightFillForBrightness(palette.brightness);
     final parsedLevel = widget.article.parsedLevel;
-    final overlayStyle = tone.brightness == Brightness.dark
+    final overlayStyle = palette.brightness == Brightness.dark
         ? SystemUiOverlayStyle.light
         : SystemUiOverlayStyle.dark;
 
@@ -961,11 +1098,81 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
           final isAudioVisible = _audioController.isVisible;
           final activeSentence = _audioController.activeSentence;
 
-          return Scaffold(
-            backgroundColor: tone.backgroundColor,
+          final readerColumn = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              _buildDocumentHeader(palette, parsedLevel),
+              const SizedBox(height: 24),
+              if (_paragraphs.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 32),
+                  child: Text(
+                    'Bu makalenin içeriği henüz eklenmedi.',
+                    style: TextStyle(
+                      fontSize: _preferences.fontSize,
+                      height: 1.75,
+                      color: palette.secondaryTextColor,
+                    ),
+                  ),
+                )
+              else
+                for (var i = 0; i < _paragraphs.length; i++) ...<Widget>[
+                  KeyedSubtree(
+                    key: _paragraphKeys[i],
+                    child: _ReaderParagraphView(
+                      key: ValueKey<String>('paragraph_$i'),
+                      paragraphIndex: i,
+                      paragraphText: _paragraphs[i],
+                      underlines: _underlinesForParagraph(i),
+                      highlightStartOffset: activeSentence != null &&
+                              activeSentence.paragraphIndex == i
+                          ? activeSentence.startOffset
+                          : null,
+                      highlightEndOffset: activeSentence != null &&
+                              activeSentence.paragraphIndex == i
+                          ? activeSentence.endOffset
+                          : null,
+                      selectedStartOffset: _selectedParagraphIndex == i
+                          ? _selectedStartOffset
+                          : null,
+                      selectedEndOffset: _selectedParagraphIndex == i
+                          ? _selectedEndOffset
+                          : null,
+                      tone: tone,
+                      fontSize: _preferences.fontSize,
+                      markStyle: _preferences.markStyle,
+                      markAccentColor: effectiveMarkAccent,
+                      markHighlightFillColor: effectiveHighlightFill,
+                      isUnderlineMode: _isUnderlineMode,
+                      onSegmentTap: (segment) => _handleSegmentTap(
+                        paragraphIndex: i,
+                        segment: segment,
+                      ),
+                      onDragMarkCommitted: (start, end) =>
+                          _handleDragMarkCommitted(
+                        paragraphIndex: i,
+                        startOffset: start,
+                        endOffset: end,
+                      ),
+                      onNormalSelectionCommitted: (start, end) =>
+                          _handleNormalSelectionCommitted(
+                        paragraphIndex: i,
+                        startOffset: start,
+                        endOffset: end,
+                      ),
+                    ),
+                  ),
+                  if (i < _paragraphs.length - 1)
+                    SizedBox(height: _preferences.fontSize * 0.95),
+                ],
+            ],
+          );
+
+          final scaffold = Scaffold(
+            backgroundColor: palette.backgroundColor,
             appBar: AppBar(
-              backgroundColor: tone.backgroundColor,
-              foregroundColor: tone.textColor,
+              backgroundColor: palette.appBarColor,
+              foregroundColor: palette.textColor,
               surfaceTintColor: Colors.transparent,
               elevation: 0,
               scrolledUnderElevation: 0.5,
@@ -1000,7 +1207,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
-                        color: tone.secondaryTextColor,
+                        color: palette.secondaryTextColor,
                       ),
                     ),
                   ),
@@ -1019,8 +1226,8 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                           : Icons.headphones_rounded,
                       size: 22,
                       color: isAudioVisible
-                          ? tone.underlineColor
-                          : tone.textColor,
+                          ? palette.underlineColor
+                          : palette.textColor,
                     ),
                   ),
                 // Altını çizme kalemi aç/kapa butonu
@@ -1032,7 +1239,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                     : context.l10n.underlinePenTooltip,
                 child: Material(
                   color: _isUnderlineMode
-                      ? _preferences.effectiveMarkAccent.withAlpha(38)
+                      ? effectiveMarkAccent.withAlpha(38)
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                   child: InkWell(
@@ -1048,8 +1255,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                         borderRadius: BorderRadius.circular(12),
                         border: _isUnderlineMode
                             ? Border.all(
-                                color: _preferences.effectiveMarkAccent
-                                    .withAlpha(170),
+                                color: effectiveMarkAccent.withAlpha(170),
                                 width: 1.2,
                               )
                             : null,
@@ -1068,8 +1274,8 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                             },
                             size: 20,
                             color: _isUnderlineMode
-                                ? _preferences.effectiveMarkAccent
-                                : tone.textColor,
+                                ? effectiveMarkAccent
+                                : palette.textColor,
                           ),
                           if (_isUnderlineMode) ...<Widget>[
                             const SizedBox(width: 5),
@@ -1078,7 +1284,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
-                                color: _preferences.effectiveMarkAccent,
+                                color: effectiveMarkAccent,
                               ),
                             ),
                           ],
@@ -1100,7 +1306,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
-                  color: tone.textColor,
+                  color: palette.textColor,
                 ),
               ),
             ),
@@ -1111,11 +1317,11 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                Divider(height: 1, thickness: 1, color: tone.dividerColor),
+                Divider(height: 1, thickness: 1, color: palette.dividerColor),
                 if (_isUnderlineMode)
                   Container(
                     width: double.infinity,
-                    color: tone.surfaceColor,
+                    color: palette.surfaceColor,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 7,
@@ -1125,7 +1331,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                         Icon(
                           Icons.edit_rounded,
                           size: 15,
-                          color: _preferences.effectiveMarkAccent,
+                          color: effectiveMarkAccent,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -1135,7 +1341,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 12,
-                              color: tone.secondaryTextColor,
+                              color: palette.secondaryTextColor,
                             ),
                           ),
                         ),
@@ -1151,89 +1357,29 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
             SafeArea(
               top: false,
               child: SingleChildScrollView(
+                controller: _scrollController,
                 padding: EdgeInsets.fromLTRB(
-                  24,
-                  24,
-                  24,
+                  palette.paperCardColor != null ? 14 : 24,
+                  palette.paperCardColor != null ? 16 : 24,
+                  palette.paperCardColor != null ? 14 : 24,
                   hasFloatingSelection ? 104 : 56,
                 ),
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 680),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        _buildDocumentHeader(tone, parsedLevel),
-                        const SizedBox(height: 24),
-                        if (_paragraphs.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 32),
-                            child: Text(
-                              'Bu makalenin içeriği henüz eklenmedi.',
-                              style: TextStyle(
-                                fontSize: _preferences.fontSize,
-                                height: 1.75,
-                                color: tone.secondaryTextColor,
+                    child: palette.paperCardColor != null
+                        ? Container(
+                            padding: const EdgeInsets.fromLTRB(18, 20, 18, 28),
+                            decoration: BoxDecoration(
+                              color: palette.paperCardColor,
+                              borderRadius: BorderRadius.circular(22),
+                              border: Border.all(
+                                color: palette.dividerColor,
                               ),
                             ),
+                            child: readerColumn,
                           )
-                        else
-                          for (var i = 0; i < _paragraphs.length; i++) ...<Widget>[
-                            KeyedSubtree(
-                              key: _paragraphKeys[i],
-                              child: _ReaderParagraphView(
-                                key: ValueKey<String>('paragraph_$i'),
-                                paragraphIndex: i,
-                                paragraphText: _paragraphs[i],
-                                underlines: _underlinesForParagraph(i),
-                                highlightStartOffset:
-                                    activeSentence != null &&
-                                            activeSentence.paragraphIndex == i
-                                        ? activeSentence.startOffset
-                                        : null,
-                                highlightEndOffset:
-                                    activeSentence != null &&
-                                            activeSentence.paragraphIndex == i
-                                        ? activeSentence.endOffset
-                                        : null,
-                                selectedStartOffset:
-                                    _selectedParagraphIndex == i
-                                        ? _selectedStartOffset
-                                        : null,
-                                selectedEndOffset: _selectedParagraphIndex == i
-                                    ? _selectedEndOffset
-                                    : null,
-                                tone: tone,
-                                fontSize: _preferences.fontSize,
-                                markStyle: _preferences.markStyle,
-                                markAccentColor:
-                                    _preferences.effectiveMarkAccent,
-                                markHighlightFillColor:
-                                    _preferences.effectiveHighlightFill,
-                                isUnderlineMode: _isUnderlineMode,
-                                onSegmentTap: (segment) => _handleSegmentTap(
-                                  paragraphIndex: i,
-                                  segment: segment,
-                                ),
-                                onDragMarkCommitted: (start, end) =>
-                                    _handleDragMarkCommitted(
-                                  paragraphIndex: i,
-                                  startOffset: start,
-                                  endOffset: end,
-                                ),
-                                onNormalSelectionCommitted: (start, end) =>
-                                    _handleNormalSelectionCommitted(
-                                  paragraphIndex: i,
-                                  startOffset: start,
-                                  endOffset: end,
-                                ),
-                              ),
-                            ),
-                            if (i < _paragraphs.length - 1)
-                              SizedBox(height: _preferences.fontSize * 0.95),
-                          ],
-                      ],
-                    ),
+                        : readerColumn,
                   ),
                 ),
               ),
@@ -1283,17 +1429,21 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
               )
             : null,
       );
+
+          return palette.usesAppBackdrop
+              ? AppThemeBackdrop(child: scaffold)
+              : scaffold;
         },
       ),
     );
   }
 
   Widget _buildDocumentHeader(
-    ArticleReaderTone tone,
+    ArticleReaderPalette palette,
     ArticleLevel? parsedLevel,
   ) {
     final article = widget.article;
-    final accentColor = parsedLevel?.accentColor ?? tone.underlineColor;
+    final accentColor = parsedLevel?.accentColor ?? palette.underlineColor;
 
     // Başlık, açıklama ve yazar alanları sabit boyutlarda tutulur;
     // yazı boyutu (A- / A+) ayarı yalnızca okuma metnini etkiler.
@@ -1301,9 +1451,9 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
       decoration: BoxDecoration(
-        color: tone.surfaceColor,
+        color: palette.surfaceColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: tone.dividerColor),
+        border: Border.all(color: palette.dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1339,7 +1489,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                   style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w600,
-                    color: tone.secondaryTextColor,
+                    color: palette.secondaryTextColor,
                   ),
                 ),
               Row(
@@ -1348,7 +1498,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                   Icon(
                     Icons.schedule_rounded,
                     size: 14,
-                    color: tone.secondaryTextColor,
+                    color: palette.secondaryTextColor,
                   ),
                   const SizedBox(width: 4),
                   Text(
@@ -1356,7 +1506,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                     style: TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w500,
-                      color: tone.secondaryTextColor,
+                      color: palette.secondaryTextColor,
                     ),
                   ),
                 ],
@@ -1368,7 +1518,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                     vertical: 3,
                   ),
                   decoration: BoxDecoration(
-                    color: tone.underlineColor.withAlpha(28),
+                    color: palette.underlineColor.withAlpha(28),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -1377,7 +1527,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                       Icon(
                         Icons.podcasts_rounded,
                         size: 13,
-                        color: tone.underlineColor,
+                        color: palette.underlineColor,
                       ),
                       const SizedBox(width: 4),
                       Text(
@@ -1385,7 +1535,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                         style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w700,
-                          color: tone.underlineColor,
+                          color: palette.underlineColor,
                         ),
                       ),
                     ],
@@ -1402,7 +1552,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
               fontWeight: FontWeight.w800,
               height: 1.28,
               letterSpacing: -0.25,
-              color: tone.textColor,
+              color: palette.textColor,
             ),
           ),
           if (article.description.isNotEmpty &&
@@ -1424,14 +1574,14 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                 style: TextStyle(
                   fontSize: 14.5,
                   height: 1.55,
-                  color: tone.secondaryTextColor,
+                  color: palette.secondaryTextColor,
                 ),
               ),
             ),
           ],
           if (article.author.isNotEmpty) ...<Widget>[
             const SizedBox(height: 14),
-            Divider(height: 1, thickness: 1, color: tone.dividerColor),
+            Divider(height: 1, thickness: 1, color: palette.dividerColor),
             const SizedBox(height: 11),
             Row(
               mainAxisSize: MainAxisSize.min,
@@ -1441,14 +1591,14 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                   height: 26,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: tone.dividerColor.withAlpha(150),
+                    color: palette.dividerColor.withAlpha(150),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     Icons.person_rounded,
                     key: const ValueKey<String>('reader_author_icon'),
                     size: 15,
-                    color: tone.secondaryTextColor,
+                    color: palette.secondaryTextColor,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -1459,7 +1609,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                     style: TextStyle(
                       fontSize: 13.5,
                       fontWeight: FontWeight.w600,
-                      color: tone.textColor.withAlpha(215),
+                      color: palette.textColor.withAlpha(215),
                     ),
                   ),
                 ),
@@ -1651,6 +1801,7 @@ class _ReaderParagraphViewState extends State<_ReaderParagraphView> {
   @override
   Widget build(BuildContext context) {
     _disposeRecognizers();
+    final palette = widget.tone.resolvePalette(context);
 
     final segments = ArticleTextParser.buildSegments(
       widget.paragraphText,
@@ -1661,16 +1812,16 @@ class _ReaderParagraphViewState extends State<_ReaderParagraphView> {
       fontSize: widget.fontSize,
       height: 1.78,
       letterSpacing: 0.15,
-      color: widget.tone.textColor,
+      color: palette.textColor,
     );
 
     final hlStart = widget.highlightStartOffset;
     final hlEnd = widget.highlightEndOffset;
     final hasSentenceHighlight =
         hlStart != null && hlEnd != null && hlEnd > hlStart;
-    final sentenceHighlightColor = widget.tone.brightness == Brightness.dark
-        ? widget.tone.underlineColor.withAlpha(64)
-        : widget.tone.underlineColor.withAlpha(34);
+    final sentenceHighlightColor = palette.brightness == Brightness.dark
+        ? palette.underlineColor.withAlpha(64)
+        : palette.underlineColor.withAlpha(34);
 
     final dragStart = _dragRangeStart;
     final dragEnd = _dragRangeEnd;
@@ -1778,52 +1929,77 @@ class _ToneOptionChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = context.l10n;
     final colorScheme = Theme.of(context).colorScheme;
+    final visuals = AppThemeVisuals.of(context);
+    final palette = tone.resolvePalette(context);
+    final isThemeChip = tone == ArticleReaderTone.appTheme;
     final toneLabel = switch (tone) {
+      ArticleReaderTone.appTheme => s.toneTheme,
       ArticleReaderTone.white => s.toneWhite,
       ArticleReaderTone.paper => s.tonePaper,
       ArticleReaderTone.dark => s.toneDark,
     };
 
     return Material(
-      color: tone.backgroundColor,
+      color: isThemeChip && visuals.hasBackdrop
+          ? Colors.transparent
+          : palette.backgroundColor,
       borderRadius: BorderRadius.circular(14),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         key: ValueKey<String>('reader_tone_${tone.storageKey}'),
         onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: isSelected ? colorScheme.primary : tone.dividerColor,
-              width: isSelected ? 2.2 : 1.2,
+        child: Stack(
+          children: <Widget>[
+            if (isThemeChip && visuals.hasBackdrop)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: CustomPaint(
+                    painter: AppThemeMeshPainter(visuals.preset),
+                  ),
+                ),
+              ),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+              decoration: BoxDecoration(
+                color: isThemeChip && visuals.hasBackdrop
+                    ? visuals.readerPaperColor.withAlpha(175)
+                    : null,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: isSelected
+                      ? colorScheme.primary
+                      : palette.dividerColor,
+                  width: isSelected ? 2.2 : 1.2,
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    'Aa',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: palette.textColor,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    toneLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight:
+                          isSelected ? FontWeight.w700 : FontWeight.w500,
+                      color: palette.secondaryTextColor,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Text(
-                'Aa',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: tone.textColor,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                toneLabel,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: tone.secondaryTextColor,
-                ),
-              ),
-            ],
-          ),
+          ],
         ),
       ),
     );
@@ -1856,15 +2032,16 @@ class _SelectionFloatingBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = context.l10n;
+    final palette = tone.resolvePalette(context);
     return Material(
       elevation: 4,
-      color: tone.surfaceColor,
+      color: palette.surfaceColor,
       borderRadius: BorderRadius.circular(999),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: tone.dividerColor),
+          border: Border.all(color: palette.dividerColor),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1875,13 +2052,13 @@ class _SelectionFloatingBar extends StatelessWidget {
                 icon: Icon(
                   Icons.border_color_rounded,
                   size: 18,
-                  color: tone.underlineColor,
+                  color: palette.underlineColor,
                 ),
                 label: Text(
                   s.underlineAction,
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
-                    color: tone.textColor,
+                    color: palette.textColor,
                   ),
                 ),
               ),
@@ -1891,11 +2068,11 @@ class _SelectionFloatingBar extends StatelessWidget {
                   icon: Icon(
                     Icons.format_clear_rounded,
                     size: 18,
-                    color: tone.secondaryTextColor,
+                    color: palette.secondaryTextColor,
                   ),
                   label: Text(
                     s.removeShort,
-                    style: TextStyle(color: tone.secondaryTextColor),
+                    style: TextStyle(color: palette.secondaryTextColor),
                   ),
                 ),
             ] else ...<Widget>[
@@ -1909,7 +2086,7 @@ class _SelectionFloatingBar extends StatelessWidget {
                 icon: Icon(
                   Icons.translate_rounded,
                   size: 18,
-                  color: tone.underlineColor,
+                  color: palette.underlineColor,
                 ),
                 label: Text(
                   isPassageSelection
@@ -1917,14 +2094,14 @@ class _SelectionFloatingBar extends StatelessWidget {
                       : s.lookupMeaningAction,
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
-                    color: tone.textColor,
+                    color: palette.textColor,
                   ),
                 ),
               ),
               Container(
                 width: 1,
                 height: 20,
-                color: tone.dividerColor,
+                color: palette.dividerColor,
               ),
               TextButton.icon(
                 key: const ValueKey<String>(
@@ -1938,13 +2115,13 @@ class _SelectionFloatingBar extends StatelessWidget {
                 icon: Icon(
                   Icons.notes_rounded,
                   size: 18,
-                  color: tone.secondaryTextColor,
+                  color: palette.secondaryTextColor,
                 ),
                 label: Text(
                   s.translateParagraphAction,
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
-                    color: tone.textColor,
+                    color: palette.textColor,
                   ),
                 ),
               ),
@@ -1955,7 +2132,7 @@ class _SelectionFloatingBar extends StatelessWidget {
               icon: Icon(
                 Icons.close_rounded,
                 size: 18,
-                color: tone.secondaryTextColor,
+                color: palette.secondaryTextColor,
               ),
             ),
           ],

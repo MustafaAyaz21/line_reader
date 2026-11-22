@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/localization/app_strings.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_theme_backdrop.dart';
 import '../../../core/tts/tts_service.dart';
 import '../../auth/controllers/auth_controller.dart';
 import '../../browser/browser_screen.dart';
@@ -27,6 +29,7 @@ class LevelArticlesScreen extends StatefulWidget {
     this.ttsService,
     this.authController,
     this.onAddWord,
+    this.onAddWordWithLexicon,
     this.loadWordLists,
     this.onCreateWordList,
   });
@@ -38,6 +41,7 @@ class LevelArticlesScreen extends StatefulWidget {
   final TtsService? ttsService;
   final AuthController? authController;
   final AddWordCallback? onAddWord;
+  final AddWordWithLexiconCallback? onAddWordWithLexicon;
   final Future<List<WordList>> Function()? loadWordLists;
   final CreateWordListCallback? onCreateWordList;
 
@@ -96,6 +100,7 @@ class _LevelArticlesScreenState extends State<LevelArticlesScreen> {
           ttsService: widget.ttsService,
           authController: widget.authController,
           onAddWord: widget.onAddWord,
+          onAddWordWithLexicon: widget.onAddWordWithLexicon,
           loadWordLists: widget.loadWordLists,
           onCreateWordList: widget.onCreateWordList,
         ),
@@ -116,10 +121,14 @@ class _LevelArticlesScreenState extends State<LevelArticlesScreen> {
             .toList(growable: false);
         final isRefreshing = widget.controller.isRefreshing;
 
-        return Scaffold(
-          appBar: AppBar(
-            title: Text('${level.code} • ${s.levelLabel(level.code)}'),
-          ),
+        final visuals = AppThemeVisuals.of(context);
+
+        return AppThemeBackdrop(
+          child: Scaffold(
+            backgroundColor: visuals.hasBackdrop ? Colors.transparent : null,
+            appBar: AppBar(
+              title: Text('${level.code} • ${s.levelLabel(level.code)}'),
+            ),
           body: Stack(
             children: <Widget>[
               Column(
@@ -164,6 +173,7 @@ class _LevelArticlesScreenState extends State<LevelArticlesScreen> {
                   child: LinearProgressIndicator(minHeight: 2),
                 ),
             ],
+          ),
           ),
         );
       },

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_theme.dart';
+
 /// Line Apps tasarım diline uygun, Chrome'dan farklı sade ve modern tarayıcı
 /// üst çubuğu. Kalem modu, Reklam Engelleyici ve Favori site aksiyonlarını içerir.
 class BrowserAddressBar extends StatelessWidget {
@@ -46,9 +48,10 @@ class BrowserAddressBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final visuals = AppThemeVisuals.of(context);
 
     return Container(
-      color: colorScheme.surface,
+      color: visuals.appBarColor,
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
       child: Column(
         mainAxisSize: MainAxisSize.min,

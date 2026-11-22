@@ -87,6 +87,10 @@ class _OverlayFakeWordRepository implements WordRepository {
     required String word,
     required String meaning,
     List<MeaningEntry> meanings = const <MeaningEntry>[],
+    String? ipaUs,
+    String? ipaUk,
+    List<String> synonyms = const <String>[],
+    List<String> antonyms = const <String>[],
     bool allowDuplicate = false,
   }) async {
     savedWords.add(
@@ -96,6 +100,10 @@ class _OverlayFakeWordRepository implements WordRepository {
         word: word,
         meaning: meaning,
         meanings: meanings,
+        ipaUs: ipaUs,
+        ipaUk: ipaUk,
+        synonyms: synonyms,
+        antonyms: antonyms,
         createdAt: DateTime.now(),
       ),
     );
@@ -106,6 +114,10 @@ class _OverlayFakeWordRepository implements WordRepository {
   Future<SaveWordStatus> updateWordMeanings({
     required SavedWord existingWord,
     required List<MeaningEntry> meanings,
+    String? ipaUs,
+    String? ipaUk,
+    List<String>? synonyms,
+    List<String>? antonyms,
   }) async =>
       SaveWordStatus.saved;
 

@@ -1,7 +1,21 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_theme.dart';
+
 /// Yerel okuma ekranı için arka plan ve tipografi renk temaları.
 enum ArticleReaderTone {
+  appTheme(
+    storageKey: 'theme',
+    label: 'Tema',
+    backgroundColor: Color(0xFFF7F0E2),
+    surfaceColor: Color(0xFFEDE3CE),
+    textColor: Color(0xFF2B231A),
+    secondaryTextColor: Color(0xFF6E6151),
+    dividerColor: Color(0xFFDFD3BC),
+    underlineColor: Color(0xFFB45309),
+    underlineFillColor: Color(0x28D97706),
+    brightness: Brightness.light,
+  ),
   white(
     storageKey: 'white',
     label: 'Beyaz',
@@ -72,6 +86,74 @@ enum ArticleReaderTone {
     }
     return ArticleReaderTone.paper;
   }
+
+  /// Aktif uygulama temasına göre okuma ekranının kesin renk paletini üretir.
+  ArticleReaderPalette resolvePalette(BuildContext context) {
+    if (this == ArticleReaderTone.appTheme) {
+      final visuals = AppThemeVisuals.of(context);
+      return ArticleReaderPalette(
+        backgroundColor: visuals.hasBackdrop
+            ? Colors.transparent
+            : visuals.readerPaperColor,
+        appBarColor: visuals.hasBackdrop
+            ? visuals.appBarColor
+            : visuals.readerPaperColor,
+        surfaceColor: visuals.readerSurfaceColor,
+        paperCardColor: visuals.hasBackdrop ? visuals.readerPaperColor : null,
+        textColor: visuals.readerTextColor,
+        secondaryTextColor: visuals.readerSecondaryTextColor,
+        dividerColor: visuals.readerDividerColor,
+        underlineColor: visuals.readerAccentColor,
+        underlineFillColor: visuals.readerAccentColor.withAlpha(42),
+        brightness: visuals.readerBrightness,
+        usesAppBackdrop: visuals.hasBackdrop,
+      );
+    }
+
+    return ArticleReaderPalette(
+      backgroundColor: backgroundColor,
+      appBarColor: backgroundColor,
+      surfaceColor: surfaceColor,
+      paperCardColor: null,
+      textColor: textColor,
+      secondaryTextColor: secondaryTextColor,
+      dividerColor: dividerColor,
+      underlineColor: underlineColor,
+      underlineFillColor: underlineFillColor,
+      brightness: brightness,
+      usesAppBackdrop: false,
+    );
+  }
+}
+
+/// Okuma ekranı ve alt ses çubuğunun canlı olarak kullandığı çözümlenmiş renk paleti.
+@immutable
+class ArticleReaderPalette {
+  const ArticleReaderPalette({
+    required this.backgroundColor,
+    required this.appBarColor,
+    required this.surfaceColor,
+    required this.paperCardColor,
+    required this.textColor,
+    required this.secondaryTextColor,
+    required this.dividerColor,
+    required this.underlineColor,
+    required this.underlineFillColor,
+    required this.brightness,
+    required this.usesAppBackdrop,
+  });
+
+  final Color backgroundColor;
+  final Color appBarColor;
+  final Color surfaceColor;
+  final Color? paperCardColor;
+  final Color textColor;
+  final Color secondaryTextColor;
+  final Color dividerColor;
+  final Color underlineColor;
+  final Color underlineFillColor;
+  final Brightness brightness;
+  final bool usesAppBackdrop;
 }
 
 /// Makale metninde işaretlenen kelimelerin görsel stili.
@@ -147,13 +229,17 @@ enum ArticleMarkColor {
   final Color lightHighlightFill;
   final Color darkHighlightFill;
 
+  Color accentForBrightness(Brightness brightness) =>
+      brightness == Brightness.dark ? darkAccentColor : swatchColor;
+
+  Color highlightFillForBrightness(Brightness brightness) =>
+      brightness == Brightness.dark ? darkHighlightFill : lightHighlightFill;
+
   Color accentForTone(ArticleReaderTone tone) =>
-      tone.brightness == Brightness.dark ? darkAccentColor : swatchColor;
+      accentForBrightness(tone.brightness);
 
   Color highlightFillForTone(ArticleReaderTone tone) =>
-      tone.brightness == Brightness.dark
-          ? darkHighlightFill
-          : lightHighlightFill;
+      highlightFillForBrightness(tone.brightness);
 
   static ArticleMarkColor fromStorageKey(String? raw) {
     final normalized = raw?.trim().toLowerCase();

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/localization/app_strings.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_theme_backdrop.dart';
 import '../controllers/auth_controller.dart';
 
 /// Gmail (Google) ile tek tık giriş, E-posta/Şifre ile kayıt & giriş ve
@@ -208,9 +210,12 @@ class _AuthScreenState extends State<AuthScreen> {
       listenable: widget.controller,
       builder: (context, _) {
         final isBusy = widget.controller.isBusy;
+        final visuals = AppThemeVisuals.of(context);
 
-        return Scaffold(
-          appBar: widget.canPop
+        return AppThemeBackdrop(
+          child: Scaffold(
+            backgroundColor: visuals.hasBackdrop ? Colors.transparent : null,
+            appBar: widget.canPop
               ? AppBar(
                   title: Text(_isSignUpMode ? s.signUp : s.signIn),
                 )
@@ -507,6 +512,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
               ),
             ),
+          ),
           ),
         );
       },

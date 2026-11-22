@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_theme.dart';
 import '../models/favorite_site.dart';
 
 /// Tarayıcı üst çubuğunun hemen altında kayıtlı favori sitelere tek tıkla
@@ -24,10 +25,11 @@ class BrowserFavoritesBar extends StatelessWidget {
 
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final visuals = AppThemeVisuals.of(context);
 
     return Container(
       height: 40,
-      color: colorScheme.surface,
+      color: visuals.appBarColor,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),

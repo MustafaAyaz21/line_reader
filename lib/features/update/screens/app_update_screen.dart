@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/localization/app_strings.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_theme_backdrop.dart';
 import '../controllers/app_update_controller.dart';
 
 /// Sağ üstteki güncelleme ikonuna tıklandığında `Navigator.push` ile açılan
@@ -44,11 +46,14 @@ class _AppUpdateScreenState extends State<AppUpdateScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final s = context.l10n;
+    final visuals = AppThemeVisuals.of(context);
 
     return PopScope(
       canPop: !widget.isMandatory,
-      child: Scaffold(
-        appBar: AppBar(
+      child: AppThemeBackdrop(
+        child: Scaffold(
+          backgroundColor: visuals.hasBackdrop ? Colors.transparent : null,
+          appBar: AppBar(
           automaticallyImplyLeading: !widget.isMandatory,
           title: Text(
             widget.isMandatory ? s.mandatoryUpdateTitle : s.updatesTitle,
@@ -393,6 +398,7 @@ class _AppUpdateScreenState extends State<AppUpdateScreen> {
             ],
           );
         },
+      ),
       ),
       ),
     );

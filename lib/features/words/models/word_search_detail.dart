@@ -1,3 +1,4 @@
+import '../../translation/models/word_lexicon_info.dart';
 import '../../translation/models/word_meaning.dart';
 
 /// Manuel kelime aramasında gösterilen tek bir kısa örnek cümle.
@@ -12,15 +13,27 @@ class WordExampleSentence {
 }
 
 /// Kelime listesine manuel ekleme ekranında gösterilen ayrıntılı arama sonucu:
-/// 10–15 farklı Türkçe anlam ve 3 kısa örnek cümle.
+/// 10–15 farklı Türkçe anlam, 3 kısa örnek cümle, US/UK IPA + eş/zıt anlamlar
+/// ve hatalı yazımlarda Google mantığıyla "Bunu mu aratmak istediniz?" önerileri.
 class WordSearchDetail {
   const WordSearchDetail({
     required this.word,
     required this.meanings,
     required this.examples,
+    this.lexiconInfo,
+    this.isMisspelled = false,
+    this.suggestions = const <String>[],
   });
 
   final String word;
   final List<MeaningEntry> meanings;
   final List<WordExampleSentence> examples;
+  final WordLexiconInfo? lexiconInfo;
+
+  /// Kelime İngilizce sözlüklerde geçersiz / yanlış yazılmış tespit edildiyse
+  /// `true` olur; uydurma anlam veya hatalı telaffuz gösterilmez.
+  final bool isMisspelled;
+
+  /// Google mantığıyla önerilen doğru İngilizce kelime adayları (`elone` → `alone`).
+  final List<String> suggestions;
 }

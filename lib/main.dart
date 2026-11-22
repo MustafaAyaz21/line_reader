@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'core/localization/app_locale.dart';
 import 'core/platform/process_text_channel.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/app_theme_controller.dart';
 import 'features/lookup_overlay/quick_lookup_overlay_app.dart';
 import 'features/splash/splash_screen.dart';
 
@@ -35,6 +36,7 @@ class _LineReaderAppState extends State<LineReaderApp> {
   void initState() {
     super.initState();
     _localeController = AppLocaleController()..load();
+    AppThemeController.shared.load();
   }
 
   @override
@@ -48,14 +50,24 @@ class _LineReaderAppState extends State<LineReaderApp> {
     return AppLocaleScope(
       controller: _localeController,
       child: ListenableBuilder(
-        listenable: _localeController,
+        listenable: Listenable.merge(<Listenable>[
+          _localeController,
+          AppThemeController.shared,
+        ]),
         builder: (context, _) {
+          final preset = AppThemeController.shared.preset;
           return MaterialApp(
             title: 'Line Reader',
             debugShowCheckedModeBanner: false,
-            theme: AppTheme.light(),
-            darkTheme: AppTheme.dark(),
-            themeMode: ThemeMode.system,
+            theme: AppTheme.forPreset(
+              preset,
+              classicBrightness: Brightness.light,
+            ),
+            darkTheme: AppTheme.forPreset(
+              preset,
+              classicBrightness: Brightness.dark,
+            ),
+            themeMode: preset.themeMode,
             home: const SplashScreen(),
           );
         },

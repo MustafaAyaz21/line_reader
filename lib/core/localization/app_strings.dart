@@ -28,6 +28,13 @@ class AppStrings {
       t('Web\'de oku ve anında çevir', 'Read on the web & translate instantly');
   String get articlesTitle => t('Makaleler', 'Articles');
   String get articlesSubtitle => t('Çevrimdışı okumalar', 'Offline readings');
+  String get continueReadingTitle =>
+      t('Kaldığın yerden devam et', 'Continue where you left off');
+  String readingProgressPercent(int percent) =>
+      isEn ? '$percent%' : '%$percent';
+  String readingProgressCompletedLabel(int percent) => percent >= 100
+      ? t('Tamamlandı', 'Completed')
+      : t('%$percent tamamlandı', '$percent% completed');
   String get settingsTitle => t('Ayarlar', 'Settings');
   String get updatesTitle => t('Güncellemeler', 'Updates');
   String get newUpdateAvailable =>
@@ -115,6 +122,7 @@ class AppStrings {
   String get markStyleUnderline => t('Altı Çizili', 'Underline');
   String get markStyleHighlight => t('Fosforlu Kalem', 'Highlighter');
   String get markStyleStrikethrough => t('Üstü Çizili', 'Strikethrough');
+  String get toneTheme => t('Tema', 'Theme');
   String get toneWhite => t('Beyaz', 'White');
   String get tonePaper => t('Kağıt Tonu', 'Paper');
   String get toneDark => t('Koyu', 'Dark');

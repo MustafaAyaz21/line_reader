@@ -188,6 +188,10 @@ class WordsController extends ChangeNotifier {
     required String word,
     required String meaning,
     List<MeaningEntry> meanings = const <MeaningEntry>[],
+    String? ipaUs,
+    String? ipaUk,
+    List<String> synonyms = const <String>[],
+    List<String> antonyms = const <String>[],
     int? listId,
     bool allowDuplicate = false,
   }) async {
@@ -200,6 +204,10 @@ class WordsController extends ChangeNotifier {
         word: word,
         meaning: meaning,
         meanings: meanings,
+        ipaUs: ipaUs,
+        ipaUk: ipaUk,
+        synonyms: synonyms,
+        antonyms: antonyms,
         allowDuplicate: allowDuplicate,
       );
 
@@ -220,11 +228,19 @@ class WordsController extends ChangeNotifier {
   Future<SaveWordStatus> updateWordMeanings({
     required SavedWord existingWord,
     required List<MeaningEntry> meanings,
+    String? ipaUs,
+    String? ipaUk,
+    List<String>? synonyms,
+    List<String>? antonyms,
   }) async {
     try {
       final status = await _repository.updateWordMeanings(
         existingWord: existingWord,
         meanings: meanings,
+        ipaUs: ipaUs,
+        ipaUk: ipaUk,
+        synonyms: synonyms,
+        antonyms: antonyms,
       );
       if (status == SaveWordStatus.saved) {
         await Future.wait<void>(<Future<void>>[

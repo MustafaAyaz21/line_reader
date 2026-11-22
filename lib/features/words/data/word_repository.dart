@@ -196,6 +196,10 @@ class WordRepository {
     required String word,
     required String meaning,
     List<MeaningEntry> meanings = const <MeaningEntry>[],
+    String? ipaUs,
+    String? ipaUk,
+    List<String> synonyms = const <String>[],
+    List<String> antonyms = const <String>[],
     bool allowDuplicate = false,
   }) async {
     final db = await _getReadyDatabase();
@@ -239,6 +243,10 @@ class WordRepository {
       word: trimmedWord,
       meaning: meaning,
       meanings: meanings,
+      ipaUs: ipaUs,
+      ipaUk: ipaUk,
+      synonyms: synonyms,
+      antonyms: antonyms,
       createdAt: DateTime.now(),
     );
 
@@ -265,6 +273,10 @@ class WordRepository {
   Future<SaveWordStatus> updateWordMeanings({
     required SavedWord existingWord,
     required List<MeaningEntry> meanings,
+    String? ipaUs,
+    String? ipaUk,
+    List<String>? synonyms,
+    List<String>? antonyms,
   }) async {
     final id = existingWord.id;
     if (id == null) return SaveWordStatus.error;
@@ -282,6 +294,10 @@ class WordRepository {
     final updated = existingWord.copyWith(
       meaning: meanings.first.baseFormatted,
       meanings: meanings,
+      ipaUs: ipaUs ?? existingWord.ipaUs,
+      ipaUk: ipaUk ?? existingWord.ipaUk,
+      synonyms: synonyms ?? existingWord.synonyms,
+      antonyms: antonyms ?? existingWord.antonyms,
     );
     final updatedMap = updated.toMap();
     await db.update(

@@ -5,11 +5,14 @@ import '../../../core/localization/app_strings.dart';
 import '../../../core/tts/tts_service.dart';
 import '../../auth/controllers/auth_controller.dart';
 import '../../auth/screens/auth_screen.dart';
+import '../../translation/models/word_lexicon_info.dart';
 import '../../translation/models/word_meaning.dart';
+import '../../translation/services/word_lexicon_service.dart';
 import '../../translation/services/word_translation_service.dart';
 import '../../words/data/word_repository.dart';
 import '../../words/models/saved_word.dart';
 import '../../words/models/word_list.dart';
+import '../../words/widgets/word_lexicon_widgets.dart';
 import '../../words/widgets/word_list_editor_dialog.dart';
 
 /// Seçilen kelimeyi, sesli dinleme (kelime ve bağlam cümlesi) kontrollerini,
@@ -21,10 +24,12 @@ class WordPreviewSheet extends StatefulWidget {
     super.key,
     required this.word,
     required this.translationService,
+    this.lexiconService,
     this.wordLists = const <WordList>[],
     this.loadWordLists,
     this.onCreateWordList,
     required this.onAddWord,
+    this.onAddWordWithLexicon,
     this.contextSentence,
     this.ttsService,
     this.authController,
@@ -33,6 +38,7 @@ class WordPreviewSheet extends StatefulWidget {
   final String word;
   final String? contextSentence;
   final WordTranslationService translationService;
+  final WordLexiconService? lexiconService;
   final List<WordList> wordLists;
   final Future<List<WordList>> Function()? loadWordLists;
   final CreateWordListCallback? onCreateWordList;
@@ -45,11 +51,20 @@ class WordPreviewSheet extends StatefulWidget {
     int? listId,
     String? listName,
   ) onAddWord;
+  final void Function(
+    String word,
+    String meaning,
+    List<MeaningEntry> meanings,
+    int? listId,
+    String? listName,
+    WordLexiconInfo? selectedLexicon,
+  )? onAddWordWithLexicon;
 
   static Future<void> show(
     BuildContext context, {
     required String word,
     required WordTranslationService translationService,
+    WordLexiconService? lexiconService,
     List<WordList> wordLists = const <WordList>[],
     Future<List<WordList>> Function()? loadWordLists,
     CreateWordListCallback? onCreateWordList,
@@ -60,6 +75,14 @@ class WordPreviewSheet extends StatefulWidget {
       int? listId,
       String? listName,
     ) onAddWord,
+    void Function(
+      String word,
+      String meaning,
+      List<MeaningEntry> meanings,
+      int? listId,
+      String? listName,
+      WordLexiconInfo? selectedLexicon,
+    )? onAddWordWithLexicon,
     String? contextSentence,
     TtsService? ttsService,
     AuthController? authController,
@@ -75,6 +98,7 @@ class WordPreviewSheet extends StatefulWidget {
           word: word,
           contextSentence: contextSentence,
           translationService: translationService,
+          lexiconService: lexiconService,
           wordLists: wordLists,
           loadWordLists: loadWordLists,
           onCreateWordList: onCreateWordList,
@@ -96,6 +120,26 @@ class WordPreviewSheet extends StatefulWidget {
               listName,
             );
           },
+          onAddWordWithLexicon: onAddWordWithLexicon == null
+              ? null
+              : (
+                  selectedWord,
+                  selectedMeaning,
+                  meanings,
+                  listId,
+                  listName,
+                  selectedLexicon,
+                ) {
+                  Navigator.of(sheetContext).pop();
+                  onAddWordWithLexicon(
+                    selectedWord,
+                    selectedMeaning,
+                    meanings,
+                    listId,
+                    listName,
+                    selectedLexicon,
+                  );
+                },
         );
       },
     );
@@ -107,6 +151,9 @@ class WordPreviewSheet extends StatefulWidget {
 
 class _WordPreviewSheetState extends State<WordPreviewSheet> {
   WordMeaning? _meaning;
+  WordLexiconInfo? _lexiconInfo;
+  final Set<String> _selectedSynonyms = <String>{};
+  final Set<String> _selectedAntonyms = <String>{};
   String? _errorMessage;
   TranslationErrorType? _errorType;
   bool _isLoading = true;
@@ -146,6 +193,24 @@ class _WordPreviewSheetState extends State<WordPreviewSheet> {
     _selectedListId = _resolveInitialListId();
     _loadWordListsAsync();
     _fetchMeaning();
+    _fetchLexiconAsync();
+  }
+
+  Future<void> _fetchLexiconAsync() async {
+    try {
+      final service = widget.lexiconService ?? WordLexiconService.shared;
+      final info = await service.lookup(widget.word);
+      if (!mounted || info == null) return;
+      setState(() {
+        _lexiconInfo = info;
+        _selectedSynonyms
+          ..clear()
+          ..addAll(info.synonyms);
+        _selectedAntonyms
+          ..clear()
+          ..addAll(info.antonyms);
+      });
+    } catch (_) {}
   }
 
   Future<void> _loadWordListsAsync() async {
@@ -425,6 +490,33 @@ class _WordPreviewSheetState extends State<WordPreviewSheet> {
         _meaning?.formattedMeaning ?? SavedWord.defaultPlaceholderMeaning;
     final allMeanings = _meaning?.orderedEntries ?? const <MeaningEntry>[];
     final selectedList = _findSelectedList();
+    final lexicon = _lexiconInfo;
+    final selectedLexicon = lexicon == null
+        ? null
+        : WordLexiconInfo(
+            word: widget.word,
+            ipaUs: lexicon.ipaUs,
+            ipaUk: lexicon.ipaUk,
+            synonyms: lexicon.synonyms
+                .where(_selectedSynonyms.contains)
+                .toList(growable: false),
+            antonyms: lexicon.antonyms
+                .where(_selectedAntonyms.contains)
+                .toList(growable: false),
+          );
+
+    if (widget.onAddWordWithLexicon != null) {
+      widget.onAddWordWithLexicon!(
+        widget.word,
+        meaningToSave,
+        allMeanings,
+        selectedList?.id,
+        selectedList?.name,
+        selectedLexicon,
+      );
+      return;
+    }
+
     widget.onAddWord(
       widget.word,
       meaningToSave,
@@ -494,6 +586,42 @@ class _WordPreviewSheetState extends State<WordPreviewSheet> {
                     ),
                     const SizedBox(height: 10),
                     _buildMeaningsSection(theme, colorScheme),
+                    if (_lexiconInfo != null &&
+                        _lexiconInfo!.hasRelations) ...<Widget>[
+                      const SizedBox(height: 10),
+                      WordRelationsSection(
+                        synonyms: _lexiconInfo!.synonyms,
+                        antonyms: _lexiconInfo!.antonyms,
+                        selectedSynonyms: _selectedSynonyms,
+                        selectedAntonyms: _selectedAntonyms,
+                        onToggleSynonym: (term) {
+                          setState(() {
+                            if (!_selectedSynonyms.remove(term)) {
+                              _selectedSynonyms.add(term);
+                            }
+                          });
+                        },
+                        onToggleAntonym: (term) {
+                          setState(() {
+                            if (!_selectedAntonyms.remove(term)) {
+                              _selectedAntonyms.add(term);
+                            }
+                          });
+                        },
+                        onToggleAll: (selectAll) {
+                          final info = _lexiconInfo;
+                          if (info == null) return;
+                          setState(() {
+                            _selectedSynonyms.clear();
+                            _selectedAntonyms.clear();
+                            if (selectAll) {
+                              _selectedSynonyms.addAll(info.synonyms);
+                              _selectedAntonyms.addAll(info.antonyms);
+                            }
+                          });
+                        },
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -595,55 +723,63 @@ class _WordPreviewSheetState extends State<WordPreviewSheet> {
             ),
           ],
         ),
-        if (_hasContextSentence) ...[
+        if (_hasContextSentence ||
+            (_lexiconInfo != null && _lexiconInfo!.hasAnyIpa)) ...[
           const SizedBox(height: 6),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: ActionChip(
-              onPressed: _handleSpeakSentence,
-              avatar: isSentenceLoading
-                  ? SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: colorScheme.onPrimaryContainer,
-                      ),
-                    )
-                  : Icon(
-                      isSentenceActive
-                          ? Icons.stop_circle_outlined
-                          : Icons.record_voice_over_outlined,
-                      size: 17,
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              if (_hasContextSentence)
+                ActionChip(
+                  onPressed: _handleSpeakSentence,
+                  avatar: isSentenceLoading
+                      ? SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: colorScheme.onPrimaryContainer,
+                          ),
+                        )
+                      : Icon(
+                          isSentenceActive
+                              ? Icons.stop_circle_outlined
+                              : Icons.record_voice_over_outlined,
+                          size: 17,
+                          color: isSentenceActive
+                              ? colorScheme.onPrimaryContainer
+                              : colorScheme.primary,
+                        ),
+                  label: Text(
+                    isSentenceLoading
+                        ? 'Ses hazırlanıyor...'
+                        : (isSentenceActive
+                            ? 'Cümle Okunuyor • Durdur'
+                            : 'Cümleyi Dinle'),
+                    style: theme.textTheme.labelMedium?.copyWith(
                       color: isSentenceActive
                           ? colorScheme.onPrimaryContainer
-                          : colorScheme.primary,
+                          : colorScheme.onSurface,
+                      fontWeight:
+                          isSentenceActive ? FontWeight.w600 : FontWeight.w500,
                     ),
-              label: Text(
-                isSentenceLoading
-                    ? 'Ses hazırlanıyor...'
-                    : (isSentenceActive
-                        ? 'Cümle Okunuyor • Durdur'
-                        : 'Cümleyi Dinle'),
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: isSentenceActive
-                      ? colorScheme.onPrimaryContainer
-                      : colorScheme.onSurface,
-                  fontWeight:
-                      isSentenceActive ? FontWeight.w600 : FontWeight.w500,
+                  ),
+                  backgroundColor: isSentenceActive
+                      ? colorScheme.primaryContainer
+                      : colorScheme.surfaceContainerLow,
+                  side: BorderSide(
+                    color: isSentenceActive
+                        ? colorScheme.primary
+                        : colorScheme.outlineVariant,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
-              ),
-              backgroundColor: isSentenceActive
-                  ? colorScheme.primaryContainer
-                  : colorScheme.surfaceContainerLow,
-              side: BorderSide(
-                color: isSentenceActive
-                    ? colorScheme.primary
-                    : colorScheme.outlineVariant,
-              ),
-              visualDensity: VisualDensity.compact,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
+              if (_lexiconInfo != null && _lexiconInfo!.hasAnyIpa)
+                WordIpaBadge(lexiconInfo: _lexiconInfo),
+            ],
           ),
         ],
         if (ttsError != null) ...[

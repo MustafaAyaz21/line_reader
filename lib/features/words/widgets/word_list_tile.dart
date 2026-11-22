@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/tts/tts_service.dart';
 import '../../translation/models/word_meaning.dart';
 import '../models/saved_word.dart';
+import 'word_lexicon_widgets.dart';
 
 /// Kelimelerim listesinde tek bir kayıtlı kelimeyi gösteren genişletilebilir satır:
 /// - Kapalı (varsayılan) durumda 1. anlamın yanında diğer anlamlar yan yana sıralanır.
@@ -63,11 +64,23 @@ class _WordListTileState extends State<WordListTile> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        widget.item.word,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: <Widget>[
+                          Text(
+                            widget.item.word,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          if (widget.item.lexiconInfo != null)
+                            WordIpaBadge(
+                              lexiconInfo: widget.item.lexiconInfo,
+                              compact: true,
+                            ),
+                        ],
                       ),
                       if (!_isExpanded) ...[
                         const SizedBox(height: 4),
@@ -144,6 +157,11 @@ class _WordListTileState extends State<WordListTile> {
                               entry: allMeanings[i],
                               isPrimary: i == 0,
                             ),
+                          ],
+                          if (widget.item.synonyms.isNotEmpty ||
+                              widget.item.antonyms.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            _buildSavedRelationsBlock(theme, colorScheme),
                           ],
                         ],
                       ),
@@ -261,6 +279,64 @@ class _WordListTileState extends State<WordListTile> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildSavedRelationsBlock(ThemeData theme, ColorScheme colorScheme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          if (widget.item.synonyms.isNotEmpty)
+            Text.rich(
+              TextSpan(
+                children: <InlineSpan>[
+                  TextSpan(
+                    text: 'Eş anlamlar: ',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                  TextSpan(
+                    text: widget.item.synonyms.join(', '),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (widget.item.synonyms.isNotEmpty &&
+              widget.item.antonyms.isNotEmpty)
+            const SizedBox(height: 4),
+          if (widget.item.antonyms.isNotEmpty)
+            Text.rich(
+              TextSpan(
+                children: <InlineSpan>[
+                  TextSpan(
+                    text: 'Zıt anlamlar: ',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.tertiary,
+                    ),
+                  ),
+                  TextSpan(
+                    text: widget.item.antonyms.join(', '),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

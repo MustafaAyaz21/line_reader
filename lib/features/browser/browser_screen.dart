@@ -10,6 +10,7 @@ import '../../core/utils/url_helper.dart';
 import '../ads/widgets/promo_interstitial_dialog.dart';
 import '../auth/controllers/auth_controller.dart';
 import '../translation/data/translation_cache_repository.dart';
+import '../translation/models/word_lexicon_info.dart';
 import '../translation/models/word_meaning.dart';
 import '../translation/services/cached_translation_service.dart';
 import '../translation/services/word_translation_service.dart';
@@ -38,6 +39,14 @@ typedef AddWordCallback = Future<SaveWordStatus> Function(
   String meaning,
   List<MeaningEntry> meanings,
   int? listId,
+);
+
+typedef AddWordWithLexiconCallback = Future<SaveWordStatus> Function(
+  String word,
+  String meaning,
+  List<MeaningEntry> meanings,
+  int? listId,
+  WordLexiconInfo? lexicon,
 );
 
 enum _BrowserViewMode {
@@ -71,6 +80,7 @@ class BrowserScreen extends StatefulWidget {
   const BrowserScreen({
     super.key,
     this.onAddWord,
+    this.onAddWordWithLexicon,
     this.loadWordLists,
     this.onCreateWordList,
     this.translationService,
@@ -81,6 +91,7 @@ class BrowserScreen extends StatefulWidget {
   });
 
   final AddWordCallback? onAddWord;
+  final AddWordWithLexiconCallback? onAddWordWithLexicon;
   final Future<List<WordList>> Function()? loadWordLists;
   final CreateWordListCallback? onCreateWordList;
   final WordTranslationService? translationService;
@@ -676,6 +687,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
         ttsService: widget.ttsService,
         authController: widget.authController,
         onAddWord: _handleAddWord,
+        onAddWordWithLexicon: _handleAddWordWithLexicon,
       );
     } finally {
       _isWordSheetOpen = false;
@@ -693,6 +705,17 @@ class _BrowserScreenState extends State<BrowserScreen> {
     List<MeaningEntry> meanings,
     int? listId,
     String? listName,
+  ) {
+    return _handleAddWordWithLexicon(word, meaning, meanings, listId, listName, null);
+  }
+
+  Future<void> _handleAddWordWithLexicon(
+    String word,
+    String meaning,
+    List<MeaningEntry> meanings,
+    int? listId,
+    String? listName,
+    WordLexiconInfo? selectedLexicon,
   ) async {
     try {
       await _webViewController.runJavaScript(
@@ -702,7 +725,15 @@ class _BrowserScreenState extends State<BrowserScreen> {
 
     SaveWordStatus status;
     try {
-      if (widget.onAddWord != null) {
+      if (widget.onAddWordWithLexicon != null) {
+        status = await widget.onAddWordWithLexicon!(
+          word,
+          meaning,
+          meanings,
+          listId,
+          selectedLexicon,
+        );
+      } else if (widget.onAddWord != null) {
         status = await widget.onAddWord!(word, meaning, meanings, listId);
       } else {
         final repo = WordRepository(AppDatabase.instance);
@@ -713,6 +744,10 @@ class _BrowserScreenState extends State<BrowserScreen> {
           word: word,
           meaning: meaning,
           meanings: meanings,
+          ipaUs: selectedLexicon?.ipaUs,
+          ipaUk: selectedLexicon?.ipaUk,
+          synonyms: selectedLexicon?.synonyms ?? const <String>[],
+          antonyms: selectedLexicon?.antonyms ?? const <String>[],
         );
       }
     } catch (error, stackTrace) {

@@ -38,8 +38,9 @@ class _FakeTtsEngine implements ArticleTtsEngine {
   }
 
   @override
-  Future<void> speak(String text) async {
+  Future<bool> speak(String text) async {
     spokenTexts.add(text);
+    return true;
   }
 
   @override
@@ -64,7 +65,9 @@ class _FakePodcastPlayer implements ArticlePodcastPlayer {
   final StreamController<void> _doneCtrl = StreamController<void>.broadcast();
 
   final List<Duration> seeks = <Duration>[];
+  final List<double> appliedRates = <double>[];
   double lastPlaybackRate = 1.0;
+  int stopCount = 0;
   bool isPlaying = false;
 
   @override
@@ -91,6 +94,7 @@ class _FakePodcastPlayer implements ArticlePodcastPlayer {
 
   @override
   Future<void> setPlaybackRate(double rate) async {
+    appliedRates.add(rate);
     lastPlaybackRate = rate;
   }
 
@@ -112,6 +116,7 @@ class _FakePodcastPlayer implements ArticlePodcastPlayer {
 
   @override
   Future<void> stop() async {
+    stopCount++;
     isPlaying = false;
   }
 
@@ -214,8 +219,13 @@ void main() {
         expect(controller.totalSentences, 4);
         expect(controller.totalParagraphs, 2);
 
+        // Kulaklık tuşu oynatıcıyı açar ama otomatik başlatmaz; Play ile başlar.
         await controller.togglePlayerVisibility();
         expect(controller.isVisible, isTrue);
+        expect(controller.isPlaying, isFalse);
+        expect(fakeTts.spokenTexts, isEmpty);
+
+        await controller.togglePlayPause();
         expect(controller.isPlaying, isTrue);
         expect(fakeTts.spokenTexts.last, 'Sentence one.');
 
@@ -290,12 +300,29 @@ void main() {
 
         expect(controller.mode, ArticleAudioMode.podcastAudio);
         await controller.togglePlayerVisibility();
+        expect(controller.isVisible, isTrue);
+        expect(controller.isPlaying, isFalse);
+
+        await controller.togglePlayPause();
         expect(controller.isPlaying, isTrue);
+        // 1.0x hızında Android Sonic DSP cızırtısını önlemek için setPlaybackRate çağrılmamalı.
+        expect(fakePodcast.appliedRates, isEmpty);
+
+        var fullUiNotifications = 0;
+        controller.addListener(() => fullUiNotifications++);
 
         fakePodcast.emitDuration(const Duration(milliseconds: 11000));
+        // Aynı cümle içindeki ara konum güncellemeleri ana ekranı yeniden çizmemeli.
+        fakePodcast.emitPosition(const Duration(milliseconds: 800));
+        fakePodcast.emitPosition(const Duration(milliseconds: 1600));
+        await Future<void>.delayed(Duration.zero);
+        expect(controller.positionNotifier.value, const Duration(milliseconds: 1600));
+        expect(fullUiNotifications, 1); // yalnızca duration değişimi
+
         fakePodcast.emitPosition(const Duration(milliseconds: 4200));
         await Future<void>.delayed(Duration.zero);
         expect(controller.currentSentenceIndex, 1);
+        expect(fullUiNotifications, 2); // cümle değişince 1 kez bildir
 
         // Geriye basınca 1. cümlenin (0ms) başına sarmalı
         await controller.previousSentence();
@@ -309,6 +336,62 @@ void main() {
 
         await controller.cycleSpeed();
         expect(fakePodcast.lastPlaybackRate, 1.25);
+        expect(fakePodcast.appliedRates, <double>[1.25]);
+
+        controller.dispose();
+      },
+    );
+
+    test(
+      'Podcast AI çalarken Cihaz Sesi moduna geçince podcast stop() edilir ve cihaz TTS hemen okur',
+      () async {
+        const article = Article(
+          id: 'b1-switch-engine',
+          level: 'B1',
+          title: 'Switch Engine Test',
+          content: 'First sentence. Second sentence.',
+          audioUrl: 'https://line-reader.pages.dev/audio/b1-switch.m4a',
+          audioSegments: <ArticleAudioSegment>[
+            ArticleAudioSegment(
+              paragraphIndex: 0,
+              sentenceIndex: 0,
+              startMs: 0,
+              endMs: 2500,
+            ),
+            ArticleAudioSegment(
+              paragraphIndex: 0,
+              sentenceIndex: 1,
+              startMs: 2500,
+              endMs: 5000,
+            ),
+          ],
+        );
+        final paragraphs = ArticleTextParser.splitParagraphs(article.content);
+        final fakeTts = _FakeTtsEngine();
+        final fakePodcast = _FakePodcastPlayer();
+        final controller = ArticleAudioController(
+          article: article,
+          paragraphs: paragraphs,
+          ttsEngine: fakeTts,
+          podcastPlayer: fakePodcast,
+          audioFileResolver: (_) async => '/tmp/fake.m4a',
+        );
+
+        await controller.togglePlayerVisibility();
+        await controller.togglePlayPause();
+        expect(controller.mode, ArticleAudioMode.podcastAudio);
+        expect(controller.isPlaying, isTrue);
+
+        // 2. cümleye gelip Cihaz Sesi'ne geç.
+        fakePodcast.emitPosition(const Duration(milliseconds: 3000));
+        await Future<void>.delayed(Duration.zero);
+        expect(controller.currentSentenceIndex, 1);
+
+        await controller.toggleEngineMode();
+        expect(fakePodcast.stopCount, greaterThanOrEqualTo(1));
+        expect(controller.mode, ArticleAudioMode.deviceTts);
+        expect(controller.isPlaying, isTrue);
+        expect(fakeTts.spokenTexts.last, 'Second sentence.');
 
         controller.dispose();
       },
@@ -335,6 +418,8 @@ void main() {
         );
 
         await controller.togglePlayerVisibility();
+        expect(controller.isPlaying, isFalse);
+        await controller.togglePlayPause();
         expect(controller.mode, ArticleAudioMode.deviceTts);
         expect(controller.isPlaying, isTrue);
         expect(fakeTts.spokenTexts.first, 'First sentence.');
@@ -388,6 +473,16 @@ void main() {
         find.byKey(const ValueKey<String>('article_audio_player_bar')),
         findsOneWidget,
       );
+      // Üst kulaklık butonuna basınca otomatik çalmaz; Play tuşuyla başlar.
+      expect(audioController.isPlaying, isFalse);
+      expect(fakeTts.spokenTexts, isEmpty);
+
+      await tester.tap(
+        find.byKey(const ValueKey<String>('audio_play_pause_button')),
+      );
+      await tester.pumpAndSettle();
+      expect(audioController.isPlaying, isTrue);
+      expect(fakeTts.spokenTexts.last, 'First line here.');
       expect(find.textContaining('Cümle 1/3'), findsOneWidget);
 
       await tester.tap(

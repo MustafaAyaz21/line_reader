@@ -21,19 +21,48 @@ class ArticlesController extends ChangeNotifier {
     this._syncService, {
     Duration silentCooldown = const Duration(seconds: 30),
     Duration livePollInterval = const Duration(seconds: 35),
+    DateTime Function()? nowProvider,
   })  : _silentCooldown = silentCooldown,
-        _livePollInterval = livePollInterval;
+        _livePollInterval = livePollInterval,
+        _nowProvider = nowProvider ?? (() => DateTime.now().toUtc());
 
   final ArticlesSyncService _syncService;
   final Duration _silentCooldown;
   final Duration _livePollInterval;
+  final DateTime Function() _nowProvider;
 
+  /// SQLite / uzak kaynaktan gelen tüm makaleler (gizli ve ileri tarihli
+  /// planlı kayıtlar dahil). Kullanıcıya yalnızca görünür filtreden geçen
+  /// [_articles] sunulur.
+  List<Article> _allArticles = const <Article>[];
   List<Article> _articles = const <Article>[];
   ArticleSyncMetadata _metadata = ArticleSyncMetadata.empty;
   List<Article>? _pendingArticles;
   ArticleSyncMetadata? _pendingMetadata;
   int _pendingNewArticlesCount = 0;
   Map<ArticleLevel, int> _pendingNewByLevel = const <ArticleLevel, int>{};
+
+  /// Cloudflare HTTP `Date` başlığından hesaplanan gerçek sunucu saat farkı.
+  /// Cihaz saati ileri alınsa bile planlı makaleler gerçek zamandan önce açılmaz.
+  Duration? _serverClockOffset;
+
+  DateTime get effectiveNowUtc {
+    final localUtc = _nowProvider().toUtc();
+    final offset = _serverClockOffset;
+    return offset == null ? localUtc : localUtc.add(offset);
+  }
+
+  List<Article> _filterVisible(List<Article> source) {
+    final nowUtc = effectiveNowUtc;
+    return List<Article>.unmodifiable(
+      source.where((item) => item.isVisibleAt(nowUtc)),
+    );
+  }
+
+  void _updateServerClock(DateTime? serverTimeUtc) {
+    if (serverTimeUtc == null) return;
+    _serverClockOffset = serverTimeUtc.toUtc().difference(_nowProvider().toUtc());
+  }
 
   bool _isLoadingCache = false;
   bool _hasLoadedCache = false;
@@ -143,8 +172,9 @@ class ArticlesController extends ChangeNotifier {
       final snapshot = await _syncService.loadCachedSnapshot();
       // Eşzamanlı tamamlanan bir uzak yenileme daha taze veri getirdiyse
       // eski önbellekle üzerine yazma.
-      if (!_hasLoadedCache || _articles.isEmpty) {
-        _articles = List<Article>.unmodifiable(snapshot.articles);
+      if (!_hasLoadedCache || _allArticles.isEmpty) {
+        _allArticles = List<Article>.unmodifiable(snapshot.articles);
+        _articles = _filterVisible(_allArticles);
       }
       if (snapshot.metadata.lastSyncedAt != null ||
           _metadata.lastSyncedAt == null) {
@@ -225,13 +255,19 @@ class ArticlesController extends ChangeNotifier {
         ignoreEtag: !silent && force,
       );
       _lastAttemptAt = DateTime.now();
+      _updateServerClock(result.serverTimeUtc);
 
-      final incomingList = List<Article>.unmodifiable(result.articles);
-      if (silent &&
-          result.status == ArticleSyncStatus.updated &&
-          _articles.isNotEmpty) {
+      if (result.status == ArticleSyncStatus.updated || _allArticles.isEmpty) {
+        _allArticles = List<Article>.unmodifiable(result.articles);
+      }
+
+      // Gizli (`is_hidden`) veya henüz zamanı gelmemiş (`publish_at`) makaleleri
+      // sunucu saatine göre filtrele; zamanı yeni dolan planlı makaleler 304
+      // yanıtında bile "+N yeni makale yüklendi | Yenile" şeridine düşer.
+      final incomingVisible = _filterVisible(_allArticles);
+      if (silent && _articles.isNotEmpty) {
         final currentIds = _articles.map((item) => item.id).toSet();
-        final newlyAdded = incomingList
+        final newlyAdded = incomingVisible
             .where((item) => !currentIds.contains(item.id))
             .toList(growable: false);
 
@@ -243,17 +279,17 @@ class ArticlesController extends ChangeNotifier {
               byLevel[parsed] = (byLevel[parsed] ?? 0) + 1;
             }
           }
-          _pendingArticles = incomingList;
+          _pendingArticles = incomingVisible;
           _pendingMetadata = result.metadata;
           _pendingNewArticlesCount = newlyAdded.length;
           _pendingNewByLevel = Map<ArticleLevel, int>.unmodifiable(byLevel);
         } else {
-          _articles = incomingList;
+          _articles = incomingVisible;
           _metadata = result.metadata;
           _clearPendingState();
         }
       } else {
-        _articles = incomingList;
+        _articles = incomingVisible;
         _metadata = result.metadata;
         _clearPendingState();
       }
@@ -288,6 +324,7 @@ class ArticlesController extends ChangeNotifier {
 
   Future<void> clearCache() async {
     await _syncService.clearCache();
+    _allArticles = const <Article>[];
     _articles = const <Article>[];
     _metadata = ArticleSyncMetadata.empty;
     _clearPendingState();

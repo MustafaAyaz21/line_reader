@@ -72,6 +72,8 @@ class Article {
     this.wordMeanings = const <String, String>{},
     this.sentenceTranslations = const <String, String>{},
     this.paragraphTranslations = const <String>[],
+    this.isHidden = false,
+    this.publishAt,
     this.publishedAt,
     this.updatedAt,
     this.sortOrder = 0,
@@ -115,6 +117,14 @@ class Article {
   /// Paragraf sırasıyla birebir eşleşir.
   final List<String> paragraphTranslations;
 
+  /// Yönetici tarafından gizlenmiş makale (`is_hidden: true`).
+  /// Uygulamada son kullanıcıya hiçbir ekranda gösterilmez.
+  final bool isHidden;
+
+  /// Planlı yayın tarih/saati (`publish_at`). Gelecekteyse zamanı gelene kadar
+  /// kullanıcıya görünmez; zamanı gelince bilgisayar kapalı olsa bile otomatik açılır.
+  final DateTime? publishAt;
+
   final DateTime? publishedAt;
   final DateTime? updatedAt;
   final int sortOrder;
@@ -122,6 +132,16 @@ class Article {
   /// Gelecekte JSON kaynağına eklenecek ek alanların önbellekte kaybolmaması
   /// için ham JSON kaydı saklanır.
   final String rawJson;
+
+  /// Makalenin verilen UTC zamanında son kullanıcıya görünür olup olmadığını döner.
+  bool isVisibleAt(DateTime nowUtc) {
+    if (isHidden) return false;
+    final scheduled = publishAt;
+    if (scheduled != null && scheduled.toUtc().isAfter(nowUtc.toUtc())) {
+      return false;
+    }
+    return true;
+  }
 
   /// Açık makalenin `word_meanings` haritasında önce kelimenin kendisini,
   /// bulunamazsa `EnglishMorphologyResolver` kök/temel form adaylarını arar.
@@ -352,6 +372,14 @@ class Article {
     final paragraphTranslations = _readParagraphTranslations(
       json['paragraph_translations'] ?? json['paragraphTranslations'],
     );
+    final isHidden = _readBool(
+      json,
+      const <String>['is_hidden', 'isHidden', 'hidden'],
+    );
+    final publishAt = _readDateTime(
+      json,
+      const <String>['publish_at', 'publishAt', 'scheduled_at', 'scheduledAt'],
+    );
     final publishedAt = _readDateTime(
       json,
       const <String>['published_at', 'publishedAt', 'date'],
@@ -388,6 +416,8 @@ class Article {
       sentenceTranslations:
           Map<String, String>.unmodifiable(sentenceTranslations),
       paragraphTranslations: List<String>.unmodifiable(paragraphTranslations),
+      isHidden: isHidden,
+      publishAt: publishAt,
       publishedAt: publishedAt,
       updatedAt: updatedAt,
       sortOrder: fallbackIndex,
@@ -401,6 +431,7 @@ class Article {
     final rawJson = (row['raw_json'] as String?) ?? '{}';
     final extractedAudio = _extractAudioFromRawJson(rawJson);
     final extractedTranslations = _extractPreparedTranslationsFromRawJson(rawJson);
+    final extractedVisibility = _extractVisibilityFromRawJson(rawJson);
 
     return Article(
       id: (row['id'] as String? ?? '').trim(),
@@ -425,6 +456,8 @@ class Article {
       ),
       sentenceTranslations: extractedTranslations.sentenceTranslations,
       paragraphTranslations: extractedTranslations.paragraphTranslations,
+      isHidden: extractedVisibility.isHidden,
+      publishAt: extractedVisibility.publishAt,
       publishedAt: publishedMillis != null
           ? DateTime.fromMillisecondsSinceEpoch(publishedMillis)
           : null,
@@ -483,9 +516,55 @@ class Article {
         'sentence_translations': sentenceTranslations,
       if (paragraphTranslations.isNotEmpty)
         'paragraph_translations': paragraphTranslations,
+      if (isHidden) 'is_hidden': true,
+      if (publishAt != null) 'publish_at': publishAt!.toUtc().toIso8601String(),
       if (publishedAt != null) 'published_at': publishedAt!.toIso8601String(),
       if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
     };
+  }
+
+  static ({bool isHidden, DateTime? publishAt}) _extractVisibilityFromRawJson(
+    String rawJson,
+  ) {
+    if (rawJson.trim().isEmpty || rawJson == '{}') {
+      return (isHidden: false, publishAt: null);
+    }
+    try {
+      final decoded = jsonDecode(rawJson);
+      if (decoded is Map) {
+        final map = Map<String, Object?>.from(decoded);
+        return (
+          isHidden: _readBool(
+            map,
+            const <String>['is_hidden', 'isHidden', 'hidden'],
+          ),
+          publishAt: _readDateTime(
+            map,
+            const <String>[
+              'publish_at',
+              'publishAt',
+              'scheduled_at',
+              'scheduledAt',
+            ],
+          ),
+        );
+      }
+    } catch (_) {}
+    return (isHidden: false, publishAt: null);
+  }
+
+  static bool _readBool(Map<String, Object?> json, List<String> keys) {
+    for (final key in keys) {
+      final value = json[key];
+      if (value is bool) return value;
+      if (value is num) return value != 0;
+      if (value is String) {
+        final norm = value.trim().toLowerCase();
+        if (norm == 'true' || norm == '1' || norm == 'yes') return true;
+        if (norm == 'false' || norm == '0' || norm == 'no') return false;
+      }
+    }
+    return false;
   }
 
   static List<ArticleAudioSegment> _readAudioSegments(Object? raw) {
@@ -782,10 +861,11 @@ class ArticleFeedPayload {
     this.remoteVersion,
     this.updatedAt,
     this.etag,
+    this.serverTimeUtc,
     this.notModified = false,
   });
 
-  const ArticleFeedPayload.notModified({this.etag})
+  const ArticleFeedPayload.notModified({this.etag, this.serverTimeUtc})
       : articles = const <Article>[],
         remoteVersion = null,
         updatedAt = null,
@@ -795,6 +875,7 @@ class ArticleFeedPayload {
   final String? remoteVersion;
   final DateTime? updatedAt;
   final String? etag;
+  final DateTime? serverTimeUtc;
   final bool notModified;
 }
 
@@ -846,12 +927,14 @@ class ArticleSyncResult {
     required this.status,
     required this.articles,
     required this.metadata,
+    this.serverTimeUtc,
     this.errorMessage,
   });
 
   final ArticleSyncStatus status;
   final List<Article> articles;
   final ArticleSyncMetadata metadata;
+  final DateTime? serverTimeUtc;
   final String? errorMessage;
 
   bool get isOfflineFallback => status == ArticleSyncStatus.offlineFallback;
