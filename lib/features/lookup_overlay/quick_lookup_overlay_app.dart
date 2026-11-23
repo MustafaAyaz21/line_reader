@@ -5,6 +5,7 @@ import '../../core/localization/app_locale.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/platform/lookup_overlay_channel.dart';
 import '../../core/platform/process_text_channel.dart';
+import '../../core/settings/display_preferences_controller.dart';
 import '../../core/settings/ipa_accent_controller.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/app_theme_controller.dart';
@@ -65,6 +66,7 @@ class _QuickLookupOverlayAppState extends State<QuickLookupOverlayApp> {
     _ownsLocaleController = widget.localeController == null;
     _localeController = widget.localeController ?? (AppLocaleController()..load());
     IpaAccentController.shared.load();
+    DisplayPreferencesController.shared.load(force: true);
     AppThemeController.shared.load();
   }
 
@@ -84,6 +86,7 @@ class _QuickLookupOverlayAppState extends State<QuickLookupOverlayApp> {
         listenable: Listenable.merge(<Listenable>[
           _localeController,
           AppThemeController.shared,
+          DisplayPreferencesController.shared,
         ]),
         builder: (context, _) {
           final preset = AppThemeController.shared.preset;
@@ -663,7 +666,8 @@ class _QuickLookupOverlayScreenState extends State<_QuickLookupOverlayScreen>
                     ),
                   ),
                   const Spacer(),
-                  if (_queryText.isNotEmpty)
+                  if (_queryText.isNotEmpty &&
+                      DisplayPreferencesController.shared.overlayShowTts)
                     IconButton.filledTonal(
                       key: const ValueKey<String>('quick_lookup_tts_button'),
                       onPressed: _handleSpeak,
@@ -708,7 +712,11 @@ class _QuickLookupOverlayScreenState extends State<_QuickLookupOverlayScreen>
                     if (!_isPassageMode &&
                         _lexiconInfo != null &&
                         _lexiconInfo!.hasAnyIpa)
-                      WordIpaBadge(lexiconInfo: _lexiconInfo),
+                      WordIpaBadge(
+                        lexiconInfo: _lexiconInfo,
+                        modeOverride:
+                            DisplayPreferencesController.shared.overlayIpaMode,
+                      ),
                   ],
                 ),
               ],
@@ -726,40 +734,57 @@ class _QuickLookupOverlayScreenState extends State<_QuickLookupOverlayScreen>
                 if (!_isPassageMode &&
                     _lexiconInfo != null &&
                     _lexiconInfo!.hasRelations) ...<Widget>[
-                  const SizedBox(height: 10),
-                  WordRelationsSection(
-                    synonyms: _lexiconInfo!.synonyms,
-                    antonyms: _lexiconInfo!.antonyms,
-                    selectedSynonyms: _selectedSynonyms,
-                    selectedAntonyms: _selectedAntonyms,
-                    onToggleSynonym: (term) {
-                      setState(() {
-                        if (!_selectedSynonyms.remove(term)) {
-                          _selectedSynonyms.add(term);
-                        }
-                        _savedJustNow = false;
-                      });
-                    },
-                    onToggleAntonym: (term) {
-                      setState(() {
-                        if (!_selectedAntonyms.remove(term)) {
-                          _selectedAntonyms.add(term);
-                        }
-                        _savedJustNow = false;
-                      });
-                    },
-                    onToggleAll: (selectAll) {
-                      final info = _lexiconInfo;
-                      if (info == null) return;
-                      setState(() {
-                        _selectedSynonyms.clear();
-                        _selectedAntonyms.clear();
-                        if (selectAll) {
-                          _selectedSynonyms.addAll(info.synonyms);
-                          _selectedAntonyms.addAll(info.antonyms);
-                        }
-                        _savedJustNow = false;
-                      });
+                  ListenableBuilder(
+                    listenable: DisplayPreferencesController.shared,
+                    builder: (context, _) {
+                      final prefs = DisplayPreferencesController.shared;
+                      final visibleSyn = prefs.overlayShowSynonyms
+                          ? _lexiconInfo!.synonyms
+                          : const <String>[];
+                      final visibleAnt = prefs.overlayShowAntonyms
+                          ? _lexiconInfo!.antonyms
+                          : const <String>[];
+                      if (visibleSyn.isEmpty && visibleAnt.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: WordRelationsSection(
+                          synonyms: visibleSyn,
+                          antonyms: visibleAnt,
+                          selectedSynonyms: _selectedSynonyms,
+                          selectedAntonyms: _selectedAntonyms,
+                          onToggleSynonym: (term) {
+                            setState(() {
+                              if (!_selectedSynonyms.remove(term)) {
+                                _selectedSynonyms.add(term);
+                              }
+                              _savedJustNow = false;
+                            });
+                          },
+                          onToggleAntonym: (term) {
+                            setState(() {
+                              if (!_selectedAntonyms.remove(term)) {
+                                _selectedAntonyms.add(term);
+                              }
+                              _savedJustNow = false;
+                            });
+                          },
+                          onToggleAll: (selectAll) {
+                            final info = _lexiconInfo;
+                            if (info == null) return;
+                            setState(() {
+                              _selectedSynonyms.clear();
+                              _selectedAntonyms.clear();
+                              if (selectAll) {
+                                _selectedSynonyms.addAll(visibleSyn);
+                                _selectedAntonyms.addAll(visibleAnt);
+                              }
+                              _savedJustNow = false;
+                            });
+                          },
+                        ),
+                      );
                     },
                   ),
                 ],
@@ -798,7 +823,8 @@ class _QuickLookupOverlayScreenState extends State<_QuickLookupOverlayScreen>
             ),
           ),
         // Alt aksiyonlar (kelime modunda: liste seç + yeni liste + ekle + uygulamada aç)
-        if (!_isPassageMode) ...[
+        if (!_isPassageMode &&
+            DisplayPreferencesController.shared.overlayShowSaveBar) ...[
           Divider(height: 1, color: colorScheme.outlineVariant),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),

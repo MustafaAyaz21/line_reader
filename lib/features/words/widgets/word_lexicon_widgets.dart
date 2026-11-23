@@ -1,21 +1,26 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/localization/app_strings.dart';
+import '../../../core/settings/display_preferences_controller.dart';
 import '../../../core/settings/ipa_accent_controller.dart';
 import '../../translation/models/word_lexicon_info.dart';
 
-/// Amerikan (US) ve İngiliz (UK) doğrulanmış IPA okunuşlarını kullanıcının tek
-/// bir aksan seçmesine gerek kalmadan yan yana kompakt haplar halinde gösterir.
+/// Amerikan (US) ve İngiliz (UK) doğrulanmış IPA okunuşlarını kullanıcının
+/// seçtiği moda (`both`, `usOnly`, `ukOnly`, `off`) göre kompakt haplar halinde gösterir.
 class WordIpaBadge extends StatelessWidget {
   const WordIpaBadge({
     super.key,
     required this.lexiconInfo,
     this.accentController,
+    this.displayPreferences,
+    this.modeOverride,
     this.compact = false,
   });
 
   final WordLexiconInfo? lexiconInfo;
   final IpaAccentController? accentController;
+  final DisplayPreferencesController? displayPreferences;
+  final IpaDisplayMode? modeOverride;
   final bool compact;
 
   @override
@@ -34,22 +39,41 @@ class WordIpaBadge extends StatelessWidget {
     }
 
     final controller = accentController ?? IpaAccentController.shared;
+    final prefs = displayPreferences ?? DisplayPreferencesController.shared;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
     return ListenableBuilder(
-      listenable: controller,
+      listenable: Listenable.merge(<Listenable>[controller, prefs]),
       builder: (context, _) {
-        if (!controller.isEnabled) {
+        final effectiveMode = modeOverride ??
+            (!controller.isEnabled ? IpaDisplayMode.off : prefs.appIpaMode);
+        if (!effectiveMode.isEnabled) {
           return const SizedBox.shrink();
         }
+
+        // Eğer kullanıcı tek aksan (örn. Sadece US) seçtiyse ve kelimede yalnızca
+        // diğer aksan varsa yanlış etiket basmadan mevcut aksanı gösterir.
+        var showUsPill = hasUs && effectiveMode.showUs;
+        var showUkPill = hasUk && effectiveMode.showUk;
+        if (!showUsPill && !showUkPill) {
+          if (hasUs) {
+            showUsPill = true;
+          } else if (hasUk) {
+            showUkPill = true;
+          }
+        }
+        if (!showUsPill && !showUkPill) {
+          return const SizedBox.shrink();
+        }
+
         return Wrap(
           key: const ValueKey<String>('word_ipa_badge'),
           spacing: compact ? 5 : 6,
           runSpacing: 4,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: <Widget>[
-            if (hasUs)
+            if (showUsPill)
               _IpaPill(
                 key: const ValueKey<String>('word_ipa_badge_us'),
                 accentLabel: IpaAccent.us.shortLabel,
@@ -57,11 +81,11 @@ class WordIpaBadge extends StatelessWidget {
                   IpaAccent.us.turkishLabel,
                   IpaAccent.us.englishLabel,
                 ),
-                ipa: cleanUs,
+                ipa: cleanUs!,
                 labelColor: colorScheme.primary,
                 compact: compact,
               ),
-            if (hasUk)
+            if (showUkPill)
               _IpaPill(
                 key: const ValueKey<String>('word_ipa_badge_uk'),
                 accentLabel: IpaAccent.uk.shortLabel,
@@ -69,7 +93,7 @@ class WordIpaBadge extends StatelessWidget {
                   IpaAccent.uk.turkishLabel,
                   IpaAccent.uk.englishLabel,
                 ),
-                ipa: cleanUk,
+                ipa: cleanUk!,
                 labelColor: colorScheme.tertiary,
                 compact: compact,
               ),

@@ -169,6 +169,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.tap(
+      find.byKey(const ValueKey<String>('settings_cat_appearance')),
+    );
+    await tester.pumpAndSettle();
+
     final electricCoralTile = find.byKey(
       const ValueKey<String>('settings_theme_electric_coral'),
     );

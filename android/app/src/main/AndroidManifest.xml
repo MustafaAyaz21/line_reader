@@ -51,7 +51,9 @@
             <meta-data
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/LineLookupOverlayTheme" />
-            <intent-filter android:label="Line&apos;da Bak">
+            <intent-filter
+                android:label="Line&apos;da Bak"
+                android:priority="999">
                 <action android:name="android.intent.action.PROCESS_TEXT" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />

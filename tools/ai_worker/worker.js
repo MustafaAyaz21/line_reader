@@ -836,6 +836,9 @@ async function handleDeveloperPanelRequest(request, env, verifiedUser, path, met
       ...(rawArticle.audio_url ? { audio_url: String(rawArticle.audio_url).trim() } : {}),
       ...(rawArticle.audio_voice ? { audio_voice: String(rawArticle.audio_voice).trim() } : {}),
       ...(rawArticle.audio_duration_sec ? { audio_duration_sec: Number(rawArticle.audio_duration_sec) } : {}),
+      ...(Array.isArray(rawArticle.audio_segments) && rawArticle.audio_segments.length > 0
+        ? { audio_segments: rawArticle.audio_segments }
+        : {}),
       is_hidden: Boolean(rawArticle.is_hidden),
       ...(rawArticle.publish_at ? { publish_at: String(rawArticle.publish_at).trim() } : {}),
     };
@@ -876,6 +879,14 @@ function slugifyArticleId(raw) {
   return cleaned || `article-${Date.now()}`;
 }
 
+function extractArticlesArray(parsed) {
+  if (Array.isArray(parsed)) return parsed;
+  if (parsed && typeof parsed === "object" && Array.isArray(parsed.articles)) {
+    return parsed.articles;
+  }
+  return null;
+}
+
 async function loadArticlesList(env) {
   if (env && env.DB) {
     try {
@@ -885,7 +896,8 @@ async function loadArticlesList(env) {
         .first();
       if (row && row.payload_json) {
         const parsed = JSON.parse(row.payload_json);
-        if (Array.isArray(parsed)) return parsed;
+        const list = extractArticlesArray(parsed);
+        if (list) return list;
       }
     } catch (_) {}
   }
@@ -894,7 +906,8 @@ async function loadArticlesList(env) {
     const res = await fetch(`${GITHUB_ARTICLES_RAW_URL}?t=${Date.now()}`);
     if (res.ok) {
       const parsed = await res.json();
-      if (Array.isArray(parsed)) return parsed;
+      const list = extractArticlesArray(parsed);
+      if (list) return list;
     }
   } catch (_) {}
 
@@ -902,7 +915,12 @@ async function loadArticlesList(env) {
 }
 
 async function saveArticlesList(env, articles, commitMessage) {
-  const payloadText = JSON.stringify(articles, null, 2);
+  const envelope = {
+    version: 1,
+    updated_at: new Date().toISOString(),
+    articles,
+  };
+  const payloadText = JSON.stringify(envelope, null, 2);
   const etag = `"articles-${Date.now()}-${payloadText.length}"`;
   await ensureSchema(env.DB);
   await env.DB
@@ -965,7 +983,39 @@ async function generateArticleWithGemini(apiKey, level, topic) {
     "3. Include 25 to 60 key content words in word_relations with ONLY synonyms and antonyms that match the EXACT sense used in this article's sentences.",
   ].join("\n");
 
-  const models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-flash-lite"];
+  const models = [
+    "gemini-flash-latest",
+    "gemini-3-flash-preview",
+    "gemini-2.5-flash",
+    "gemini-2.5-pro",
+  ];
+  // Eğer sabit modellerin hepsi 404 verirse API anahtarının desteklediği aktif Flash modelini otomatik keşfet.
+  try {
+    const listRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`
+    );
+    if (listRes.ok) {
+      const listData = await listRes.json();
+      const apiModels = Array.isArray(listData?.models) ? listData.models : [];
+      for (const m of apiModels) {
+        const name = String(m?.name || "").replace(/^models\//, "");
+        const methods = Array.isArray(m?.supportedGenerationMethods)
+          ? m.supportedGenerationMethods
+          : [];
+        if (
+          methods.includes("generateContent") &&
+          name.includes("gemini") &&
+          name.includes("flash") &&
+          !name.includes("tts") &&
+          !name.includes("image") &&
+          !models.includes(name)
+        ) {
+          models.push(name);
+        }
+      }
+    }
+  } catch (_) {}
+
   let lastError = "Gemini yanıt vermedi.";
 
   for (const model of models) {
@@ -1091,11 +1141,101 @@ async function generatePodcastAudioWithGemini(env, articleId, title, content, vo
     `Add podcast audio for ${articleId}`
   );
 
+  // Cloudflare Workers AI Whisper ile gerçek cümle zaman damgalarını (audio_segments) çıkar.
+  const audioSegments = await alignAudioSegmentsWithWhisper(env, wavBytes, content, durationSec * 1000);
+
   return {
     audio_url: `https://raw.githubusercontent.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/main/${repoPath}`,
     audio_voice: voiceName || "Kore",
     audio_duration_sec: durationSec,
+    ...(audioSegments.length > 0 ? { audio_segments: audioSegments } : {}),
   };
+}
+
+/**
+ * Cloudflare Workers AI Whisper (`@cf/openai/whisper`) ile ses dosyasından
+ * her cümlenin gerçek milisaniye başlangıç/bitişini hizalar.
+ */
+async function alignAudioSegmentsWithWhisper(env, wavBytes, content, totalDurationMs) {
+  if (!env || !env.AI || !content) return [];
+  try {
+    const paragraphs = String(content)
+      .split(/\n\s*\n/)
+      .map((p) => p.trim())
+      .filter(Boolean);
+    const sentences = [];
+    paragraphs.forEach((pText, pIdx) => {
+      const parts = pText
+        .split(/(?<=[.!?])\s+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      parts.forEach((text, sIdx) => {
+        sentences.push({ p: pIdx, s: sIdx, text });
+      });
+    });
+    if (sentences.length === 0) return [];
+
+    // Whisper girişi: 8-bit dizi olarak WAV baytları (küçük/orta makaleler için doğrudan çalışır).
+    const whisperRes = await env.AI.run("@cf/openai/whisper", {
+      audio: [...wavBytes],
+    });
+
+    const words = Array.isArray(whisperRes?.words) ? whisperRes.words : [];
+    const vttSegments = Array.isArray(whisperRes?.segments) ? whisperRes.segments : [];
+    if (words.length === 0 && vttSegments.length === 0) return [];
+
+    const norm = (str) => String(str || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const aligned = [];
+
+    if (words.length > 0) {
+      let cursor = 0;
+      for (const sent of sentences) {
+        const tokens = sent.text.split(/\s+/).map(norm).filter(Boolean);
+        if (tokens.length === 0) continue;
+        const firstTok = tokens[0];
+        let startIdx = cursor;
+        const searchEnd = Math.min(words.length, cursor + 14);
+        for (let k = cursor; k < searchEnd; k++) {
+          if (norm(words[k]?.word) === firstTok) {
+            startIdx = k;
+            break;
+          }
+        }
+        const endIdx = Math.min(words.length - 1, startIdx + Math.max(1, tokens.length - 1));
+        const startMs = Math.max(0, Math.round((Number(words[startIdx]?.start) || 0) * 1000));
+        const endMs = Math.max(
+          startMs + 250,
+          Math.round((Number(words[endIdx]?.end) || Number(words[startIdx]?.end) || 0) * 1000)
+        );
+        aligned.push({ p: sent.p, s: sent.s, start_ms: startMs, end_ms: endMs });
+        cursor = Math.min(words.length - 1, endIdx + 1);
+      }
+      return aligned;
+    }
+
+    // Kelime zamanı yoksa segment zamanlarından orantılı dağıt.
+    if (vttSegments.length > 0) {
+      const segStartMs = Math.round((Number(vttSegments[0]?.start) || 0) * 1000);
+      const segEndMs = Math.max(
+        totalDurationMs,
+        Math.round((Number(vttSegments[vttSegments.length - 1]?.end) || 0) * 1000)
+      );
+      const span = Math.max(1000, segEndMs - segStartMs);
+      const totalChars = sentences.reduce((acc, s) => acc + s.text.length + 6, 0);
+      let acc = 0;
+      for (const sent of sentences) {
+        const w = sent.text.length + 6;
+        const startMs = segStartMs + Math.round((acc / totalChars) * span);
+        acc += w;
+        const endMs = segStartMs + Math.round((acc / totalChars) * span);
+        aligned.push({ p: sent.p, s: sent.s, start_ms: startMs, end_ms: endMs });
+      }
+      return aligned;
+    }
+    return [];
+  } catch (_) {
+    return [];
+  }
 }
 
 async function upsertGitHubFile(githubToken, repoPath, contentBase64, commitMessage) {

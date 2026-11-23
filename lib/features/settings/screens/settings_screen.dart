@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/localization/app_locale.dart';
 import '../../../core/localization/app_strings.dart';
 import '../../../core/settings/api_key_controller.dart';
+import '../../../core/settings/display_preferences_controller.dart';
 import '../../../core/settings/ipa_accent_controller.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_theme_backdrop.dart';
@@ -41,6 +42,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     IpaAccentController.shared.load();
+    DisplayPreferencesController.shared.load();
     AppThemeController.shared.load();
     if (widget.authController.isAuthenticated) {
       widget.authController.refreshEntitlement();
@@ -133,6 +135,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
   }
 
+  void _openSubPage({
+    required BuildContext context,
+    required String Function(AppStrings s) titleBuilder,
+    required Widget Function(
+      BuildContext ctx,
+      ThemeData theme,
+      ColorScheme colorScheme,
+      AppStrings s,
+    ) bodyBuilder,
+  }) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _SettingsCategorySubPage(
+          listenable: Listenable.merge(<Listenable>[
+            widget.authController,
+            widget.localeController,
+            AppThemeController.shared,
+            IpaAccentController.shared,
+            DisplayPreferencesController.shared,
+          ]),
+          titleBuilder: titleBuilder,
+          bodyBuilder: bodyBuilder,
+        ),
+      ),
+    );
+  }
+
+  String _profileSummary(AppStrings s) {
+    final auth = widget.authController;
+    if (auth.isAuthenticated) {
+      if (auth.isAuthorizedStaff) {
+        return s.t('Geliştirici • Sınırsız', 'Developer • Unlimited');
+      }
+      if (auth.isUnlimited) {
+        return s.t('Premium Üye • Sınırsız', 'Premium Member • Unlimited');
+      }
+      return s.t(
+        'Standart Hesap • ${auth.dailyRemainingToday} / ${auth.dailyTranslationLimit}',
+        'Standard Account • ${auth.dailyRemainingToday} / ${auth.dailyTranslationLimit}',
+      );
+    }
+    return s.t(
+      'Misafir Modu • ${auth.guestRemainingToday} / ${AuthController.guestDailyTranslationLimit}',
+      'Guest Mode • ${auth.guestRemainingToday} / ${AuthController.guestDailyTranslationLimit}',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = context.l10n;
@@ -146,171 +195,404 @@ class _SettingsScreenState extends State<SettingsScreen> {
         appBar: AppBar(
           title: Text(s.settingsTitle),
         ),
-        body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-        children: <Widget>[
-          // 1) Hesap / Yetki / Misafir Bölümü
-          _SectionTitle(label: s.t('Hesap', 'Account')),
-          const SizedBox(height: 8),
-          ListenableBuilder(
-            listenable: widget.authController,
-            builder: (context, _) {
-              return _buildAccountCard(context, theme, colorScheme, s);
-            },
-          ),
-          const SizedBox(height: 22),
+        body: ListenableBuilder(
+          listenable: Listenable.merge(<Listenable>[
+            widget.authController,
+            widget.localeController,
+            AppThemeController.shared,
+            IpaAccentController.shared,
+            DisplayPreferencesController.shared,
+          ]),
+          builder: (context, _) {
+            final isEn = s.isEn;
+            final activeTheme = AppThemeController.shared.preset
+                .titleForLocale(isEnglish: isEn);
+            final langLabel = widget.localeController.language == AppLanguage.en
+                ? 'English'
+                : 'Türkçe';
+            final prefs = DisplayPreferencesController.shared;
+            final auth = widget.authController;
 
-          // 2) Dil Seçimi Bölümü (Sadece Arayüz: Türkçe / İngilizce)
-          _SectionTitle(label: s.t('Dil Seçimi', 'Language')),
-          const SizedBox(height: 8),
-          ListenableBuilder(
-            listenable: widget.localeController,
-            builder: (context, _) {
-              return Card(
-                margin: EdgeInsets.zero,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      Row(
-                        children: <Widget>[
-                          Icon(
-                            Icons.translate_rounded,
-                            size: 20,
-                            color: colorScheme.primary,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              s.t(
-                                'Uygulama Arayüz Dili',
-                                'App Interface Language',
-                              ),
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      SegmentedButton<AppLanguage>(
-                        key: const ValueKey<String>(
-                          'settings_language_selector',
-                        ),
-                        segments: const <ButtonSegment<AppLanguage>>[
-                          ButtonSegment<AppLanguage>(
-                            value: AppLanguage.tr,
-                            label: Text('Türkçe'),
-                          ),
-                          ButtonSegment<AppLanguage>(
-                            value: AppLanguage.en,
-                            label: Text('English'),
-                          ),
-                        ],
-                        selected: <AppLanguage>{
-                          widget.localeController.language,
-                        },
-                        onSelectionChanged: (selected) {
-                          widget.localeController.setLanguage(selected.first);
-                        },
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        s.t(
-                          'Yalnızca uygulama arayüzü değişir; kelime çevirileri Türkçe, makaleler orijinal dilinde kalır.',
-                          'Only the app interface changes; word translations remain in Turkish and articles stay in their original language.',
-                        ),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                          height: 1.4,
-                        ),
-                      ),
-                    ],
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
+              children: <Widget>[
+                _SettingsCategoryCard(
+                  key: const ValueKey<String>('settings_cat_profile'),
+                  icon: auth.isAuthorizedStaff
+                      ? Icons.code_rounded
+                      : Icons.person_outline_rounded,
+                  iconBg: colorScheme.primaryContainer,
+                  iconColor: colorScheme.onPrimaryContainer,
+                  title: s.t('Profil ve Hesap', 'Profile & Account'),
+                  subtitle: _profileSummary(s),
+                  onTap: () => _openSubPage(
+                    context: context,
+                    titleBuilder: (ls) =>
+                        ls.t('Profil ve Hesap', 'Profile & Account'),
+                    bodyBuilder: (ctx, th, cs, ls) => ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
+                      children: <Widget>[
+                        _buildAccountCard(ctx, th, cs, ls),
+                      ],
+                    ),
                   ),
                 ),
-              );
-            },
-          ),
-          const SizedBox(height: 22),
-
-          // 3) Telaffuz ve IPA Aksanı (US & UK IPA Aç / Kapat)
-          _SectionTitle(
-            label: s.t('Telaffuz ve IPA Aksanı', 'Pronunciation & IPA Accent'),
-          ),
-          const SizedBox(height: 8),
-          ListenableBuilder(
-            listenable: IpaAccentController.shared,
-            builder: (context, _) {
-              final ipaEnabled = IpaAccentController.shared.isEnabled;
-              return Card(
-                margin: EdgeInsets.zero,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 12, 14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      Row(
-                        children: <Widget>[
-                          Icon(
-                            Icons.record_voice_over_rounded,
-                            size: 20,
-                            color: colorScheme.primary,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              s.t('IPA Okunuş Aksanı', 'IPA Pronunciation'),
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          Switch(
-                            key: const ValueKey<String>(
-                              'settings_ipa_enabled_switch',
-                            ),
-                            value: ipaEnabled,
-                            onChanged: (value) {
-                              IpaAccentController.shared.setEnabled(value);
-                            },
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        s.t(
-                          'Açıkken kelimelerin yanında hem Amerikan (US) hem İngiliz (UK) IPA okunuşları birlikte gösterilir.',
-                          'When enabled, both American (US) and British (UK) IPA pronunciations are shown beside words.',
+                const SizedBox(height: 12),
+                _SettingsCategoryCard(
+                  key: const ValueKey<String>('settings_cat_appearance'),
+                  icon: Icons.palette_outlined,
+                  iconBg: colorScheme.secondaryContainer,
+                  iconColor: colorScheme.onSecondaryContainer,
+                  title: s.t('Görünüm ve Temalar', 'Appearance & Themes'),
+                  subtitle: '$langLabel • $activeTheme',
+                  onTap: () => _openSubPage(
+                    context: context,
+                    titleBuilder: (ls) =>
+                        ls.t('Görünüm ve Temalar', 'Appearance & Themes'),
+                    bodyBuilder: (ctx, th, cs, ls) => ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
+                      children: <Widget>[
+                        _SectionTitle(label: ls.t('Dil Seçimi', 'Language')),
+                        const SizedBox(height: 8),
+                        _buildLanguageCard(th, cs, ls),
+                        const SizedBox(height: 22),
+                        _SectionTitle(
+                          label: ls.t('Uygulama Teması', 'App Theme'),
                         ),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                          height: 1.4,
-                        ),
-                      ),
-                    ],
+                        const SizedBox(height: 8),
+                        _buildThemeSelectorCard(ctx, th, cs, ls),
+                      ],
+                    ),
                   ),
                 ),
-              );
-            },
-          ),
-          const SizedBox(height: 22),
+                const SizedBox(height: 12),
+                _SettingsCategoryCard(
+                  key: const ValueKey<String>('settings_cat_features'),
+                  icon: Icons.tune_rounded,
+                  iconBg: colorScheme.tertiaryContainer,
+                  iconColor: colorScheme.onTertiaryContainer,
+                  title: s.t('Özellikler', 'Features'),
+                  subtitle:
+                      'IPA: ${prefs.appIpaMode.label(isEnglish: isEn)} • ${s.t('Eş & Zıt Anlam', 'Synonyms & Antonyms')}',
+                  onTap: () => _openSubPage(
+                    context: context,
+                    titleBuilder: (ls) => ls.t('Özellikler', 'Features'),
+                    bodyBuilder: (ctx, th, cs, ls) =>
+                        _buildFeaturesBody(th, cs, ls),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _SettingsCategoryCard(
+                  key: const ValueKey<String>('settings_cat_quick_lookup'),
+                  icon: Icons.manage_search_rounded,
+                  iconBg: colorScheme.primaryContainer.withAlpha(200),
+                  iconColor: colorScheme.primary,
+                  title: s.t("Line'da Bak", 'Quick Lookup'),
+                  subtitle:
+                      'IPA: ${prefs.overlayIpaMode.label(isEnglish: isEn)} • ${s.t('Mini kart özelleştirme', 'Customize mini card')}',
+                  onTap: () => _openSubPage(
+                    context: context,
+                    titleBuilder: (ls) =>
+                        ls.t("Line'da Bak Ayarları", 'Quick Lookup Settings'),
+                    bodyBuilder: (ctx, th, cs, ls) =>
+                        _buildQuickLookupBody(th, cs, ls),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
 
-          // 4) Uygulama Teması (Kod Tabanlı Gradyan Temalar + Varsayılan)
-          _SectionTitle(
-            label: s.t('Uygulama Teması', 'App Theme'),
-          ),
-          const SizedBox(height: 8),
-          ListenableBuilder(
-            listenable: AppThemeController.shared,
-            builder: (context, _) {
-              return _buildThemeSelectorCard(context, theme, colorScheme, s);
-            },
-          ),
-        ],
+  Widget _buildLanguageCard(
+    ThemeData theme,
+    ColorScheme colorScheme,
+    AppStrings s,
+  ) {
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Icon(
+                  Icons.translate_rounded,
+                  size: 20,
+                  color: colorScheme.primary,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    s.t('Uygulama Arayüz Dili', 'App Interface Language'),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SegmentedButton<AppLanguage>(
+              key: const ValueKey<String>('settings_language_selector'),
+              segments: const <ButtonSegment<AppLanguage>>[
+                ButtonSegment<AppLanguage>(
+                  value: AppLanguage.tr,
+                  label: Text('Türkçe'),
+                ),
+                ButtonSegment<AppLanguage>(
+                  value: AppLanguage.en,
+                  label: Text('English'),
+                ),
+              ],
+              selected: <AppLanguage>{widget.localeController.language},
+              onSelectionChanged: (selected) {
+                widget.localeController.setLanguage(selected.first);
+              },
+            ),
+            const SizedBox(height: 10),
+            Text(
+              s.t(
+                'Yalnızca uygulama arayüzü değişir; kelime çevirileri Türkçe, makaleler orijinal dilinde kalır.',
+                'Only the app interface changes; word translations remain in Turkish and articles stay in their original language.',
+              ),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ),
       ),
-      ),
+    );
+  }
+
+  Widget _buildFeaturesBody(
+    ThemeData theme,
+    ColorScheme colorScheme,
+    AppStrings s,
+  ) {
+    final prefs = DisplayPreferencesController.shared;
+    final isEn = s.isEn;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
+      children: <Widget>[
+        _SectionTitle(
+          label: s.t('Telaffuz ve IPA Gösterimi', 'Pronunciation & IPA'),
+        ),
+        const SizedBox(height: 8),
+        Card(
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Text(
+                  s.t('Uygulama İçi IPA Modu', 'In-App IPA Display'),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  s.t(
+                    'Makalelerde, tarayıcıda ve kelime listelerinde hangi IPA okunuşlarının görüneceğini seçin.',
+                    'Choose which IPA pronunciations appear across articles, browser, and word lists.',
+                  ),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: IpaDisplayMode.values.map((mode) {
+                    return ChoiceChip(
+                      key: ValueKey<String>(
+                        'settings_app_ipa_${mode.storageValue}',
+                      ),
+                      label: Text(mode.label(isEnglish: isEn)),
+                      selected: prefs.appIpaMode == mode,
+                      onSelected: (_) {
+                        prefs.setAppIpaMode(mode);
+                        IpaAccentController.shared.setEnabled(mode.isEnabled);
+                      },
+                    );
+                  }).toList(growable: false),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        _SectionTitle(
+          label: s.t('Kelime Kartı İçeriği', 'Word Card Content'),
+        ),
+        const SizedBox(height: 8),
+        Card(
+          margin: EdgeInsets.zero,
+          child: Column(
+            children: <Widget>[
+              SwitchListTile(
+                key: const ValueKey<String>('settings_app_synonyms_switch'),
+                title: Text(s.t('Eş Anlamlıları Göster', 'Show Synonyms')),
+                subtitle: Text(
+                  s.t(
+                    'Kelime önizleme kartında eş anlamlıları listeler.',
+                    'Lists synonyms inside the word preview card.',
+                  ),
+                ),
+                value: prefs.appShowSynonyms,
+                onChanged: prefs.setAppShowSynonyms,
+              ),
+              const Divider(height: 1),
+              SwitchListTile(
+                key: const ValueKey<String>('settings_app_antonyms_switch'),
+                title: Text(s.t('Zıt Anlamlıları Göster', 'Show Antonyms')),
+                subtitle: Text(
+                  s.t(
+                    'Kelime önizleme kartında zıt anlamlıları listeler.',
+                    'Lists antonyms inside the word preview card.',
+                  ),
+                ),
+                value: prefs.appShowAntonyms,
+                onChanged: prefs.setAppShowAntonyms,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickLookupBody(
+    ThemeData theme,
+    ColorScheme colorScheme,
+    AppStrings s,
+  ) {
+    final prefs = DisplayPreferencesController.shared;
+    final isEn = s.isEn;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
+      children: <Widget>[
+        _SectionTitle(
+          label: s.t("Line'da Bak Mini Kartı", 'Quick Lookup Mini Card'),
+        ),
+        const SizedBox(height: 8),
+        Card(
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Text(
+                  s.t('Mini Kartta IPA Gösterimi', 'IPA in Mini Card'),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  s.t(
+                    'Başka bir uygulamada kelime seçip "Line\'da Bak" açtığında kaç IPA aksanı görüneceğini seçin.',
+                    'Choose which IPA accents appear when using Quick Lookup from other apps.',
+                  ),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: IpaDisplayMode.values.map((mode) {
+                    return ChoiceChip(
+                      key: ValueKey<String>(
+                        'overlay_ipa_mode_${mode.storageValue}',
+                      ),
+                      label: Text(mode.label(isEnglish: isEn)),
+                      selected: prefs.overlayIpaMode == mode,
+                      onSelected: (_) => prefs.setOverlayIpaMode(mode),
+                    );
+                  }).toList(growable: false),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Card(
+          margin: EdgeInsets.zero,
+          child: Column(
+            children: <Widget>[
+              SwitchListTile(
+                key: const ValueKey<String>('overlay_show_synonyms_switch'),
+                title: Text(s.t('Eş Anlamlılar', 'Synonyms')),
+                subtitle: Text(
+                  s.t(
+                    'Mini kartta eş anlamlı kelimeleri göster.',
+                    'Show synonyms in the mini card.',
+                  ),
+                ),
+                value: prefs.overlayShowSynonyms,
+                onChanged: prefs.setOverlayShowSynonyms,
+              ),
+              const Divider(height: 1),
+              SwitchListTile(
+                key: const ValueKey<String>('overlay_show_antonyms_switch'),
+                title: Text(s.t('Zıt Anlamlılar', 'Antonyms')),
+                subtitle: Text(
+                  s.t(
+                    'Mini kartta zıt anlamlı kelimeleri göster.',
+                    'Show antonyms in the mini card.',
+                  ),
+                ),
+                value: prefs.overlayShowAntonyms,
+                onChanged: prefs.setOverlayShowAntonyms,
+              ),
+              const Divider(height: 1),
+              SwitchListTile(
+                key: const ValueKey<String>('overlay_show_tts_switch'),
+                title: Text(
+                  s.t('Sesli Dinleme Butonu', 'Pronunciation Button'),
+                ),
+                subtitle: Text(
+                  s.t(
+                    'Üst çubukta kelimeyi sesli dinleme ikonunu göster.',
+                    'Show the speaker icon in the top bar.',
+                  ),
+                ),
+                value: prefs.overlayShowTts,
+                onChanged: prefs.setOverlayShowTts,
+              ),
+              const Divider(height: 1),
+              SwitchListTile(
+                key: const ValueKey<String>('overlay_show_save_bar_switch'),
+                title: Text(
+                  s.t('Liste Seç & Kaydet Çubuğu', 'List & Save Bar'),
+                ),
+                subtitle: Text(
+                  s.t(
+                    'Kapatırsan mini kart sadece hızlı anlam gösterimi için sadeleşir.',
+                    'Turn off for an ultra-compact meaning-only mini card.',
+                  ),
+                ),
+                value: prefs.overlayShowSaveBar,
+                onChanged: prefs.setOverlayShowSaveBar,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -1036,6 +1318,123 @@ class _SectionTitle extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
       ),
+    );
+  }
+}
+
+class _SettingsCategoryCard extends StatelessWidget {
+  const _SettingsCategoryCard({
+    super.key,
+    required this.icon,
+    required this.iconBg,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final Color iconBg;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: Row(
+            children: <Widget>[
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: iconBg,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: iconColor, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SettingsCategorySubPage extends StatelessWidget {
+  const _SettingsCategorySubPage({
+    required this.listenable,
+    required this.titleBuilder,
+    required this.bodyBuilder,
+  });
+
+  final Listenable listenable;
+  final String Function(AppStrings s) titleBuilder;
+  final Widget Function(
+    BuildContext context,
+    ThemeData theme,
+    ColorScheme colorScheme,
+    AppStrings s,
+  ) bodyBuilder;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: listenable,
+      builder: (context, _) {
+        final s = context.l10n;
+        final theme = Theme.of(context);
+        final colorScheme = theme.colorScheme;
+        final visuals = AppThemeVisuals.of(context);
+
+        return AppThemeBackdrop(
+          child: Scaffold(
+            backgroundColor: visuals.hasBackdrop ? Colors.transparent : null,
+            appBar: AppBar(
+              title: Text(titleBuilder(s)),
+            ),
+            body: bodyBuilder(context, theme, colorScheme, s),
+          ),
+        );
+      },
     );
   }
 }

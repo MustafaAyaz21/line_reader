@@ -841,6 +841,7 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
           audioUrl: result.audioUrl,
           audioVoice: result.audioVoice,
           audioDurationSec: result.audioDurationSec,
+          audioSegments: result.audioSegments,
         );
       });
       _showSnack(result.message);

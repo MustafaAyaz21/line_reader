@@ -116,6 +116,7 @@ class DevGeneratedArticle {
     this.audioUrl,
     this.audioVoice,
     this.audioDurationSec,
+    this.audioSegments = const <Map<String, dynamic>>[],
     this.isHidden = false,
   });
 
@@ -129,6 +130,7 @@ class DevGeneratedArticle {
   final String? audioUrl;
   final String? audioVoice;
   final int? audioDurationSec;
+  final List<Map<String, dynamic>> audioSegments;
   final bool isHidden;
 
   bool get hasAudio => audioUrl != null && audioUrl!.trim().isNotEmpty;
@@ -139,6 +141,7 @@ class DevGeneratedArticle {
     String? audioUrl,
     String? audioVoice,
     int? audioDurationSec,
+    List<Map<String, dynamic>>? audioSegments,
     bool? isHidden,
   }) {
     return DevGeneratedArticle(
@@ -152,6 +155,7 @@ class DevGeneratedArticle {
       audioUrl: audioUrl ?? this.audioUrl,
       audioVoice: audioVoice ?? this.audioVoice,
       audioDurationSec: audioDurationSec ?? this.audioDurationSec,
+      audioSegments: audioSegments ?? this.audioSegments,
       isHidden: isHidden ?? this.isHidden,
     );
   }
@@ -169,6 +173,7 @@ class DevGeneratedArticle {
         if (audioVoice != null && audioVoice!.trim().isNotEmpty)
           'audio_voice': audioVoice,
         if (audioDurationSec != null) 'audio_duration_sec': audioDurationSec,
+        if (audioSegments.isNotEmpty) 'audio_segments': audioSegments,
         'is_hidden': isHidden,
       };
 
@@ -211,12 +216,14 @@ class DevAudioResult {
     required this.audioVoice,
     required this.audioDurationSec,
     required this.message,
+    this.audioSegments = const <Map<String, dynamic>>[],
   });
 
   final String audioUrl;
   final String audioVoice;
   final int audioDurationSec;
   final String message;
+  final List<Map<String, dynamic>> audioSegments;
 }
 
 /// Mobil Geliştirici Paneli için sunucu istemcisi.
@@ -228,16 +235,21 @@ class DeveloperPanelService {
   DeveloperPanelService({
     http.Client? httpClient,
     String? baseUrl,
+    String? fallbackBaseUrl,
   })  : _httpClient = httpClient ?? http.Client(),
         _ownsClient = httpClient == null,
         _baseUrl = (baseUrl ?? ApiConfig.browserAiTranslateEndpoint)
+            .replaceAll(RegExp(r'/+$'), ''),
+        _fallbackBaseUrl = (fallbackBaseUrl ?? ApiConfig.browserAiFallbackEndpoint)
             .replaceAll(RegExp(r'/+$'), '');
 
   final http.Client _httpClient;
   final bool _ownsClient;
   final String _baseUrl;
+  final String _fallbackBaseUrl;
+  String? _preferredBaseUrl;
 
-  static const Duration _timeout = Duration(seconds: 12);
+  static const Duration _timeout = Duration(seconds: 25);
 
   Map<String, String> _headers(String idToken) => <String, String>{
         'Authorization': 'Bearer $idToken',
@@ -245,10 +257,63 @@ class DeveloperPanelService {
         'Accept': 'application/json',
       };
 
+  List<String> _orderedBaseUrls() {
+    final ordered = <String>[];
+    if (_preferredBaseUrl != null && _preferredBaseUrl!.isNotEmpty) {
+      ordered.add(_preferredBaseUrl!);
+    }
+    if (!ordered.contains(_baseUrl)) ordered.add(_baseUrl);
+    if (_fallbackBaseUrl.isNotEmpty && !ordered.contains(_fallbackBaseUrl)) {
+      ordered.add(_fallbackBaseUrl);
+    }
+    return ordered;
+  }
+
+  /// Birincil `workers.dev` adresine mobil veride ulaşılamazsa otomatik olarak
+  /// `line-reader.pages.dev/api` yedek proxy adresine geçer.
+  Future<http.Response> _request(
+    String method,
+    String path, {
+    required String idToken,
+    Object? jsonBody,
+    Duration timeout = _timeout,
+  }) async {
+    final bases = _orderedBaseUrls();
+    Object? lastError;
+
+    for (var i = 0; i < bases.length; i++) {
+      final base = bases[i];
+      final isFirstWithFallback = i == 0 && bases.length > 1;
+      final attemptTimeout = isFirstWithFallback && timeout.inSeconds <= 25
+          ? const Duration(seconds: 8)
+          : timeout;
+      try {
+        final uri = Uri.parse('$base$path');
+        final req = http.Request(method, uri)..headers.addAll(_headers(idToken));
+        if (jsonBody != null) {
+          req.body = jsonEncode(jsonBody);
+        }
+        final streamed = await _httpClient.send(req).timeout(attemptTimeout);
+        final res = await http.Response.fromStream(streamed);
+        if (res.statusCode == 404 &&
+            isFirstWithFallback &&
+            !res.body.trimLeft().startsWith('{')) {
+          continue;
+        }
+        _preferredBaseUrl = base;
+        return res;
+      } catch (err) {
+        lastError = err;
+      }
+    }
+
+    throw Exception(
+      'Sunucuya bağlanılamadı: ${lastError ?? "Ağ hatası"}',
+    );
+  }
+
   Future<List<DevEntitlementUser>> fetchUsers(String idToken) async {
-    final res = await _httpClient
-        .get(Uri.parse('$_baseUrl/dev/users'), headers: _headers(idToken))
-        .timeout(_timeout);
+    final res = await _request('GET', '/dev/users', idToken: idToken);
     final data = _decodeJsonMap(res.body);
     if (res.statusCode != 200 || data['ok'] != true) {
       throw Exception(
@@ -266,13 +331,12 @@ class DeveloperPanelService {
   }
 
   Future<DevActionResult> grantPremium(String idToken, String email) async {
-    final res = await _httpClient
-        .post(
-          Uri.parse('$_baseUrl/dev/users'),
-          headers: _headers(idToken),
-          body: jsonEncode(<String, Object?>{'email': email.trim()}),
-        )
-        .timeout(_timeout);
+    final res = await _request(
+      'POST',
+      '/dev/users',
+      idToken: idToken,
+      jsonBody: <String, Object?>{'email': email.trim()},
+    );
     final data = _decodeJsonMap(res.body);
     return DevActionResult(
       ok: res.statusCode == 200 && data['ok'] == true,
@@ -284,11 +348,12 @@ class DeveloperPanelService {
   }
 
   Future<DevActionResult> revokePremium(String idToken, String email) async {
-    final req = http.Request('DELETE', Uri.parse('$_baseUrl/dev/users'))
-      ..headers.addAll(_headers(idToken))
-      ..body = jsonEncode(<String, Object?>{'email': email.trim()});
-    final streamed = await _httpClient.send(req).timeout(_timeout);
-    final res = await http.Response.fromStream(streamed);
+    final res = await _request(
+      'DELETE',
+      '/dev/users',
+      idToken: idToken,
+      jsonBody: <String, Object?>{'email': email.trim()},
+    );
     final data = _decodeJsonMap(res.body);
     return DevActionResult(
       ok: res.statusCode == 200 && data['ok'] == true,
@@ -300,9 +365,7 @@ class DeveloperPanelService {
   }
 
   Future<List<DevAccessCode>> fetchCodes(String idToken) async {
-    final res = await _httpClient
-        .get(Uri.parse('$_baseUrl/dev/codes'), headers: _headers(idToken))
-        .timeout(_timeout);
+    final res = await _request('GET', '/dev/codes', idToken: idToken);
     final data = _decodeJsonMap(res.body);
     if (res.statusCode != 200 || data['ok'] != true) {
       throw Exception(
@@ -325,17 +388,16 @@ class DeveloperPanelService {
     required int maxUses,
     String note = '',
   }) async {
-    final res = await _httpClient
-        .post(
-          Uri.parse('$_baseUrl/dev/codes'),
-          headers: _headers(idToken),
-          body: jsonEncode(<String, Object?>{
-            'code': code.trim().toUpperCase(),
-            'max_uses': maxUses,
-            'note': note.trim(),
-          }),
-        )
-        .timeout(_timeout);
+    final res = await _request(
+      'POST',
+      '/dev/codes',
+      idToken: idToken,
+      jsonBody: <String, Object?>{
+        'code': code.trim().toUpperCase(),
+        'max_uses': maxUses,
+        'note': note.trim(),
+      },
+    );
     final data = _decodeJsonMap(res.body);
     return DevActionResult(
       ok: res.statusCode == 200 && data['ok'] == true,
@@ -351,16 +413,15 @@ class DeveloperPanelService {
     required String code,
     required bool isActive,
   }) async {
-    final res = await _httpClient
-        .patch(
-          Uri.parse('$_baseUrl/dev/codes'),
-          headers: _headers(idToken),
-          body: jsonEncode(<String, Object?>{
-            'code': code.trim().toUpperCase(),
-            'is_active': isActive,
-          }),
-        )
-        .timeout(_timeout);
+    final res = await _request(
+      'PATCH',
+      '/dev/codes',
+      idToken: idToken,
+      jsonBody: <String, Object?>{
+        'code': code.trim().toUpperCase(),
+        'is_active': isActive,
+      },
+    );
     final data = _decodeJsonMap(res.body);
     return DevActionResult(
       ok: res.statusCode == 200 && data['ok'] == true,
@@ -372,11 +433,12 @@ class DeveloperPanelService {
   }
 
   Future<DevActionResult> deleteCode(String idToken, String code) async {
-    final req = http.Request('DELETE', Uri.parse('$_baseUrl/dev/codes'))
-      ..headers.addAll(_headers(idToken))
-      ..body = jsonEncode(<String, Object?>{'code': code.trim().toUpperCase()});
-    final streamed = await _httpClient.send(req).timeout(_timeout);
-    final res = await http.Response.fromStream(streamed);
+    final res = await _request(
+      'DELETE',
+      '/dev/codes',
+      idToken: idToken,
+      jsonBody: <String, Object?>{'code': code.trim().toUpperCase()},
+    );
     final data = _decodeJsonMap(res.body);
     return DevActionResult(
       ok: res.statusCode == 200 && data['ok'] == true,
@@ -388,9 +450,7 @@ class DeveloperPanelService {
   }
 
   Future<List<DevArticleSummary>> fetchArticles(String idToken) async {
-    final res = await _httpClient
-        .get(Uri.parse('$_baseUrl/dev/articles'), headers: _headers(idToken))
-        .timeout(_timeout);
+    final res = await _request('GET', '/dev/articles', idToken: idToken);
     final data = _decodeJsonMap(res.body);
     if (res.statusCode != 200 || data['ok'] != true) {
       throw Exception(
@@ -412,16 +472,16 @@ class DeveloperPanelService {
     required String level,
     String topic = '',
   }) async {
-    final res = await _httpClient
-        .post(
-          Uri.parse('$_baseUrl/dev/articles/generate'),
-          headers: _headers(idToken),
-          body: jsonEncode(<String, Object?>{
-            'level': level.trim().toUpperCase(),
-            'topic': topic.trim(),
-          }),
-        )
-        .timeout(const Duration(seconds: 65));
+    final res = await _request(
+      'POST',
+      '/dev/articles/generate',
+      idToken: idToken,
+      jsonBody: <String, Object?>{
+        'level': level.trim().toUpperCase(),
+        'topic': topic.trim(),
+      },
+      timeout: const Duration(seconds: 65),
+    );
     final data = _decodeJsonMap(res.body);
     if (res.statusCode != 200 || data['ok'] != true) {
       throw Exception(
@@ -443,18 +503,18 @@ class DeveloperPanelService {
     required String content,
     String voice = 'Kore',
   }) async {
-    final res = await _httpClient
-        .post(
-          Uri.parse('$_baseUrl/dev/articles/audio'),
-          headers: _headers(idToken),
-          body: jsonEncode(<String, Object?>{
-            'id': id,
-            'title': title,
-            'content': content,
-            'voice': voice,
-          }),
-        )
-        .timeout(const Duration(seconds: 75));
+    final res = await _request(
+      'POST',
+      '/dev/articles/audio',
+      idToken: idToken,
+      jsonBody: <String, Object?>{
+        'id': id,
+        'title': title,
+        'content': content,
+        'voice': voice,
+      },
+      timeout: const Duration(seconds: 75),
+    );
     final data = _decodeJsonMap(res.body);
     if (res.statusCode != 200 || data['ok'] != true) {
       throw Exception(
@@ -462,12 +522,21 @@ class DeveloperPanelService {
             'Podcast AI sesi üretilemedi (HTTP ${res.statusCode}).',
       );
     }
+    final rawSegments = data['audio_segments'];
+    final parsedSegments = rawSegments is List<dynamic>
+        ? rawSegments
+            .whereType<Map<String, dynamic>>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList(growable: false)
+        : const <Map<String, dynamic>>[];
+
     return DevAudioResult(
       audioUrl: (data['audio_url'] ?? '').toString(),
       audioVoice: (data['audio_voice'] ?? voice).toString(),
       audioDurationSec: data['audio_duration_sec'] is num
           ? (data['audio_duration_sec'] as num).round()
           : 0,
+      audioSegments: parsedSegments,
       message: data['message']?.toString() ?? 'Podcast AI sesi oluşturuldu.',
     );
   }
@@ -476,13 +545,13 @@ class DeveloperPanelService {
     String idToken,
     DevGeneratedArticle article,
   ) async {
-    final res = await _httpClient
-        .post(
-          Uri.parse('$_baseUrl/dev/articles/publish'),
-          headers: _headers(idToken),
-          body: jsonEncode(<String, Object?>{'article': article.toJson()}),
-        )
-        .timeout(const Duration(seconds: 25));
+    final res = await _request(
+      'POST',
+      '/dev/articles/publish',
+      idToken: idToken,
+      jsonBody: <String, Object?>{'article': article.toJson()},
+      timeout: const Duration(seconds: 25),
+    );
     final data = _decodeJsonMap(res.body);
     return DevActionResult(
       ok: res.statusCode == 200 && data['ok'] == true,
@@ -498,13 +567,12 @@ class DeveloperPanelService {
     required String id,
     required bool isHidden,
   }) async {
-    final res = await _httpClient
-        .patch(
-          Uri.parse('$_baseUrl/dev/articles'),
-          headers: _headers(idToken),
-          body: jsonEncode(<String, Object?>{'id': id, 'is_hidden': isHidden}),
-        )
-        .timeout(_timeout);
+    final res = await _request(
+      'PATCH',
+      '/dev/articles',
+      idToken: idToken,
+      jsonBody: <String, Object?>{'id': id, 'is_hidden': isHidden},
+    );
     final data = _decodeJsonMap(res.body);
     return DevActionResult(
       ok: res.statusCode == 200 && data['ok'] == true,
@@ -516,11 +584,12 @@ class DeveloperPanelService {
   }
 
   Future<DevActionResult> deleteArticle(String idToken, String id) async {
-    final req = http.Request('DELETE', Uri.parse('$_baseUrl/dev/articles'))
-      ..headers.addAll(_headers(idToken))
-      ..body = jsonEncode(<String, Object?>{'id': id});
-    final streamed = await _httpClient.send(req).timeout(_timeout);
-    final res = await http.Response.fromStream(streamed);
+    final res = await _request(
+      'DELETE',
+      '/dev/articles',
+      idToken: idToken,
+      jsonBody: <String, Object?>{'id': id},
+    );
     final data = _decodeJsonMap(res.body);
     return DevActionResult(
       ok: res.statusCode == 200 && data['ok'] == true,

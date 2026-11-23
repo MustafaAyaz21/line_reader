@@ -465,22 +465,35 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text('Ayarlar'), findsOneWidget);
-        expect(find.text('Misafir Modu'), findsOneWidget);
+        expect(find.byKey(const ValueKey<String>('settings_cat_profile')), findsOneWidget);
+        expect(find.byKey(const ValueKey<String>('settings_cat_appearance')), findsOneWidget);
+        expect(find.byKey(const ValueKey<String>('settings_cat_features')), findsOneWidget);
+        expect(find.byKey(const ValueKey<String>('settings_cat_quick_lookup')), findsOneWidget);
+        expect(find.textContaining('Misafir Modu'), findsOneWidget);
         expect(find.textContaining('40 / 40'), findsOneWidget);
-        expect(
-          find.byKey(const ValueKey<String>('settings_ipa_enabled_switch')),
-          findsOneWidget,
-        );
-        expect(find.text('Çeviri ve Önbellek'), findsNothing);
-        expect(find.text('Çeviri Önbelleğini Temizle'), findsNothing);
-        expect(find.text('Gemini API Anahtarı'), findsNothing);
 
+        // Görünüm ve Temalar kartına girip dili English yap.
+        await tester.tap(find.byKey(const ValueKey<String>('settings_cat_appearance')));
+        await tester.pumpAndSettle();
         await tester.tap(find.text('English'));
         await tester.pumpAndSettle();
 
         expect(langStore.saved, AppLanguage.en);
+        expect(find.text('Appearance & Themes'), findsOneWidget);
+
+        await tester.pageBack();
+        await tester.pumpAndSettle();
         expect(find.text('Settings'), findsOneWidget);
-        expect(find.text('Guest Mode'), findsOneWidget);
+        expect(find.textContaining('Guest Mode'), findsOneWidget);
+
+        // Line'da Bak kartına girip özelleştirme kontrollerini doğrula.
+        await tester.tap(find.byKey(const ValueKey<String>('settings_cat_quick_lookup')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey<String>('overlay_ipa_mode_us')), findsOneWidget);
+        expect(find.byKey(const ValueKey<String>('overlay_show_synonyms_switch')), findsOneWidget);
+        expect(find.byKey(const ValueKey<String>('overlay_show_antonyms_switch')), findsOneWidget);
+        expect(find.byKey(const ValueKey<String>('overlay_show_tts_switch')), findsOneWidget);
+        expect(find.byKey(const ValueKey<String>('overlay_show_save_bar_switch')), findsOneWidget);
 
         apiKeyController.dispose();
         authController.dispose();
@@ -517,6 +530,9 @@ void main() {
             ),
           ),
         );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const ValueKey<String>('settings_cat_profile')));
         await tester.pumpAndSettle();
 
         expect(find.text('Standart Hesap'), findsOneWidget);
@@ -589,6 +605,9 @@ void main() {
             ),
           ),
         );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const ValueKey<String>('settings_cat_profile')));
         await tester.pumpAndSettle();
 
         expect(find.text('Geliştirici'), findsOneWidget);

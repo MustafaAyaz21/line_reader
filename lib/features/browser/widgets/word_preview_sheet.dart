@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/localization/app_strings.dart';
+import '../../../core/settings/display_preferences_controller.dart';
 import '../../../core/tts/tts_service.dart';
 import '../../auth/controllers/auth_controller.dart';
 import '../../auth/screens/auth_screen.dart';
@@ -588,37 +589,54 @@ class _WordPreviewSheetState extends State<WordPreviewSheet> {
                     _buildMeaningsSection(theme, colorScheme),
                     if (_lexiconInfo != null &&
                         _lexiconInfo!.hasRelations) ...<Widget>[
-                      const SizedBox(height: 10),
-                      WordRelationsSection(
-                        synonyms: _lexiconInfo!.synonyms,
-                        antonyms: _lexiconInfo!.antonyms,
-                        selectedSynonyms: _selectedSynonyms,
-                        selectedAntonyms: _selectedAntonyms,
-                        onToggleSynonym: (term) {
-                          setState(() {
-                            if (!_selectedSynonyms.remove(term)) {
-                              _selectedSynonyms.add(term);
-                            }
-                          });
-                        },
-                        onToggleAntonym: (term) {
-                          setState(() {
-                            if (!_selectedAntonyms.remove(term)) {
-                              _selectedAntonyms.add(term);
-                            }
-                          });
-                        },
-                        onToggleAll: (selectAll) {
-                          final info = _lexiconInfo;
-                          if (info == null) return;
-                          setState(() {
-                            _selectedSynonyms.clear();
-                            _selectedAntonyms.clear();
-                            if (selectAll) {
-                              _selectedSynonyms.addAll(info.synonyms);
-                              _selectedAntonyms.addAll(info.antonyms);
-                            }
-                          });
+                      ListenableBuilder(
+                        listenable: DisplayPreferencesController.shared,
+                        builder: (context, _) {
+                          final prefs = DisplayPreferencesController.shared;
+                          final visibleSyn = prefs.appShowSynonyms
+                              ? _lexiconInfo!.synonyms
+                              : const <String>[];
+                          final visibleAnt = prefs.appShowAntonyms
+                              ? _lexiconInfo!.antonyms
+                              : const <String>[];
+                          if (visibleSyn.isEmpty && visibleAnt.isEmpty) {
+                            return const SizedBox.shrink();
+                          }
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 10),
+                            child: WordRelationsSection(
+                              synonyms: visibleSyn,
+                              antonyms: visibleAnt,
+                              selectedSynonyms: _selectedSynonyms,
+                              selectedAntonyms: _selectedAntonyms,
+                              onToggleSynonym: (term) {
+                                setState(() {
+                                  if (!_selectedSynonyms.remove(term)) {
+                                    _selectedSynonyms.add(term);
+                                  }
+                                });
+                              },
+                              onToggleAntonym: (term) {
+                                setState(() {
+                                  if (!_selectedAntonyms.remove(term)) {
+                                    _selectedAntonyms.add(term);
+                                  }
+                                });
+                              },
+                              onToggleAll: (selectAll) {
+                                final info = _lexiconInfo;
+                                if (info == null) return;
+                                setState(() {
+                                  _selectedSynonyms.clear();
+                                  _selectedAntonyms.clear();
+                                  if (selectAll) {
+                                    _selectedSynonyms.addAll(visibleSyn);
+                                    _selectedAntonyms.addAll(visibleAnt);
+                                  }
+                                });
+                              },
+                            ),
+                          );
                         },
                       ),
                     ],

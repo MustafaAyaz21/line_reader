@@ -6,6 +6,7 @@ import '../../core/localization/app_locale.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/platform/process_text_channel.dart';
 import '../../core/settings/api_key_controller.dart';
+import '../../core/settings/display_preferences_controller.dart';
 import '../../core/settings/ipa_accent_controller.dart';
 import '../../core/settings/settings_repository.dart';
 import '../../core/theme/app_theme.dart';
@@ -72,6 +73,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _ensureInitialized();
     IpaAccentController.shared.load();
+    DisplayPreferencesController.shared.load();
     ArticleReadingProgressController.shared.load();
     ProcessTextChannel.ensureInitialized();
     ProcessTextChannel.pendingTextNotifier

@@ -21,6 +21,11 @@ abstract final class ApiConfig {
     defaultValue: 'https://linereader-ai.xreasayaz21.workers.dev',
   );
 
+  /// Mobil operatörlerin `*.workers.dev` alan adını engellemesi/yavaşlatması
+  /// durumunda otomatik devreye giren Cloudflare Pages proxy yedeği.
+  static const String browserAiFallbackEndpoint =
+      'https://line-reader.pages.dev/api';
+
   /// Varsayılan güncel Gemini modeli.
   static const String geminiModel = 'gemini-3.0-flash';
 
