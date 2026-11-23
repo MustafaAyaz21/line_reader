@@ -33,6 +33,13 @@ abstract class AuthBackend {
 
   Future<AuthActionResult> sendPasswordResetEmail(String email);
 
+  /// Mevcut kullanıcıya e-posta doğrulama bağlantısı gönderir.
+  Future<AuthActionResult> sendEmailVerification() async =>
+      const AuthActionResult.success();
+
+  /// Sunucudan güncel kullanıcı bilgisini (özellikle `emailVerified`) yeniler.
+  Future<AppAuthUser?> reloadCurrentUser() async => currentUser;
+
   /// Kayıtlı kullanıcı için kısa ömürlü imzalı Firebase ID Token döndürür.
   Future<String?> getIdToken();
 
@@ -107,6 +114,7 @@ class FirebaseAuthBackend implements AuthBackend {
       displayName: user.displayName,
       photoUrl: user.photoURL,
       provider: isGoogle ? AuthProviderType.google : AuthProviderType.email,
+      emailVerified: isGoogle || user.emailVerified,
     );
   }
 
@@ -250,6 +258,9 @@ class FirebaseAuthBackend implements AuthBackend {
       }
 
       final refreshed = FirebaseAuth.instance.currentUser ?? user;
+      if (!refreshed.emailVerified) {
+        await sendEmailVerification();
+      }
       return AuthActionResult.success(user: _mapFirebaseUser(refreshed));
     } on FirebaseAuthException catch (error) {
       return AuthActionResult.failure(
@@ -262,6 +273,68 @@ class FirebaseAuthBackend implements AuthBackend {
         errorCode: 'unknown',
         message: 'Kayıt sırasında bir hata oluştu.',
       );
+    }
+  }
+
+  @override
+  Future<AuthActionResult> sendEmailVerification() async {
+    await initialize();
+    if (!_isConfigured) {
+      return const AuthActionResult.failure(
+        errorCode: 'not_configured',
+        message: 'Firebase hesabı henüz yapılandırılmadı.',
+      );
+    }
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return const AuthActionResult.failure(
+        errorCode: 'no_user',
+        message: 'Doğrulanacak aktif kullanıcı bulunamadı.',
+      );
+    }
+    try {
+      await user.sendEmailVerification(
+        ActionCodeSettings(
+          url: 'https://line-reader.pages.dev/verified',
+          handleCodeInApp: false,
+        ),
+      );
+      return const AuthActionResult.success(
+        message: 'Doğrulama bağlantısı e-posta adresinize gönderildi.',
+      );
+    } catch (_) {
+      // Authorized domains henüz eklenmediyse standart doğrulama maili gönder.
+      try {
+        await user.sendEmailVerification();
+        return const AuthActionResult.success(
+          message: 'Doğrulama bağlantısı e-posta adresinize gönderildi.',
+        );
+      } on FirebaseAuthException catch (error) {
+        return AuthActionResult.failure(
+          errorCode: error.code,
+          message: _mapFirebaseError(error.code),
+        );
+      } catch (_) {
+        return const AuthActionResult.failure(
+          errorCode: 'verification_send_failed',
+          message: 'Doğrulama e-postası gönderilemedi. Biraz sonra tekrar deneyin.',
+        );
+      }
+    }
+  }
+
+  @override
+  Future<AppAuthUser?> reloadCurrentUser() async {
+    await initialize();
+    if (!_isConfigured) return null;
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return null;
+      await user.reload();
+      final refreshed = FirebaseAuth.instance.currentUser;
+      return refreshed == null ? null : _mapFirebaseUser(refreshed);
+    } catch (_) {
+      return currentUser;
     }
   }
 

@@ -27,6 +27,7 @@ class AppAuthUser {
     this.displayName,
     this.photoUrl,
     required this.provider,
+    this.emailVerified = true,
   });
 
   final String uid;
@@ -34,6 +35,7 @@ class AppAuthUser {
   final String? displayName;
   final String? photoUrl;
   final AuthProviderType provider;
+  final bool emailVerified;
 
   String get effectiveName {
     final name = displayName?.trim() ?? '';

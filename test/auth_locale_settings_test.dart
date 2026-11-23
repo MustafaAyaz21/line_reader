@@ -130,9 +130,25 @@ class _FakeEntitlementClient implements EntitlementClient {
 }
 
 class _FakeAuthBackend implements AuthBackend {
+  _FakeAuthBackend({this.signUpReturnsUnverified = false});
+
+  final bool signUpReturnsUnverified;
   final StreamController<AppAuthUser?> _stream =
       StreamController<AppAuthUser?>.broadcast();
   AppAuthUser? _current;
+  int verificationSendCount = 0;
+
+  void markEmailVerified() {
+    if (_current == null) return;
+    _current = AppAuthUser(
+      uid: _current!.uid,
+      email: _current!.email,
+      displayName: _current!.displayName,
+      photoUrl: _current!.photoUrl,
+      provider: _current!.provider,
+      emailVerified: true,
+    );
+  }
 
   @override
   bool get isConfigured => true;
@@ -183,10 +199,23 @@ class _FakeAuthBackend implements AuthBackend {
       email: email,
       displayName: displayName,
       provider: AuthProviderType.email,
+      emailVerified: !signUpReturnsUnverified,
     );
+    if (signUpReturnsUnverified) {
+      verificationSendCount += 1;
+    }
     _stream.add(_current);
     return AuthActionResult.success(user: _current);
   }
+
+  @override
+  Future<AuthActionResult> sendEmailVerification() async {
+    verificationSendCount += 1;
+    return const AuthActionResult.success();
+  }
+
+  @override
+  Future<AppAuthUser?> reloadCurrentUser() async => _current;
 
   @override
   Future<AuthActionResult> sendPasswordResetEmail(String email) async {
@@ -907,5 +936,105 @@ void main() {
       expect(optionalController.requiresMandatoryUpdate, isFalse);
       optionalController.dispose();
     });
+  });
+
+  group('AuthScreen • Zorunlu Kayıt Alanları & Otomatik E-posta Doğrulama', () {
+    testWidgets(
+      'Kayıtta Ad Soyad zorunlu olur; doğrulama sonrası otomatik Doğrulandınız ekranına geçer',
+      (tester) async {
+        final backend = _FakeAuthBackend(signUpReturnsUnverified: true);
+        final authController = AuthController(
+          backend: backend,
+          localStore: _InMemoryAuthLocalStore(),
+          entitlementClient: _FakeEntitlementClient(),
+        );
+        await authController.initialize();
+        final localeController = AppLocaleController(
+          store: _InMemoryLanguageStore(),
+        );
+        await localeController.load();
+
+        await tester.pumpWidget(
+          AppLocaleScope(
+            controller: localeController,
+            child: MaterialApp(
+              home: AuthScreen(
+                controller: authController,
+                canPop: false,
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Kayıt Ol sekmesine geç
+        await tester.tap(find.text('Kayıt Ol'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Ad Soyad *'), findsOneWidget);
+        expect(find.text('E-posta (Gmail) *'), findsOneWidget);
+        expect(find.text('Şifre *'), findsOneWidget);
+
+        // Ad Soyad boşken kayıt reddedilmeli
+        await tester.enterText(
+          find.byKey(const ValueKey<String>('auth_email_field')),
+          'yeni@gmail.com',
+        );
+        await tester.enterText(
+          find.byKey(const ValueKey<String>('auth_password_field')),
+          '123456',
+        );
+        final submitBtn = find.byKey(
+          const ValueKey<String>('auth_email_submit_button'),
+        );
+        await tester.ensureVisible(submitBtn);
+        await tester.tap(submitBtn);
+        await tester.pumpAndSettle();
+
+        expect(
+          find.textContaining('Lütfen adınızı ve soyadınızı girin (zorunlu).'),
+          findsOneWidget,
+        );
+        expect(authController.isAwaitingEmailVerification, isFalse);
+
+        // Ad Soyad girip kayıt ol -> doğrulama bekleme ekranı açılır
+        await tester.enterText(
+          find.byKey(const ValueKey<String>('auth_name_field')),
+          'Mustafa Ayaz',
+        );
+        await tester.ensureVisible(submitBtn);
+        await tester.tap(submitBtn);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+
+        expect(authController.isAwaitingEmailVerification, isTrue);
+        expect(authController.isAuthenticated, isFalse);
+        expect(
+          find.byKey(const ValueKey<String>('auth_verify_waiting_title')),
+          findsOneWidget,
+        );
+        expect(backend.verificationSendCount, 1);
+
+        // Kullanıcı e-postadaki linke tıklar ve uygulama öne döner (resumed)
+        backend.markEmailVerified();
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 150));
+
+        expect(
+          find.byKey(const ValueKey<String>('auth_verified_success_title')),
+          findsOneWidget,
+        );
+        expect(find.text('Doğrulandınız!'), findsOneWidget);
+
+        // 900ms geçiş süresi bitince kullanıcı artık doğrulanmış + oturum açmış olur
+        await tester.pump(const Duration(seconds: 1));
+        expect(authController.isAuthenticated, isTrue);
+        expect(authController.isAwaitingEmailVerification, isFalse);
+
+        authController.dispose();
+        localeController.dispose();
+      },
+    );
   });
 }

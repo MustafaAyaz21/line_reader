@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/localization/app_strings.dart';
@@ -42,28 +44,91 @@ class AuthScreen extends StatefulWidget {
   State<AuthScreen> createState() => _AuthScreenState();
 }
 
-class _AuthScreenState extends State<AuthScreen> {
+class _AuthScreenState extends State<AuthScreen> with WidgetsBindingObserver {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
   late bool _isSignUpMode;
   bool _obscurePassword = true;
+  bool _justVerified = false;
+  bool _isCheckingVerification = false;
+  Timer? _verificationPollTimer;
   String? _errorMessage;
   String? _infoMessage;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _isSignUpMode = widget.initialSignUpTab;
+    if (widget.controller.isAwaitingEmailVerification) {
+      _startVerificationPolling();
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _verificationPollTimer?.cancel();
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
+        widget.controller.isAwaitingEmailVerification) {
+      _checkVerificationNow();
+    }
+  }
+
+  void _startVerificationPolling() {
+    _verificationPollTimer?.cancel();
+    _verificationPollTimer = Timer.periodic(
+      const Duration(seconds: 3),
+      (_) => _checkVerificationNow(),
+    );
+  }
+
+  Future<void> _checkVerificationNow() async {
+    if (_isCheckingVerification || _justVerified || !mounted) return;
+    if (!widget.controller.isAwaitingEmailVerification) return;
+    _isCheckingVerification = true;
+    try {
+      final verified = await widget.controller.checkEmailVerified();
+      if (!mounted) return;
+      if (verified) {
+        _verificationPollTimer?.cancel();
+        setState(() => _justVerified = true);
+        await Future<void>.delayed(const Duration(milliseconds: 900));
+        if (!mounted) return;
+        if (widget.canPop) {
+          Navigator.of(context).pop(true);
+        }
+      }
+    } finally {
+      _isCheckingVerification = false;
+    }
+  }
+
+  Future<void> _handleResendVerification() async {
+    final result = await widget.controller.resendVerificationEmail();
+    if (!mounted) return;
+    setState(() {
+      if (result.isSuccess) {
+        _infoMessage = result.message ??
+            context.l10n.t(
+              'Doğrulama e-postası tekrar gönderildi.',
+              'Verification email resent.',
+            );
+        _errorMessage = null;
+      } else {
+        _errorMessage = result.message;
+      }
+    });
   }
 
   Future<void> _handleGoogleSignIn() async {
@@ -99,6 +164,17 @@ class _AuthScreenState extends State<AuthScreen> {
     final password = _passwordController.text;
     final name = _nameController.text.trim();
 
+    if (_isSignUpMode && name.length < 2) {
+      setState(() {
+        _errorMessage = s.t(
+          'Lütfen adınızı ve soyadınızı girin (zorunlu).',
+          'Please enter your full name (required).',
+        );
+        _infoMessage = null;
+      });
+      return;
+    }
+
     if (email.isEmpty || !email.contains('@')) {
       setState(() {
         _errorMessage = s.t(
@@ -130,7 +206,7 @@ class _AuthScreenState extends State<AuthScreen> {
         ? await widget.controller.signUpWithEmail(
             email: email,
             password: password,
-            displayName: name.isEmpty ? null : name,
+            displayName: name,
           )
         : await widget.controller.signInWithEmail(
             email: email,
@@ -140,6 +216,16 @@ class _AuthScreenState extends State<AuthScreen> {
     if (!mounted) return;
 
     if (result.isSuccess) {
+      if (widget.controller.isAwaitingEmailVerification) {
+        _startVerificationPolling();
+        setState(() {
+          _infoMessage = s.t(
+            'Doğrulama bağlantısı $email adresine gönderildi. Maildeki linke tıklayınca otomatik giriş yapılacaktır.',
+            'Verification link sent to $email. Click the link in your email to continue automatically.',
+          );
+        });
+        return;
+      }
       if (widget.canPop) {
         Navigator.of(context).pop(true);
       }
@@ -211,6 +297,18 @@ class _AuthScreenState extends State<AuthScreen> {
       builder: (context, _) {
         final isBusy = widget.controller.isBusy;
         final visuals = AppThemeVisuals.of(context);
+        final awaitingVerification =
+            widget.controller.isAwaitingEmailVerification;
+
+        if (_justVerified || awaitingVerification) {
+          return _buildVerificationScaffold(
+            context,
+            theme: theme,
+            colorScheme: colorScheme,
+            visuals: visuals,
+            s: s,
+          );
+        }
 
         return AppThemeBackdrop(
           child: Scaffold(
@@ -324,11 +422,14 @@ class _AuthScreenState extends State<AuthScreen> {
                       const SizedBox(height: 16),
                       if (_isSignUpMode) ...<Widget>[
                         TextField(
+                          key: const ValueKey<String>('auth_name_field'),
                           controller: _nameController,
                           enabled: !isBusy,
+                          textCapitalization: TextCapitalization.words,
                           textInputAction: TextInputAction.next,
                           decoration: InputDecoration(
-                            labelText: s.t('Ad Soyad (Opsiyonel)', 'Name (Optional)'),
+                            labelText: s.t('Ad Soyad *', 'Full Name *'),
+                            helperText: s.t('Zorunlu alan', 'Required'),
                             prefixIcon: const Icon(Icons.person_outline_rounded),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
@@ -345,7 +446,12 @@ class _AuthScreenState extends State<AuthScreen> {
                         autocorrect: false,
                         textInputAction: TextInputAction.next,
                         decoration: InputDecoration(
-                          labelText: s.t('E-posta', 'Email'),
+                          labelText: _isSignUpMode
+                              ? s.t('E-posta (Gmail) *', 'Email *')
+                              : s.t('E-posta', 'Email'),
+                          helperText: _isSignUpMode
+                              ? s.t('Zorunlu alan', 'Required')
+                              : null,
                           prefixIcon: const Icon(Icons.mail_outline_rounded),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(14),
@@ -361,7 +467,12 @@ class _AuthScreenState extends State<AuthScreen> {
                         textInputAction: TextInputAction.done,
                         onSubmitted: (_) => isBusy ? null : _handleEmailSubmit(),
                         decoration: InputDecoration(
-                          labelText: s.t('Şifre', 'Password'),
+                          labelText: _isSignUpMode
+                              ? s.t('Şifre *', 'Password *')
+                              : s.t('Şifre', 'Password'),
+                          helperText: _isSignUpMode
+                              ? s.t('Zorunlu • En az 6 karakter', 'Required • Min 6 characters')
+                              : null,
                           prefixIcon: const Icon(Icons.lock_outline_rounded),
                           suffixIcon: IconButton(
                             onPressed: () {
@@ -516,6 +627,192 @@ class _AuthScreenState extends State<AuthScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildVerificationScaffold(
+    BuildContext context, {
+    required ThemeData theme,
+    required ColorScheme colorScheme,
+    required AppThemeVisuals visuals,
+    required AppStrings s,
+  }) {
+    final email = widget.controller.user?.email ?? _emailController.text.trim();
+
+    return AppThemeBackdrop(
+      child: Scaffold(
+        backgroundColor: visuals.hasBackdrop ? Colors.transparent : null,
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400),
+                child: Card(
+                  margin: EdgeInsets.zero,
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: _justVerified
+                        ? Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: <Widget>[
+                              CircleAvatar(
+                                radius: 32,
+                                backgroundColor: const Color(0xFF16A34A)
+                                    .withAlpha(36),
+                                child: const Icon(
+                                  Icons.check_rounded,
+                                  size: 36,
+                                  color: Color(0xFF16A34A),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                s.t('Doğrulandınız!', 'Email Verified!'),
+                                key: const ValueKey<String>(
+                                  'auth_verified_success_title',
+                                ),
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                s.t(
+                                  'Ana Menüye aktarılıyorsunuz...',
+                                  'Taking you to Home...',
+                                ),
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          )
+                        : Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: <Widget>[
+                              Center(
+                                child: CircleAvatar(
+                                  radius: 30,
+                                  backgroundColor: colorScheme.primaryContainer,
+                                  child: Icon(
+                                    Icons.mark_email_unread_outlined,
+                                    size: 30,
+                                    color: colorScheme.onPrimaryContainer,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                s.t(
+                                  'E-postanızı Doğrulayın',
+                                  'Verify Your Email',
+                                ),
+                                key: const ValueKey<String>(
+                                  'auth_verify_waiting_title',
+                                ),
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                s.t(
+                                  '$email adresine doğrulama bağlantısı gönderdik. Maildeki "E-postayı Doğrula" bağlantısına tıkladığınızda uygulamaya otomatik dönüp giriş yapacaksınız.',
+                                  'We sent a verification link to $email. Tap the link in your email to return and sign in automatically.',
+                                ),
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                  height: 1.45,
+                                ),
+                              ),
+                              const SizedBox(height: 18),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: <Widget>[
+                                  const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    s.t(
+                                      'Doğrulama bekleniyor...',
+                                      'Waiting for verification...',
+                                    ),
+                                    style: theme.textTheme.labelMedium?.copyWith(
+                                      color: colorScheme.primary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (_infoMessage != null) ...<Widget>[
+                                const SizedBox(height: 14),
+                                Text(
+                                  _infoMessage!,
+                                  textAlign: TextAlign.center,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.primary,
+                                  ),
+                                ),
+                              ],
+                              if (_errorMessage != null) ...<Widget>[
+                                const SizedBox(height: 14),
+                                Text(
+                                  _errorMessage!,
+                                  textAlign: TextAlign.center,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.error,
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 18),
+                              OutlinedButton.icon(
+                                onPressed: _handleResendVerification,
+                                icon: const Icon(Icons.refresh_rounded, size: 18),
+                                label: Text(
+                                  s.t(
+                                    'Doğrulama Mailini Tekrar Gönder',
+                                    'Resend Verification Email',
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              TextButton(
+                                onPressed: () async {
+                                  _verificationPollTimer?.cancel();
+                                  await widget.controller.signOut();
+                                  if (!mounted) return;
+                                  setState(() {
+                                    _infoMessage = null;
+                                    _errorMessage = null;
+                                  });
+                                },
+                                child: Text(
+                                  s.t(
+                                    'Farklı E-posta ile Dene',
+                                    'Use a Different Email',
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

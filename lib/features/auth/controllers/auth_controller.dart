@@ -376,6 +376,11 @@ class AuthController extends ChangeNotifier {
     }
   }
 
+  bool get isAwaitingEmailVerification =>
+      _user != null &&
+      _user!.provider == AuthProviderType.email &&
+      !_user!.emailVerified;
+
   Future<AuthActionResult> signUpWithEmail({
     required String email,
     required String password,
@@ -393,16 +398,46 @@ class AuthController extends ChangeNotifier {
       );
       if (result.isSuccess && result.user != null) {
         _user = result.user;
-        _status = AuthSessionStatus.authenticated;
         _sessionLookupCount = 0;
-        await _localStore.setGuestModeEnabled(false);
-        await _syncEntitlementAfterSignIn();
+        if (result.user!.emailVerified) {
+          _status = AuthSessionStatus.authenticated;
+          await _localStore.setGuestModeEnabled(false);
+          await _syncEntitlementAfterSignIn();
+        } else {
+          _status = AuthSessionStatus.unauthenticated;
+        }
       }
       return result;
     } finally {
       _isBusy = false;
       _safeNotify();
     }
+  }
+
+  /// Sunucudan kullanıcının e-posta doğrulamasını tamamlayıp tamamlamadığını
+  /// sessizce kontrol eder; doğrulandıysa oturumu otomatik aktif eder.
+  Future<bool> checkEmailVerified() async {
+    try {
+      final reloaded = await _backend.reloadCurrentUser();
+      if (reloaded == null) return false;
+      _user = reloaded;
+      if (reloaded.emailVerified) {
+        _status = AuthSessionStatus.authenticated;
+        _sessionLookupCount = 0;
+        await _localStore.setGuestModeEnabled(false);
+        await _syncEntitlementAfterSignIn();
+        _safeNotify();
+        return true;
+      }
+      _safeNotify();
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<AuthActionResult> resendVerificationEmail() {
+    return _backend.sendEmailVerification();
   }
 
   Future<void> _syncEntitlementAfterSignIn() async {
