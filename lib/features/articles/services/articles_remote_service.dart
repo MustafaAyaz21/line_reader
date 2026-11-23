@@ -28,6 +28,7 @@ class ArticlesRemoteService {
     http.Client? httpClient,
     String? remoteUrl,
     String? fallbackUrl,
+    String? secondaryFallbackUrl,
     Duration? timeout,
   })  : _httpClient = httpClient ?? http.Client(),
         _ownsClient = httpClient == null,
@@ -37,6 +38,13 @@ class ArticlesRemoteService {
         fallbackUrl = fallbackUrl != null
             ? (fallbackUrl.trim().isEmpty ? null : fallbackUrl.trim())
             : (remoteUrl == null ? ApiConfig.articlesFallbackJsonUrl : null),
+        secondaryFallbackUrl = secondaryFallbackUrl != null
+            ? (secondaryFallbackUrl.trim().isEmpty
+                ? null
+                : secondaryFallbackUrl.trim())
+            : (remoteUrl == null
+                ? ApiConfig.articlesGithubFallbackJsonUrl
+                : null),
         _timeout = timeout ?? ApiConfig.requestTimeout;
 
   static const Map<String, String> _baseHeaders = <String, String>{
@@ -50,6 +58,7 @@ class ArticlesRemoteService {
   final bool _ownsClient;
   final String remoteUrl;
   final String? fallbackUrl;
+  final String? secondaryFallbackUrl;
   final Duration _timeout;
 
   /// Uzak `articles.json` kaynağını sorgular.
@@ -58,7 +67,7 @@ class ArticlesRemoteService {
   ///   döndürürse [ArticleFeedPayload.notModified] döner.
   /// - Hem üst düzey JSON dizisini (`[...]`) hem de sarmalanmış nesneyi
   ///   (`{"version": 1, "articles": [...]}`) destekler.
-  /// - Birincil adres başarısız olursa varsa [fallbackUrl] denenir.
+  /// - Birincil adres başarısız olursa sırayla yedek adresler denenir.
   /// - Tüm kaynaklar başarısız olursa [ArticlesRemoteException] fırlatır;
   ///   böylece yerel önbellek asla bozuk veriyle ezilmez.
   Future<ArticleFeedPayload> fetchArticles({
@@ -72,20 +81,26 @@ class ArticlesRemoteService {
         bypassCdnCache: bypassCdnCache,
       );
     } on ArticlesRemoteException catch (primaryError) {
-      final backup = fallbackUrl;
-      if (backup == null || backup == remoteUrl) {
-        rethrow;
+      final backups = <String>[
+        if (fallbackUrl != null && fallbackUrl != remoteUrl) fallbackUrl!,
+        if (secondaryFallbackUrl != null &&
+            secondaryFallbackUrl != remoteUrl &&
+            secondaryFallbackUrl != fallbackUrl)
+          secondaryFallbackUrl!,
+      ];
+      for (final backup in backups) {
+        try {
+          // Yedek uç nokta farklı ETag üretir; temiz yanıt almak için ETag gönderme.
+          return await _fetchFromUrl(
+            backup,
+            etag: null,
+            bypassCdnCache: bypassCdnCache,
+          );
+        } on ArticlesRemoteException {
+          continue;
+        }
       }
-      try {
-        // Yedek uç nokta farklı ETag üretir; temiz yanıt almak için ETag gönderme.
-        return await _fetchFromUrl(
-          backup,
-          etag: null,
-          bypassCdnCache: bypassCdnCache,
-        );
-      } on ArticlesRemoteException {
-        throw primaryError;
-      }
+      throw primaryError;
     }
   }
 

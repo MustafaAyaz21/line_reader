@@ -187,7 +187,7 @@ class MainMenuScreen extends StatelessWidget {
                   listenable: Listenable.merge(listenables),
                   builder: (context, _) {
                     final lastProgress = progressController.lastProgress;
-                    if (lastProgress == null) {
+                    if (lastProgress == null || lastProgress.isCompleted) {
                       return const SizedBox.shrink();
                     }
                     final article = _findVisibleArticleById(
@@ -419,15 +419,17 @@ class _MenuShortcutCard extends StatelessWidget {
                   color: textColor,
                 ),
               ),
-              const SizedBox(height: 6),
-              Text(
-                subtitle,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: textColor.withAlpha(210),
-                  height: 1.3,
+              if (subtitle.trim().isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  subtitle,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: textColor.withAlpha(210),
+                    height: 1.3,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),

@@ -27,7 +27,8 @@ class AppStrings {
   String get browserSubtitle =>
       t('Web\'de oku ve anında çevir', 'Read on the web & translate instantly');
   String get articlesTitle => t('Makaleler', 'Articles');
-  String get articlesSubtitle => t('Çevrimdışı okumalar', 'Offline readings');
+  String get articlesSubtitle =>
+      t('Seviyene göre oku ve öğren', 'Read & learn by level');
   String get continueReadingTitle =>
       t('Kaldığın yerden devam et', 'Continue where you left off');
   String readingProgressPercent(int percent) =>

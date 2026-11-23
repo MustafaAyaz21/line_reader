@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'app_theme_preset.dart';
 
@@ -207,6 +208,8 @@ abstract final class AppTheme {
         scrolledUnderElevation: 0.5,
         backgroundColor: colorScheme.surface,
         foregroundColor: colorScheme.onSurface,
+        systemOverlayStyle:
+            isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
       ),
       navigationBarTheme: NavigationBarThemeData(
         height: 68,
@@ -430,6 +433,9 @@ abstract final class AppTheme {
         surfaceTintColor: Colors.transparent,
         backgroundColor: visuals.appBarColor,
         foregroundColor: colorScheme.onSurface,
+        systemOverlayStyle: colorScheme.brightness == Brightness.dark
+            ? SystemUiOverlayStyle.light
+            : SystemUiOverlayStyle.dark,
       ),
       navigationBarTheme: NavigationBarThemeData(
         height: 68,

@@ -230,4 +230,55 @@ void main() {
     expect(find.byType(AppThemeBackdrop), findsOneWidget);
     expect(find.text('Colors of the Sky'), findsOneWidget);
   });
+
+  testWidgets(
+    'Default classic theme & article reader automatically follow system dark/light mode',
+    (WidgetTester tester) async {
+      expect(AppThemePreset.classic.themeMode, ThemeMode.system);
+      expect(ArticleReaderPreferences.defaults.tone, ArticleReaderTone.appTheme);
+      expect(ArticleReaderTone.fromStorageKey(null), ArticleReaderTone.appTheme);
+
+      ArticleReaderPalette? darkPalette;
+      tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
+      addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          themeMode: AppThemePreset.classic.themeMode,
+          home: Builder(
+            builder: (context) {
+              darkPalette =
+                  ArticleReaderPreferences.defaults.tone.resolvePalette(context);
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(darkPalette, isNotNull);
+      expect(darkPalette!.brightness, Brightness.dark);
+
+      ArticleReaderPalette? lightPalette;
+      tester.platformDispatcher.platformBrightnessTestValue = Brightness.light;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          themeMode: AppThemePreset.classic.themeMode,
+          home: Builder(
+            builder: (context) {
+              lightPalette =
+                  ArticleReaderPreferences.defaults.tone.resolvePalette(context);
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(lightPalette, isNotNull);
+      expect(lightPalette!.brightness, Brightness.light);
+    },
+  );
 }

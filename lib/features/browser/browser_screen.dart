@@ -128,7 +128,6 @@ class _BrowserScreenState extends State<BrowserScreen> {
   Listenable? _toolbarListenable;
 
   bool _isWordSheetOpen = false;
-  bool _isBackgroundColorSynced = false;
   bool _hasEarlyInjectedCurrentPage = false;
   bool _hasLoadedAnyWebPage = false;
   bool _openedWebFromSearch = false;
@@ -264,12 +263,11 @@ class _BrowserScreenState extends State<BrowserScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!_isBackgroundColorSynced) {
-      _isBackgroundColorSynced = true;
-      _webViewController.setBackgroundColor(
-        Theme.of(context).colorScheme.surface,
-      );
-    }
+    // Web sayfalarının çoğu kendi arka plan rengini belirtmeyip varsayılan
+    // beyaz tarayıcı tuvaline koyu metin yazar. Koyu uygulama temalarında
+    // siyah metnin koyu arka planda kaybolmaması için WebView tuvali daima
+    // beyaz tutulur (yalnızca tarayıcı üst çubuğu ve başlangıç ekranı temaya uyar).
+    _webViewController.setBackgroundColor(Colors.white);
   }
 
   @override
@@ -977,7 +975,10 @@ class _BrowserScreenState extends State<BrowserScreen> {
                     // WebView'i başlangıç ekranında görünmez (offstage) başlatma;
                     // ilk kez bir web sayfası açıldığında görünür olarak bağla.
                     if (_hasLoadedAnyWebPage || mode == _BrowserViewMode.web)
-                      _webViewWidget
+                      ColoredBox(
+                        color: Colors.white,
+                        child: _webViewWidget,
+                      )
                     else
                       const SizedBox.shrink(),
                   ],

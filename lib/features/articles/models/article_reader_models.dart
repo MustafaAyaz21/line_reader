@@ -84,7 +84,7 @@ enum ArticleReaderTone {
         return tone;
       }
     }
-    return ArticleReaderTone.paper;
+    return ArticleReaderTone.appTheme;
   }
 
   /// Aktif uygulama temasına göre okuma ekranının kesin renk paletini üretir.
@@ -255,7 +255,7 @@ enum ArticleMarkColor {
 /// Okuma ekranının yerel olarak saklanan görünüm ve işaretleme ayarları.
 class ArticleReaderPreferences {
   const ArticleReaderPreferences({
-    this.tone = ArticleReaderTone.paper,
+    this.tone = ArticleReaderTone.appTheme,
     this.fontSize = defaultFontSize,
     this.markStyle = ArticleMarkStyle.underline,
     this.markColor = ArticleMarkColor.amber,

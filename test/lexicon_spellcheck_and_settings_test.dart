@@ -367,10 +367,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // US IPA görünmeli; dokununca UK IPA'ya geçmeli!
+      // Hem US hem UK IPA aynı anda görünmeli (tek aksan seçme zorunluluğu yok).
+      expect(find.byKey(const ValueKey<String>('word_ipa_badge_us')), findsOneWidget);
+      expect(find.byKey(const ValueKey<String>('word_ipa_badge_uk')), findsOneWidget);
+      expect(find.text('US'), findsOneWidget);
       expect(find.text('/ˈɫɝn/'), findsOneWidget);
-      await tester.tap(find.byKey(const ValueKey<String>('word_ipa_badge')));
-      await tester.pumpAndSettle();
+      expect(find.text('UK'), findsOneWidget);
+      expect(find.text('/ˈɫɝn/'), findsOneWidget);
       expect(find.text('/lˈɜːn/'), findsOneWidget);
 
       // 'discover' eş anlamlısını görünür yap ve tek dokunuşla çıkar.
@@ -427,7 +430,16 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      expect(find.text('/ˈɫɝn/'), findsOneWidget);
       expect(find.text('/lˈɜːn/'), findsOneWidget);
+
+      // Ayarlardan IPA kapatıldığında tüm rozetler anında gizlenmeli.
+      await IpaAccentController.shared.setEnabled(false);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey<String>('word_ipa_badge')), findsNothing);
+      await IpaAccentController.shared.setEnabled(true);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey<String>('word_ipa_badge')), findsOneWidget);
 
       await IpaAccentController.shared.setAccent(IpaAccent.us);
     },
@@ -551,6 +563,121 @@ void main() {
       // Eş ve zıt anlamlar makaledeki bağlama özel olanlar olmalı (shiny/dim değil!)
       expect(info.synonyms, <String>['clever', 'smart']);
       expect(info.antonyms, <String>['dull', 'slow']);
+    },
+  );
+
+  test(
+    'WordDictionarySearchService rejects short fragments like "air transport" and returns 8-22 word Worker AI / Tatoeba sentences',
+    () async {
+      final mockClient = MockClient((request) async {
+        final url = request.url.toString();
+        if (url.contains('/examples')) {
+          return http.Response(
+            jsonEncode(<String, Object?>{
+              'ok': true,
+              'word': 'air transport',
+              'cached': true,
+              'examples': <Map<String, String>>[
+                <String, String>{
+                  'english': 'air transport',
+                  'turkish': 'hava taşımacılığı',
+                },
+                <String, String>{
+                  'english':
+                      'Modern air transport allows international companies to deliver urgent medical supplies across continents within hours.',
+                  'turkish':
+                      'Modern hava taşımacılığı uluslararası şirketlerin acil tıbbi malzemeleri kıtalar arasında saatler içinde teslim etmesini sağlar.',
+                },
+                <String, String>{
+                  'english':
+                      'Although air transport costs more than shipping by sea, many travelers prefer it for long distances.',
+                  'turkish':
+                      'Hava taşımacılığı deniz taşımacılığından daha pahalı olsa da birçok yolcu uzun mesafelerde bunu tercih eder.',
+                },
+              ],
+            }),
+            200,
+            headers: const <String, String>{
+              'content-type': 'application/json; charset=utf-8',
+            },
+          );
+        }
+        if (url.contains('tatoeba.org')) {
+          return http.Response(
+            jsonEncode(<String, Object?>{
+              'results': <Map<String, Object?>>[
+                <String, Object?>{
+                  'text':
+                      'Rapid growth in air transport has completely transformed global tourism and international business travel.',
+                  'translations': <List<Map<String, String>>>[
+                    <Map<String, String>>[
+                      <String, String>{
+                        'lang': 'tur',
+                        'text':
+                            'Hava taşımacılığındaki hızlı büyüme küresel turizmi ve uluslararası iş seyahatlerini tamamen dönüştürdü.',
+                      },
+                    ],
+                  ],
+                },
+              ],
+            }),
+            200,
+            headers: const <String, String>{
+              'content-type': 'application/json; charset=utf-8',
+            },
+          );
+        }
+        if (url.contains('translate.googleapis.com')) {
+          return http.Response(
+            jsonEncode(<Object?>[
+              <Object?>[
+                <Object?>['hava taşımacılığı', 'air transport', null, null, 1],
+              ],
+              null,
+              'en',
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              <Object?>[
+                <Object?>[
+                  <Object?>['air transport'],
+                ],
+              ],
+            ]),
+            200,
+            headers: const <String, String>{
+              'content-type': 'application/json; charset=utf-8',
+            },
+          );
+        }
+        return http.Response('{}', 404);
+      });
+
+      final searchService = WordDictionarySearchService(
+        httpClient: mockClient,
+        lexiconService: WordLexiconService(
+          enableOnlineEnrichment: false,
+          testBundledEntries: const <String, WordLexiconInfo>{},
+        ),
+      );
+
+      final detail = await searchService.searchWord('air transport');
+      expect(detail.examples.length, 3);
+      for (final ex in detail.examples) {
+        final words = ex.english.trim().split(RegExp(r'\s+')).length;
+        expect(words, greaterThanOrEqualTo(8));
+        expect(words, lessThanOrEqualTo(22));
+        expect(ex.english.toLowerCase(), contains('air transport'));
+        expect(ex.turkish, isNotNull);
+        expect(ex.turkish!.isNotEmpty, isTrue);
+      }
     },
   );
 }

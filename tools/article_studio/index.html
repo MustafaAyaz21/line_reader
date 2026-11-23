@@ -1181,14 +1181,14 @@
         <!-- Sağ: Manuel Kullanıcı Yetki Yönetimi -->
         <div class="admin-card">
           <div>
-            <h3>Kullanıcı Yetkileri (Premium Üye / Yetkili)</h3>
-            <p class="admin-sub">Kod paylaşmadan istediğiniz e-postaya <b>Premium Üye</b> veya <b>Yetkili</b> rolü verin; mevcut kullanıcıları tek tıkla <b>Yetkili</b> yapın ya da yetkisini kaldırın.</p>
+            <h3>Kullanıcı Yetkileri (Premium Üye / Geliştirici)</h3>
+            <p class="admin-sub">Kod paylaşmadan istediğiniz e-postaya <b>Premium Üye</b> veya <b>Geliştirici</b> rolü verin; mevcut kullanıcıları tek tıkla <b>Geliştirici</b> yapın ya da yetkisini kaldırın.</p>
           </div>
 
           <div class="admin-form-row">
             <input type="email" id="grantUserEmailInput" class="admin-input" style="flex:1;min-width:200px;" placeholder="kullanici@gmail.com" />
             <button class="btn btn-primary" id="grantUserBtn">⭐ Premium Üye Ver</button>
-            <button class="btn btn-ai" id="grantAdminBtn">🛡 Yetkili Yap</button>
+            <button class="btn btn-ai" id="grantAdminBtn">🛠 Geliştirici Yap</button>
           </div>
 
           <div class="admin-table" id="adminUsersList">
@@ -2994,10 +2994,10 @@
         accessEl.usersList.innerHTML = users.map(u => {
           const isAdmin = String(u.source || "").toLowerCase() === "admin";
           const rolePill = isAdmin
-            ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:rgba(99,102,241,0.22);color:#c7d2fe;border:1px solid rgba(129,140,248,0.45);">🛡 Yetkili</span>`
+            ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:rgba(99,102,241,0.22);color:#c7d2fe;border:1px solid rgba(129,140,248,0.45);">🛠 Geliştirici</span>`
             : `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:rgba(34,197,94,0.16);color:#86efac;border:1px solid rgba(74,222,128,0.35);">⭐ Premium Üye</span>`;
           const subLabel = isAdmin
-            ? "Ayarlar'da 'Yetkili' görünür"
+            ? "Ayarlar'da 'Geliştirici' görünür"
             : (u.code_used ? `Kod: ${u.code_used}` : "Manuel Premium Üye");
           return `
             <div class="admin-row">
@@ -3010,7 +3010,7 @@
               </div>
               <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;">
                 <button class="mini-btn" data-role-email="${escapeHtml(u.email)}" data-next-role="${isAdmin ? "premium" : "admin"}">
-                  ${isAdmin ? "⭐ Premium Yap" : "🛡 Yetkili Yap"}
+                  ${isAdmin ? "⭐ Premium Yap" : "🛠 Geliştirici Yap"}
                 </button>
                 <button class="mini-btn del" data-revoke-email="${escapeHtml(u.email)}">Yetkiyi Kaldır</button>
               </div>
@@ -3023,12 +3023,16 @@
             const email = btn.dataset.roleEmail;
             const nextRole = btn.dataset.nextRole;
             const r = await fetch("/api/admin/users", {
-              method: "PATCH",
+              method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ email, role: nextRole })
             });
             const d = await r.json();
-            showToast(d.message || "Rol güncellendi.", r.ok ? "success" : "error");
+            if (r.ok && nextRole === "admin" && d.role !== "admin") {
+              showToast("Cloudflare Worker eski sürümde! tools/ai_worker/worker.js dosyasını Cloudflare'da Deploy edin.", "error");
+            } else {
+              showToast(d.message || "Rol güncellendi.", r.ok ? "success" : "error");
+            }
             await loadAdminUsers();
           });
         });
@@ -3120,7 +3124,11 @@
           body: JSON.stringify({ email, role })
         });
         const data = await res.json();
-        showToast(data.message || data.error || "İşlem tamamlandı.", res.ok ? "success" : "error");
+        if (res.ok && role === "admin" && data.role !== "admin") {
+          showToast("Cloudflare Worker eski sürümde! tools/ai_worker/worker.js dosyasını Cloudflare'da Deploy edin.", "error");
+        } else {
+          showToast(data.message || data.error || "İşlem tamamlandı.", res.ok ? "success" : "error");
+        }
         if (res.ok) {
           accessEl.grantEmailInput.value = "";
           await loadAdminUsers();

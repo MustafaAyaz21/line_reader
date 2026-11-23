@@ -54,7 +54,17 @@ export default {
       });
     }
 
-    // 2) Admin uç noktaları (PC Makale Paneli — X-Admin-Secret korumalı)
+    // 2) Herkese açık anlık makale akışı (Cloudflare D1 — 1 saniye altı yayın)
+    if (method === "GET" && (path === "/articles" || path === "/articles.json")) {
+      return handleGetArticlesFeed(request, env);
+    }
+
+    // 2.5) Herkese açık D1 önbellekli doğal örnek cümle servisi (8-22 kelimelik cümleler)
+    if ((method === "GET" || method === "POST") && path === "/examples") {
+      return handleWordExamples(request, env, url);
+    }
+
+    // 3) Admin uç noktaları (PC Makale Paneli — X-Admin-Secret korumalı)
     if (path.startsWith("/admin/")) {
       return handleAdminRequest(request, env, path, method);
     }
@@ -82,9 +92,154 @@ export default {
       return handleBrowserAiTranslate(request, env, verifiedUser);
     }
 
+    // 4) Mobil Geliştirici Paneli uç noktaları (Firebase ID Token + D1 source='admin' zorunlu)
+    if (path.startsWith("/dev/")) {
+      return handleDeveloperPanelRequest(request, env, verifiedUser, path, method);
+    }
+
     return jsonResponse({ error: "not_found" }, 404);
   },
 };
+
+/* ---------------- Herkese Açık D1 Önbellekli Örnek Cümle Üretici ---------------- */
+
+async function handleWordExamples(request, env, url) {
+  let rawWord = url.searchParams.get("word") || "";
+  if (!rawWord && request.method.toUpperCase() === "POST") {
+    const body = await safeReadJson(request);
+    rawWord = String(body?.word || "");
+  }
+
+  const word = rawWord
+    .replace(/\s+/g, " ")
+    .replace(/^[^a-zA-Z]+|[^a-zA-Z]+$/g, "")
+    .trim()
+    .toLowerCase();
+
+  if (word.length < 2 || word.length > 64 || !/^[a-z][a-z\s'\-]*[a-z]$/.test(word)) {
+    return jsonResponse({ ok: false, error: "invalid_word" }, 400);
+  }
+
+  // 1) Önce Cloudflare D1 önbelleğine bak (maliyetsiz ve <100ms).
+  if (env && env.DB) {
+    try {
+      await ensureSchema(env.DB);
+      const cached = await env.DB
+        .prepare("SELECT examples_json FROM word_examples_cache WHERE word = ? LIMIT 1")
+        .bind(word)
+        .first();
+      if (cached && cached.examples_json) {
+        const parsed = JSON.parse(cached.examples_json);
+        if (Array.isArray(parsed) && parsed.length >= 2) {
+          return jsonResponse({
+            ok: true,
+            word,
+            cached: true,
+            examples: parsed,
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  if (!env || !env.AI) {
+    return jsonResponse({ ok: false, error: "ai_not_configured" }, 503);
+  }
+
+  const systemPrompt = [
+    "You are an expert English-Turkish dictionary editor.",
+    "Write EXACTLY 3 natural, meaningful, real-life English example sentences for the given English word or expression, with fluent Turkish translations.",
+    "Strict rules:",
+    "1. Every English sentence MUST be a complete, natural sentence between 10 and 18 words long (never shorter than 8 words, never longer than 22 words).",
+    "2. Every sentence MUST naturally use the target word or expression in a clear, realistic context (daily life, work, travel, technology, news, or conversation).",
+    "3. Use 3 distinct, varied contexts. Never write dictionary definitions, bare phrases, or robotic templates like 'We talked about X in class today'.",
+    "4. Provide a natural, idiomatic Turkish translation for each sentence.",
+    '5. Respond ONLY with valid JSON: {"examples":[{"english":"...","turkish":"..."},{"english":"...","turkish":"..."},{"english":"...","turkish":"..."}]}',
+  ].join("\n");
+
+  const userPrompt = `Target word or expression: "${word}"\nReturn ONLY the JSON object.`;
+
+  try {
+    const aiResult = await env.AI.run(MODEL_ID, {
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.35,
+      max_tokens: 420,
+    });
+
+    const rawText = extractModelText(aiResult);
+    const validExamples = parseExamplesJson(rawText);
+
+    if (validExamples.length === 0) {
+      return jsonResponse({ ok: false, error: "empty_examples" }, 502);
+    }
+
+    // D1 önbelleğine kaydet (bir sonraki aramada anında ve ücretsiz döner).
+    if (env && env.DB && validExamples.length >= 2) {
+      try {
+        await env.DB
+          .prepare(`
+            INSERT INTO word_examples_cache (word, examples_json, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(word) DO UPDATE SET
+              examples_json = excluded.examples_json,
+              updated_at = excluded.updated_at
+          `)
+          .bind(word, JSON.stringify(validExamples), new Date().toISOString())
+          .run();
+      } catch (_) {}
+    }
+
+    return jsonResponse({
+      ok: true,
+      word,
+      cached: false,
+      examples: validExamples,
+    });
+  } catch (err) {
+    return jsonResponse({
+      ok: false,
+      error: "examples_generation_failed",
+      detail: String(err?.message || err),
+    }, 502);
+  }
+}
+
+function parseExamplesJson(rawText) {
+  if (!rawText) return [];
+  const cleaned = String(rawText)
+    .replace(/```json\s*/gi, "")
+    .replace(/```/g, "")
+    .trim();
+
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+  if (start === -1 || end <= start) return [];
+
+  try {
+    const parsed = JSON.parse(cleaned.slice(start, end + 1));
+    const rawList = Array.isArray(parsed?.examples) ? parsed.examples : [];
+    const valid = [];
+    const seen = new Set();
+    for (const item of rawList) {
+      if (!item || typeof item !== "object") continue;
+      const en = String(item.english || "").replace(/\s+/g, " ").trim();
+      const tr = String(item.turkish || "").replace(/\s+/g, " ").trim();
+      const wordCount = en.split(/\s+/).filter(Boolean).length;
+      if (wordCount < 7 || wordCount > 26 || tr.length < 4) continue;
+      const key = en.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      valid.push({ english: en, turkish: tr });
+      if (valid.length >= 3) break;
+    }
+    return valid;
+  } catch (_) {
+    return [];
+  }
+}
 
 /* ---------------- Kullanıcı Yetki & Kod İşlemleri ---------------- */
 
@@ -120,7 +275,60 @@ async function ensureSchema(db) {
         UNIQUE(code, email)
       )
     `),
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS articles_feed (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        payload_json TEXT NOT NULL,
+        etag TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    `),
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS word_examples_cache (
+        word TEXT PRIMARY KEY,
+        examples_json TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    `),
   ]);
+}
+
+async function handleGetArticlesFeed(request, env) {
+  if (!env || !env.DB) {
+    return jsonResponse({ ok: false, error: "db_not_configured" }, 503);
+  }
+  try {
+    await ensureSchema(env.DB);
+    const row = await env.DB
+      .prepare("SELECT payload_json, etag, updated_at FROM articles_feed WHERE id = 1 LIMIT 1")
+      .first();
+    if (!row || !row.payload_json) {
+      return jsonResponse({ ok: false, error: "articles_not_seeded" }, 404);
+    }
+
+    const etag = String(row.etag || "").trim();
+    const ifNoneMatch = (request.headers.get("If-None-Match") || "").trim();
+    const baseHeaders = {
+      ...CORS_HEADERS,
+      "Cache-Control": "no-cache, no-store, must-revalidate",
+      "Pragma": "no-cache",
+      ...(etag ? { "ETag": etag } : {}),
+    };
+
+    if (etag && ifNoneMatch && ifNoneMatch === etag) {
+      return new Response(null, { status: 304, headers: baseHeaders });
+    }
+
+    return new Response(String(row.payload_json), {
+      status: 200,
+      headers: {
+        ...baseHeaders,
+        "Content-Type": "application/json; charset=utf-8",
+      },
+    });
+  } catch (err) {
+    return jsonResponse({ ok: false, error: "db_error", message: String(err?.message || err) }, 500);
+  }
 }
 
 async function getUserEntitlement(db, user) {
@@ -346,6 +554,147 @@ async function handleBrowserAiTranslate(request, env, user) {
   }
 }
 
+/* ---------------- Mobil Geliştirici Paneli (Firebase Token + D1 Admin Doğrulamalı) ---------------- */
+
+async function handleDeveloperPanelRequest(request, env, verifiedUser, path, method) {
+  if (!env || !env.DB) {
+    return jsonResponse({ ok: false, error: "db_not_configured", message: "D1 veritabanı bağlı değil." }, 503);
+  }
+
+  await ensureSchema(env.DB);
+  const callerEnt = await getUserEntitlement(env.DB, verifiedUser);
+  const isDeveloper = callerEnt.isUnlimited && String(callerEnt.source || "").toLowerCase() === "admin";
+  if (!isDeveloper) {
+    return jsonResponse({
+      ok: false,
+      error: "developer_required",
+      message: "Bu işlem yalnızca Geliştirici rolündeki hesaplara açıktır.",
+    }, 403);
+  }
+
+  const callerEmail = String(verifiedUser.email || verifiedUser.uid || "dev").trim().toLowerCase();
+
+  // 1) Premium kullanıcı yönetimi (Geliştirici rolleri yalnızca PC panelinden değiştirilebilir)
+  if (path === "/dev/users") {
+    if (method === "GET") {
+      const res = await env.DB
+        .prepare("SELECT email, uid, is_unlimited, source, code_used, granted_at FROM user_entitlements ORDER BY granted_at DESC")
+        .all();
+      return jsonResponse({ ok: true, users: res.results || [] });
+    }
+
+    const body = await safeReadJson(request);
+    const email = String(body?.email || "").trim().toLowerCase();
+    if (!email || !email.includes("@")) {
+      return jsonResponse({ ok: false, message: "Geçerli bir e-posta adresi girin." }, 400);
+    }
+
+    const existing = await env.DB
+      .prepare("SELECT email, source FROM user_entitlements WHERE LOWER(email) = ? LIMIT 1")
+      .bind(email)
+      .first();
+
+    if (existing && String(existing.source || "").toLowerCase() === "admin") {
+      return jsonResponse({
+        ok: false,
+        error: "protected_role",
+        message: "Geliştirici hesaplarının rolü yalnızca PC Yönetim Panelinden değiştirilebilir.",
+      }, 403);
+    }
+
+    if (method === "POST") {
+      await env.DB
+        .prepare(`
+          INSERT INTO user_entitlements (email, uid, is_unlimited, source, code_used, granted_at)
+          VALUES (?, NULL, 1, 'manual', ?, ?)
+          ON CONFLICT(email) DO UPDATE SET
+            is_unlimited = 1,
+            source = 'manual',
+            code_used = excluded.code_used,
+            granted_at = excluded.granted_at
+        `)
+        .bind(email, `dev:${callerEmail}`, new Date().toISOString())
+        .run();
+      return jsonResponse({
+        ok: true,
+        role: "premium",
+        message: `${email} hesabına Premium Üye yetkisi verildi.`,
+      });
+    }
+
+    if (method === "DELETE") {
+      await env.DB
+        .prepare("DELETE FROM user_entitlements WHERE LOWER(email) = ? AND LOWER(source) != 'admin'")
+        .bind(email)
+        .run();
+      return jsonResponse({
+        ok: true,
+        message: `${email} hesabının Premium yetkisi kaldırıldı.`,
+      });
+    }
+  }
+
+  // 2) Aktivasyon kodu üretme ve yönetimi
+  if (path === "/dev/codes") {
+    if (method === "GET") {
+      const res = await env.DB
+        .prepare("SELECT code, max_uses, used_count, is_active, note, created_at FROM access_codes ORDER BY created_at DESC")
+        .all();
+      return jsonResponse({ ok: true, codes: res.results || [] });
+    }
+
+    const body = await safeReadJson(request);
+    const code = String(body?.code || "").trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "");
+
+    if (method === "POST") {
+      if (code.length < 4 || code.length > 32) {
+        return jsonResponse({ ok: false, message: "Kod 4 ile 32 karakter arasında olmalıdır." }, 400);
+      }
+      const maxUses = Math.max(1, Math.min(100000, parseInt(body?.max_uses ?? 1, 10) || 1));
+      const rawNote = String(body?.note || "").trim().slice(0, 120);
+      const note = rawNote ? `${rawNote} (by ${callerEmail})` : `Geliştirici: ${callerEmail}`;
+
+      await env.DB
+        .prepare(`
+          INSERT INTO access_codes (code, max_uses, used_count, is_active, note, created_at)
+          VALUES (?, ?, 0, 1, ?, ?)
+          ON CONFLICT(code) DO UPDATE SET
+            max_uses = excluded.max_uses,
+            is_active = 1,
+            note = excluded.note
+        `)
+        .bind(code, maxUses, note, new Date().toISOString())
+        .run();
+      return jsonResponse({ ok: true, code, message: `${code} kodu oluşturuldu (${maxUses} kullanım).` });
+    }
+
+    if (method === "PATCH") {
+      if (!code) {
+        return jsonResponse({ ok: false, message: "Kod adı gerekli." }, 400);
+      }
+      const isActive = body?.is_active ? 1 : 0;
+      await env.DB
+        .prepare("UPDATE access_codes SET is_active = ? WHERE code = ?")
+        .bind(isActive, code)
+        .run();
+      return jsonResponse({
+        ok: true,
+        message: `${code} ${isActive ? "aktif edildi" : "pasife alındı"}.`,
+      });
+    }
+
+    if (method === "DELETE") {
+      if (!code) {
+        return jsonResponse({ ok: false, message: "Silinecek kod adı gerekli." }, 400);
+      }
+      await env.DB.prepare("DELETE FROM access_codes WHERE code = ?").bind(code).run();
+      return jsonResponse({ ok: true, message: `${code} kodu silindi.` });
+    }
+  }
+
+  return jsonResponse({ ok: false, error: "not_found" }, 404);
+}
+
 /* ---------------- Admin Uç Noktaları (PC Makale Paneli) ---------------- */
 
 async function handleAdminRequest(request, env, path, method) {
@@ -372,6 +721,42 @@ async function handleAdminRequest(request, env, path, method) {
   }
 
   await ensureSchema(env.DB);
+
+  // Anlık makale akışı güncelleme (PC Makale Paneli -> 1 saniyede canlı yayın)
+  if (path === "/admin/articles" && method === "POST") {
+    const body = await safeReadJson(request);
+    if (!body || !Array.isArray(body.articles)) {
+      return jsonResponse(
+        { ok: false, error: "invalid_articles", message: "Geçerli bir 'articles' dizisi gönderilmedi." },
+        400
+      );
+    }
+    const nowIso = new Date().toISOString();
+    const payloadText = JSON.stringify({
+      version: body.version ?? 1,
+      updated_at: body.updated_at || nowIso,
+      articles: body.articles,
+    });
+    const etag = `"d1-${Date.now()}-${payloadText.length}"`;
+    await env.DB
+      .prepare(`
+        INSERT INTO articles_feed (id, payload_json, etag, updated_at)
+        VALUES (1, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          payload_json = excluded.payload_json,
+          etag = excluded.etag,
+          updated_at = excluded.updated_at
+      `)
+      .bind(payloadText, etag, nowIso)
+      .run();
+
+    return jsonResponse({
+      ok: true,
+      count: body.articles.length,
+      etag,
+      message: `${body.articles.length} makale Cloudflare D1'e anında yayınlandı.`,
+    });
+  }
 
   // Kod yönetimi
   if (path === "/admin/codes") {
@@ -459,8 +844,9 @@ async function handleAdminRequest(request, env, path, method) {
 
     if (method === "POST" || method === "PATCH") {
       const requestedRole = String(body?.role || "").trim().toLowerCase();
-      const targetSource = requestedRole === "admin" ? "admin" : "manual";
-      const roleLabel = targetSource === "admin" ? "Yetkili" : "Premium Üye";
+      const isDeveloper = requestedRole === "admin" || requestedRole === "developer";
+      const targetSource = isDeveloper ? "admin" : "manual";
+      const roleLabel = isDeveloper ? "Geliştirici" : "Premium Üye";
       await env.DB
         .prepare(`
           INSERT INTO user_entitlements (email, uid, is_unlimited, source, code_used, granted_at)
@@ -474,7 +860,8 @@ async function handleAdminRequest(request, env, path, method) {
         .run();
       return jsonResponse({
         ok: true,
-        role: targetSource === "admin" ? "admin" : "premium",
+        role: isDeveloper ? "admin" : "premium",
+        source: targetSource,
         message: `${email} hesabına ${roleLabel} yetkisi tanımlandı.`,
       });
     }

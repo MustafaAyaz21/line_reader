@@ -52,12 +52,11 @@ class AppThemeController extends ChangeNotifier {
     try {
       final repo = _resolveRepository();
       await repo.saveString(_settingsKey, next.storageKey);
-      if (next.isGradientTheme) {
-        // Yeni gradyan tema seçildiğinde makale okuma alanı da otomatik olarak
-        // temaya uyumlu okunaklı yüzey moduna geçer (kullanıcı Aa'dan yine
-        // Beyaz/Kağıt/Koyu seçebilir).
-        await repo.saveString('article_reader_tone', 'theme');
-      }
+      // Tema değiştirildiğinde (Sistem Varsayılanı veya özel gradyan tema)
+      // makale okuma alanı da otomatik olarak seçilen temaya / telefonun
+      // koyu-açık moduna uyumlu hale gelir (kullanıcı Aa'dan yine
+      // Beyaz/Kağıt/Koyu seçebilir).
+      await repo.saveString('article_reader_tone', 'theme');
     } catch (_) {}
   }
 

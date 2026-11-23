@@ -25,6 +25,8 @@ class ArticleReadingProgress {
 
   int get progressPercent => (clampedProgress * 100).round();
 
+  bool get isCompleted => progressPercent >= 99;
+
   ArticleReadingProgress copyWith({
     String? articleTitle,
     String? articleLevel,

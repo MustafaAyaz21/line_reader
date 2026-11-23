@@ -19,8 +19,8 @@ import '../services/articles_sync_service.dart';
 class ArticlesController extends ChangeNotifier {
   ArticlesController(
     this._syncService, {
-    Duration silentCooldown = const Duration(seconds: 30),
-    Duration livePollInterval = const Duration(seconds: 35),
+    Duration silentCooldown = const Duration(seconds: 5),
+    Duration livePollInterval = const Duration(seconds: 12),
     DateTime Function()? nowProvider,
   })  : _silentCooldown = silentCooldown,
         _livePollInterval = livePollInterval,

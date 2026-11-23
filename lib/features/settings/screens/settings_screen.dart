@@ -11,6 +11,7 @@ import '../../../core/theme/app_theme_preset.dart';
 import '../../auth/controllers/auth_controller.dart';
 import '../../auth/models/auth_user.dart';
 import '../../auth/screens/auth_screen.dart';
+import 'developer_panel_screen.dart';
 
 /// Dil seçimi (Türkçe / İngilizce), çeviri önbelleği, hesap/yetki yönetimi
 /// ("Kod Kullan" ile sınırsız yetki + 3 katmanlı kota gösterimi) sayfası.
@@ -41,6 +42,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.initState();
     IpaAccentController.shared.load();
     AppThemeController.shared.load();
+    if (widget.authController.isAuthenticated) {
+      widget.authController.refreshEntitlement();
+    }
   }
 
   @override
@@ -231,7 +235,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 22),
 
-          // 3) Telaffuz / IPA Aksanı Seçimi (Amerikan US / İngiliz UK)
+          // 3) Telaffuz ve IPA Aksanı (US & UK IPA Aç / Kapat)
           _SectionTitle(
             label: s.t('Telaffuz ve IPA Aksanı', 'Pronunciation & IPA Accent'),
           ),
@@ -239,10 +243,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ListenableBuilder(
             listenable: IpaAccentController.shared,
             builder: (context, _) {
+              final ipaEnabled = IpaAccentController.shared.isEnabled;
               return Card(
                 margin: EdgeInsets.zero,
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 12, 14),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
@@ -256,45 +261,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              s.t('IPA Okunuş Aksanı', 'IPA Accent'),
+                              s.t('IPA Okunuş Aksanı', 'IPA Pronunciation'),
                               style: theme.textTheme.titleSmall?.copyWith(
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      SegmentedButton<IpaAccent>(
-                        key: const ValueKey<String>(
-                          'settings_ipa_accent_selector',
-                        ),
-                        segments: <ButtonSegment<IpaAccent>>[
-                          ButtonSegment<IpaAccent>(
-                            value: IpaAccent.us,
-                            label: Text(
-                              s.t('Amerikan (US)', 'American (US)'),
+                          Switch(
+                            key: const ValueKey<String>(
+                              'settings_ipa_enabled_switch',
                             ),
-                          ),
-                          ButtonSegment<IpaAccent>(
-                            value: IpaAccent.uk,
-                            label: Text(
-                              s.t('İngiliz (UK)', 'British (UK)'),
-                            ),
+                            value: ipaEnabled,
+                            onChanged: (value) {
+                              IpaAccentController.shared.setEnabled(value);
+                            },
                           ),
                         ],
-                        selected: <IpaAccent>{
-                          IpaAccentController.shared.accent,
-                        },
-                        onSelectionChanged: (selected) {
-                          IpaAccentController.shared.setAccent(selected.first);
-                        },
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 4),
                       Text(
                         s.t(
-                          'Makalelerde, tarayıcıda, kelime aramada ve Line\'da Bak kartında gösterilen IPA okunuş aksanını belirler.',
-                          'Sets the IPA pronunciation accent shown across articles, browser, word search, and quick lookup.',
+                          'Açıkken kelimelerin yanında hem Amerikan (US) hem İngiliz (UK) IPA okunuşları birlikte gösterilir.',
+                          'When enabled, both American (US) and British (UK) IPA pronunciations are shown beside words.',
                         ),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
@@ -645,7 +633,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         children: <Widget>[
                           Icon(
                             isStaff
-                                ? Icons.verified_user_rounded
+                                ? Icons.code_rounded
                                 : Icons.workspace_premium_rounded,
                             size: 22,
                             color: colorScheme.primary,
@@ -654,7 +642,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           Expanded(
                             child: Text(
                               isStaff
-                                  ? s.t('Yetkili', 'Authorized')
+                                  ? s.t('Geliştirici', 'Developer')
                                   : s.t('Premium Üye', 'Premium Member'),
                               style: theme.textTheme.titleMedium?.copyWith(
                                 color: colorScheme.onPrimaryContainer,
@@ -686,6 +674,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: colorScheme.primary,
                             fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                      if (isStaff) ...<Widget>[
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            key: const ValueKey<String>(
+                              'settings_developer_panel_button',
+                            ),
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => DeveloperPanelScreen(
+                                    authController: auth,
+                                  ),
+                                ),
+                              );
+                            },
+                            icon: const Icon(
+                              Icons.admin_panel_settings_outlined,
+                              size: 18,
+                            ),
+                            label: Text(
+                              s.t('Geliştirici Paneli', 'Developer Panel'),
+                            ),
                           ),
                         ),
                       ],

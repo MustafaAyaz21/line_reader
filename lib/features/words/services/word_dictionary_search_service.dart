@@ -49,7 +49,7 @@ Given an English word or short expression, return:
    - For verbs, ALWAYS use the plain Turkish infinitive (mastar) ending in -mak/-mek (e.g. "koşmak", "çalıştırmak", "yönetmek").
    - Keep each "meaning" concise (1 to 3 Turkish words, lowercase dictionary form, no parentheses).
    - Set "partOfSpeech" to strictly one of: "noun", "verb", "adjective", "adverb", or null.
-2. "examples": EXACTLY 3 short, clear, natural everyday English example sentences using the target word (each 5 to 12 words), together with a natural Turkish translation.
+2. "examples": EXACTLY 3 natural, meaningful, real-life English example sentences using the target word or expression (each 10 to 18 words, strictly between 8 and 22 words, in varied everyday contexts), together with a fluent Turkish translation.
 
 Respond ONLY with valid JSON:
 {
@@ -222,7 +222,44 @@ Respond ONLY with valid JSON:
           }
         }
 
-        // Örnek cümleleri topla (önce gerçek sözlük örnekleri, kısa ve net olanlar).
+        // Örnek cümleleri topla (öncelik: 1) Worker AI + D1 önbellek,
+        // 2) Tatoeba insan çevirili korpus, 3) Sözlüklerden 8-22 kelimelik tam cümleler).
+        if (collectedExamples.length < _targetExamplesCount) {
+          final richResults = await Future.wait<List<WordExampleSentence>>(
+            <Future<List<WordExampleSentence>>>[
+              _fetchWorkerExamples(normalizedWord),
+              _fetchTatoebaExamples(normalizedWord),
+            ],
+          );
+
+          final workerExamples = richResults[0];
+          final tatoebaExamples = richResults[1];
+
+          for (final ex in workerExamples) {
+            if (_isQualityExampleSentence(ex.english, normalizedWord)) {
+              addExample(ex);
+            }
+          }
+
+          if (collectedExamples.length < _targetExamplesCount &&
+              tatoebaExamples.isNotEmpty) {
+            final rankedTatoeba = tatoebaExamples
+                .where(
+                  (ex) => _isQualityExampleSentence(ex.english, normalizedWord),
+                )
+                .toList()
+              ..sort(
+                (a, b) => _scoreExampleSentence(b.english)
+                    .compareTo(_scoreExampleSentence(a.english)),
+              );
+            for (final ex in rankedTatoeba) {
+              addExample(ex);
+            }
+          }
+        }
+
+        // Hâlâ 3 örneğe ulaşmadıysa sözlük kaynaklarından 8–22 kelimelik
+        // tam cümleleri (kısa öbekleri eleyerek) kalite sırasına göre seç.
         final rawEnglishExamples = <String>[];
         if (dictBundle != null) {
           rawEnglishExamples.addAll(dictBundle.examples);
@@ -231,7 +268,9 @@ Respond ONLY with valid JSON:
           rawEnglishExamples.addAll(googleBundle.examples);
         }
 
-        rawEnglishExamples.sort((a, b) => a.length.compareTo(b.length));
+        rawEnglishExamples.sort(
+          (a, b) => _scoreExampleSentence(b).compareTo(_scoreExampleSentence(a)),
+        );
         final chosenEnglish = <String>[];
         final chosenKeys = <String>{
           ...collectedExamples.map((e) => e.english.toLowerCase()),
@@ -243,13 +282,13 @@ Respond ONLY with valid JSON:
             break;
           }
           final clean = _cleanSentence(candidate);
-          if (clean.length < 14 || clean.length > 130) continue;
+          if (!_isQualityExampleSentence(clean, normalizedWord)) continue;
           if (chosenKeys.add(clean.toLowerCase())) {
             chosenEnglish.add(clean);
           }
         }
 
-        // 3 örneğe ulaşmadıysa kelimenin türüne uygun kısa doğal cümlelerle tamamla.
+        // 3 örneğe hâlâ ulaşmadıysa (ör. çevrimdışı) 10–16 kelimelik doğal yedeklerle tamamla.
         final neededExamples = _targetExamplesCount -
             (collectedExamples.length + chosenEnglish.length);
         if (neededExamples > 0) {
@@ -914,30 +953,206 @@ Respond ONLY with valid JSON:
     }
   }
 
+  /// Cloudflare Worker AI + D1 önbellek üzerinden hedef kelime/ifade için
+  /// 3 adet 8–22 kelimelik doğal İngilizce–Türkçe örnek cümle getirir.
+  Future<List<WordExampleSentence>> _fetchWorkerExamples(String word) async {
+    try {
+      final uri = Uri.parse(ApiConfig.wordExamplesWorkerUrl);
+      final response = await _httpClient
+          .post(
+            uri,
+            headers: const <String, String>{
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode(<String, Object?>{'word': word}),
+          )
+          .timeout(const Duration(seconds: 7));
+
+      if (response.statusCode != 200) return const <WordExampleSentence>[];
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) return const <WordExampleSentence>[];
+      final rawList = decoded['examples'];
+      if (rawList is! List<dynamic>) return const <WordExampleSentence>[];
+
+      final results = <WordExampleSentence>[];
+      for (final item in rawList) {
+        if (item is! Map<String, dynamic>) continue;
+        final en = _cleanSentence((item['english'] ?? '').toString());
+        final tr = (item['turkish'] ?? '').toString().trim();
+        if (en.isEmpty) continue;
+        results.add(
+          WordExampleSentence(
+            english: en,
+            turkish: tr.isNotEmpty ? tr : null,
+          ),
+        );
+      }
+      return results;
+    } catch (_) {
+      return const <WordExampleSentence>[];
+    }
+  }
+
+  /// Tatoeba açık korpusundan insan çevirili İngilizce–Türkçe örnek cümleler çeker.
+  Future<List<WordExampleSentence>> _fetchTatoebaExamples(String word) async {
+    try {
+      final queryValue = word.contains(' ') ? '"$word"' : word;
+      final uri = Uri.parse(ApiConfig.tatoebaSearchBaseUrl).replace(
+        queryParameters: <String, String>{
+          'from': 'eng',
+          'to': 'tur',
+          'query': queryValue,
+          'orphans': 'no',
+          'unapproved': 'no',
+          'sort': 'relevance',
+        },
+      );
+      final response = await _httpClient.get(
+        uri,
+        headers: const <String, String>{
+          'Accept': 'application/json',
+          'User-Agent': 'LineReader/1.0',
+        },
+      ).timeout(const Duration(seconds: 6));
+
+      if (response.statusCode != 200) return const <WordExampleSentence>[];
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) return const <WordExampleSentence>[];
+      final rawResults = decoded['results'];
+      if (rawResults is! List<dynamic>) return const <WordExampleSentence>[];
+
+      final examples = <WordExampleSentence>[];
+      for (final item in rawResults) {
+        if (item is! Map<String, dynamic>) continue;
+        final en = _cleanSentence((item['text'] ?? '').toString());
+        if (en.isEmpty) continue;
+
+        String? tr;
+        final translations = item['translations'];
+        if (translations is List<dynamic>) {
+          for (final group in translations) {
+            if (group is! List<dynamic>) continue;
+            for (final trEntry in group) {
+              if (trEntry is Map<String, dynamic> &&
+                  trEntry['lang'] == 'tur' &&
+                  trEntry['text'] != null) {
+                final candidateTr = trEntry['text'].toString().trim();
+                if (candidateTr.isNotEmpty) {
+                  tr = candidateTr;
+                  break;
+                }
+              }
+            }
+            if (tr != null) break;
+          }
+        }
+
+        if (tr != null && tr.isNotEmpty) {
+          examples.add(WordExampleSentence(english: en, turkish: tr));
+        }
+        if (examples.length >= 8) break;
+      }
+      return examples;
+    } catch (_) {
+      return const <WordExampleSentence>[];
+    }
+  }
+
+  static int _countWords(String sentence) {
+    return sentence
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((token) => token.isNotEmpty)
+        .length;
+  }
+
+  /// Kısa öbekleri ("air transport" gibi) eleyip yalnızca anlamlı,
+  /// 7–26 kelimelik gerçek cümleleri kabul eder.
+  static bool _isQualityExampleSentence(String sentence, String targetWord) {
+    final clean = sentence.trim();
+    if (clean.length < 30 || clean.length > 210) return false;
+    final wordCount = _countWords(clean);
+    if (wordCount < 7 || wordCount > 26) return false;
+
+    final lowerSentence = clean.toLowerCase();
+    final lowerTarget = targetWord.trim().toLowerCase();
+    if (lowerTarget.isNotEmpty) {
+      if (lowerTarget.contains(' ')) {
+        // Çok kelimeli ifadelerde ifadenin kendisi veya anlamlı kelimelerinin tamamı geçmeli.
+        if (!lowerSentence.contains(lowerTarget)) {
+          final parts = lowerTarget
+              .split(RegExp(r'\s+'))
+              .where((p) => p.length >= 3)
+              .toList();
+          if (parts.isNotEmpty &&
+              !parts.every((part) => lowerSentence.contains(part))) {
+            return false;
+          }
+        }
+      } else if (lowerTarget.length >= 4) {
+        final stem = lowerTarget.length > 5
+            ? lowerTarget.substring(0, lowerTarget.length - 1)
+            : lowerTarget;
+        if (!lowerSentence.contains(lowerTarget) &&
+            !lowerSentence.contains(stem)) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  /// 8–22 kelime aralığını (özellikle 10–18 kelime bandını) en yüksek puanla öne çıkarır.
+  static int _scoreExampleSentence(String sentence) {
+    final clean = sentence.trim();
+    final words = _countWords(clean);
+    if (words < 7 || words > 26) return -1000;
+
+    var score = 100;
+    // 10–18 kelime arası en ideal aralık (8–22 arası güçlü).
+    if (words >= 10 && words <= 18) {
+      score += 40;
+    } else if (words >= 8 && words <= 22) {
+      score += 20;
+    } else {
+      score -= 10;
+    }
+    // Tam cümle noktalama işareti bonusu.
+    if (RegExp(r'[.!?]$').hasMatch(clean)) {
+      score += 10;
+    }
+    // Büyük harfle başlayan düzgün cümle bonusu.
+    if (clean.isNotEmpty && RegExp(r'^[A-Z]').hasMatch(clean)) {
+      score += 5;
+    }
+    return score;
+  }
+
   List<String> _buildFallbackShortExamples({
     required String word,
     WordPartOfSpeech? pos,
   }) {
     return switch (pos) {
       WordPartOfSpeech.verb => <String>[
-          'We need to $word carefully today.',
-          'She can $word very well in practice.',
-          'Try to $word this step by step.',
+          'Before making a final decision, the team took extra time to $word every detail carefully.',
+          'With regular practice and clear feedback, most learners quickly learn how to $word with confidence.',
+          'During the workshop, our instructor showed us a practical way to $word complex situations effectively.',
         ],
       WordPartOfSpeech.adjective => <String>[
-          'This task looks very $word to me.',
-          'It was a really $word decision.',
-          'The result became more $word over time.',
+          'After reviewing the new proposal together, everyone agreed that the plan looked surprisingly $word.',
+          'She explained why choosing a more $word approach would save the entire team valuable time.',
+          'Even under tight deadlines, staying $word helped them handle every unexpected challenge without stress.',
         ],
       WordPartOfSpeech.adverb => <String>[
-          'He answered the question $word.',
-          'They finished the project $word.',
-          'Please speak $word during the meeting.',
+          'Despite the busy schedule, the team responded $word and solved the customer\'s issue before noon.',
+          'He walked through the presentation $word so that every member of the audience could follow.',
+          'Because they planned each stage $word, the whole project finished ahead of the original deadline.',
         ],
       _ => <String>[
-          'We talked about $word in class today.',
-          'Understanding $word takes a little practice.',
-          'This article gives a clear view of $word.',
+          'Modern businesses rely heavily on $word to stay connected with international partners every single day.',
+          'In recent years, major improvements in $word have completely changed how people plan their daily lives.',
+          'The report highlights how investing in $word can create faster, safer, and more reliable services.',
         ],
     };
   }

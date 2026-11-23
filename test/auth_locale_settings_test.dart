@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:linereader/core/database/app_database.dart';
 import 'package:linereader/core/localization/app_locale.dart';
 import 'package:linereader/core/settings/api_key_controller.dart';
@@ -13,7 +16,9 @@ import 'package:linereader/features/auth/models/auth_user.dart';
 import 'package:linereader/features/auth/screens/auth_screen.dart';
 import 'package:linereader/features/auth/services/auth_service.dart';
 import 'package:linereader/features/auth/services/entitlement_service.dart';
+import 'package:linereader/features/settings/screens/developer_panel_screen.dart';
 import 'package:linereader/features/settings/screens/settings_screen.dart';
+import 'package:linereader/features/settings/services/developer_panel_service.dart';
 import 'package:linereader/features/update/controllers/app_update_controller.dart';
 import 'package:linereader/features/update/models/app_update_info.dart';
 import 'package:linereader/features/update/services/app_update_service.dart';
@@ -463,7 +468,7 @@ void main() {
         expect(find.text('Misafir Modu'), findsOneWidget);
         expect(find.textContaining('40 / 40'), findsOneWidget);
         expect(
-          find.byKey(const ValueKey<String>('settings_ipa_accent_selector')),
+          find.byKey(const ValueKey<String>('settings_ipa_enabled_switch')),
           findsOneWidget,
         );
         expect(find.text('Çeviri ve Önbellek'), findsNothing);
@@ -586,15 +591,156 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(find.text('Yetkili'), findsOneWidget);
+        expect(find.text('Geliştirici'), findsOneWidget);
         expect(find.text('Premium Üye'), findsNothing);
+        expect(
+          find.byKey(const ValueKey<String>('settings_developer_panel_button')),
+          findsOneWidget,
+        );
 
         await localeController.setLanguage(AppLanguage.en);
         await tester.pumpAndSettle();
-        expect(find.text('Authorized'), findsOneWidget);
+        expect(find.text('Developer'), findsOneWidget);
         expect(find.text('Premium Member'), findsNothing);
+        expect(find.text('Developer Panel'), findsOneWidget);
 
         apiKeyController.dispose();
+        authController.dispose();
+        localeController.dispose();
+      },
+    );
+
+    testWidgets(
+      'DeveloperPanelScreen sends Bearer token to /dev/users and /dev/codes to grant Premium and create codes',
+      (WidgetTester tester) async {
+        final localStore = _InMemoryAuthLocalStore();
+        final entitlementClient = _FakeEntitlementClient()
+          ..remoteUnlimited = true
+          ..remoteRole = 'admin'
+          ..remoteSource = 'admin';
+        final authController = AuthController(
+          backend: _FakeAuthBackend(),
+          localStore: localStore,
+          entitlementClient: entitlementClient,
+        );
+        await authController.initialize();
+        await authController.signInWithGoogle();
+
+        final users = <Map<String, Object?>>[
+          <String, Object?>{
+            'email': 'dev@gmail.com',
+            'source': 'admin',
+            'is_unlimited': 1,
+          },
+        ];
+        final codes = <Map<String, Object?>>[];
+        String? capturedAuthHeader;
+
+        final mockClient = MockClient((request) async {
+          capturedAuthHeader = request.headers['Authorization'];
+          final path = request.url.path;
+          if (path.endsWith('/dev/users') && request.method == 'GET') {
+            return http.Response(
+              jsonEncode(<String, Object?>{'ok': true, 'users': users}),
+              200,
+              headers: const <String, String>{'content-type': 'application/json'},
+            );
+          }
+          if (path.endsWith('/dev/users') && request.method == 'POST') {
+            final body = jsonDecode(request.body) as Map<String, dynamic>;
+            final email = body['email'].toString();
+            users.add(<String, Object?>{
+              'email': email,
+              'source': 'manual',
+              'is_unlimited': 1,
+              'code_used': 'dev:dev@gmail.com',
+            });
+            return http.Response(
+              jsonEncode(<String, Object?>{
+                'ok': true,
+                'role': 'premium',
+                'message': '$email hesabına Premium Üye yetkisi verildi.',
+              }),
+              200,
+              headers: const <String, String>{'content-type': 'application/json'},
+            );
+          }
+          if (path.endsWith('/dev/codes') && request.method == 'GET') {
+            return http.Response(
+              jsonEncode(<String, Object?>{'ok': true, 'codes': codes}),
+              200,
+              headers: const <String, String>{'content-type': 'application/json'},
+            );
+          }
+          if (path.endsWith('/dev/codes') && request.method == 'POST') {
+            final body = jsonDecode(request.body) as Map<String, dynamic>;
+            final code = body['code'].toString();
+            codes.add(<String, Object?>{
+              'code': code,
+              'max_uses': body['max_uses'] ?? 5,
+              'used_count': 0,
+              'is_active': 1,
+              'note': 'Geliştirici: dev@gmail.com',
+            });
+            return http.Response(
+              jsonEncode(<String, Object?>{
+                'ok': true,
+                'code': code,
+                'message': '$code kodu oluşturuldu.',
+              }),
+              200,
+              headers: const <String, String>{'content-type': 'application/json'},
+            );
+          }
+          return http.Response('{}', 404);
+        });
+
+        final devService = DeveloperPanelService(httpClient: mockClient);
+        final localeController = AppLocaleController(
+          store: _InMemoryLanguageStore(),
+        );
+
+        await tester.pumpWidget(
+          AppLocaleScope(
+            controller: localeController,
+            child: MaterialApp(
+              home: DeveloperPanelScreen(
+                authController: authController,
+                service: devService,
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(capturedAuthHeader, startsWith('Bearer '));
+        expect(find.text('dev@gmail.com'), findsOneWidget);
+
+        // 1) Yeni Gmail'e Premium Üye ver
+        await tester.enterText(
+          find.byKey(const ValueKey<String>('dev_panel_email_field')),
+          'arkadas@gmail.com',
+        );
+        await tester.tap(
+          find.byKey(const ValueKey<String>('dev_panel_grant_premium_btn')),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('arkadas@gmail.com'), findsOneWidget);
+
+        // 2) Aktivasyon Kodları sekmesine geç, rastgele kod üret ve oluştur
+        await tester.tap(find.text('Aktivasyon Kodları'));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey<String>('dev_panel_random_code_btn')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey<String>('dev_panel_create_code_btn')),
+        );
+        await tester.pumpAndSettle();
+        expect(codes.length, 1);
+        expect(find.text(codes.first['code']! as String), findsOneWidget);
+
         authController.dispose();
         localeController.dispose();
       },

@@ -4,8 +4,8 @@ import '../../../core/localization/app_strings.dart';
 import '../../../core/settings/ipa_accent_controller.dart';
 import '../../translation/models/word_lexicon_info.dart';
 
-/// Amerikan (US) / İngiliz (UK) doğrulanmış IPA okunuşunu sade tek bir hap
-/// içinde gösterir; dokunulduğunda US ↔ UK arasında anında geçiş yapar.
+/// Amerikan (US) ve İngiliz (UK) doğrulanmış IPA okunuşlarını kullanıcının tek
+/// bir aksan seçmesine gerek kalmadan yan yana kompakt haplar halinde gösterir.
 class WordIpaBadge extends StatelessWidget {
   const WordIpaBadge({
     super.key,
@@ -25,6 +25,14 @@ class WordIpaBadge extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
+    final cleanUs = info.ipaUs?.trim();
+    final cleanUk = info.ipaUk?.trim();
+    final hasUs = cleanUs != null && cleanUs.isNotEmpty;
+    final hasUk = cleanUk != null && cleanUk.isNotEmpty;
+    if (!hasUs && !hasUk) {
+      return const SizedBox.shrink();
+    }
+
     final controller = accentController ?? IpaAccentController.shared;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -32,66 +40,103 @@ class WordIpaBadge extends StatelessWidget {
     return ListenableBuilder(
       listenable: controller,
       builder: (context, _) {
-        final resolved = info.resolveIpa(controller.accent);
-        if (resolved == null) return const SizedBox.shrink();
-        final canToggle = info.hasBothIpas;
-
-        return Tooltip(
-          message: canToggle
-              ? context.l10n.t(
-                  'US / UK IPA aksanını değiştirmek için dokunun',
-                  'Tap to switch US / UK IPA accent',
-                )
-              : resolved.accent.turkishLabel,
-          child: Material(
-            color: colorScheme.surfaceContainerHighest.withAlpha(180),
-            borderRadius: BorderRadius.circular(999),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              key: const ValueKey<String>('word_ipa_badge'),
-              onTap: canToggle ? controller.toggle : null,
-              child: Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: compact ? 8 : 10,
-                  vertical: compact ? 3 : 5,
+        if (!controller.isEnabled) {
+          return const SizedBox.shrink();
+        }
+        return Wrap(
+          key: const ValueKey<String>('word_ipa_badge'),
+          spacing: compact ? 5 : 6,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: <Widget>[
+            if (hasUs)
+              _IpaPill(
+                key: const ValueKey<String>('word_ipa_badge_us'),
+                accentLabel: IpaAccent.us.shortLabel,
+                tooltip: context.l10n.t(
+                  IpaAccent.us.turkishLabel,
+                  IpaAccent.us.englishLabel,
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    Text(
-                      resolved.accent.shortLabel,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        fontSize: compact ? 10 : 10.5,
-                        color: colorScheme.primary,
-                        letterSpacing: 0.4,
-                      ),
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      resolved.ipa,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontFamily: 'monospace',
-                        fontSize: compact ? 11.5 : 12.5,
-                        fontWeight: FontWeight.w500,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    if (canToggle) ...<Widget>[
-                      const SizedBox(width: 3),
-                      Icon(
-                        Icons.swap_horiz_rounded,
-                        size: compact ? 12 : 13,
-                        color: colorScheme.onSurfaceVariant.withAlpha(170),
-                      ),
-                    ],
-                  ],
-                ),
+                ipa: cleanUs,
+                labelColor: colorScheme.primary,
+                compact: compact,
               ),
-            ),
-          ),
+            if (hasUk)
+              _IpaPill(
+                key: const ValueKey<String>('word_ipa_badge_uk'),
+                accentLabel: IpaAccent.uk.shortLabel,
+                tooltip: context.l10n.t(
+                  IpaAccent.uk.turkishLabel,
+                  IpaAccent.uk.englishLabel,
+                ),
+                ipa: cleanUk,
+                labelColor: colorScheme.tertiary,
+                compact: compact,
+              ),
+          ],
         );
       },
+    );
+  }
+}
+
+class _IpaPill extends StatelessWidget {
+  const _IpaPill({
+    super.key,
+    required this.accentLabel,
+    required this.tooltip,
+    required this.ipa,
+    required this.labelColor,
+    required this.compact,
+  });
+
+  final String accentLabel;
+  final String tooltip;
+  final String ipa;
+  final Color labelColor;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Tooltip(
+      message: tooltip,
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 7 : 9,
+          vertical: compact ? 2.5 : 4,
+        ),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest.withAlpha(180),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Text(
+              accentLabel,
+              style: theme.textTheme.labelSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                fontSize: compact ? 9.5 : 10,
+                color: labelColor,
+                letterSpacing: 0.4,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              ipa,
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontFamily: 'monospace',
+                fontSize: compact ? 11 : 12,
+                fontWeight: FontWeight.w500,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

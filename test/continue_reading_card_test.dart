@@ -8,6 +8,8 @@ import 'package:linereader/features/articles/controllers/article_reading_progres
 import 'package:linereader/features/articles/controllers/articles_controller.dart';
 import 'package:linereader/features/articles/data/articles_cache_repository.dart';
 import 'package:linereader/features/articles/models/article.dart';
+import 'package:linereader/features/articles/models/article_level.dart';
+import 'package:linereader/features/articles/screens/level_articles_screen.dart';
 import 'package:linereader/features/articles/services/articles_remote_service.dart';
 import 'package:linereader/features/articles/services/articles_sync_service.dart';
 import 'package:linereader/features/home/widgets/main_menu_screen.dart';
@@ -190,6 +192,19 @@ void main() {
     expect(find.text('64% completed'), findsOneWidget);
     expect(find.text('Kaldığın yerden devam et'), findsNothing);
 
+    // Makale %100 tamamlandığında kart ana ekrandan otomatik kalkmalı.
+    await progressController.recordProgress(
+      article: article,
+      progress: 1.0,
+      persist: true,
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey<String>('main_menu_continue_reading_card')),
+      findsNothing,
+    );
+
     articlesController.dispose();
     apiKeyController.dispose();
     localeController.dispose();
@@ -249,6 +264,86 @@ void main() {
 
     articlesController.dispose();
     apiKeyController.dispose();
+    localeController.dispose();
+    progressController.dispose();
+  });
+
+  testWidgets(
+      'LevelArticlesScreen shows Tamamlandı / Completed badge only on completed articles',
+      (WidgetTester tester) async {
+    final settings = _InMemorySettingsRepository();
+    final localeController = AppLocaleController(
+      store: SqliteAppLanguageStore(settings),
+    );
+    final progressController = ArticleReadingProgressController(
+      repository: settings,
+    );
+
+    final doneArticle = _sampleArticle(
+      id: 'b1-done',
+      title: 'Finished Story',
+      level: 'B1',
+    );
+    final inProgressArticle = _sampleArticle(
+      id: 'b1-half',
+      title: 'Halfway Story',
+      level: 'B1',
+    );
+    final articlesController = ArticlesController(
+      ArticlesSyncService(
+        cacheStore: _InMemoryArticlesCacheStore(<Article>[
+          doneArticle,
+          inProgressArticle,
+        ]),
+        remoteService: _NoopRemoteService(),
+      ),
+    );
+    await articlesController.loadCache();
+    await progressController.recordProgress(
+      article: doneArticle,
+      progress: 1.0,
+      persist: true,
+    );
+    await progressController.recordProgress(
+      article: inProgressArticle,
+      progress: 0.5,
+      persist: true,
+    );
+
+    await tester.pumpWidget(
+      AppLocaleScope(
+        controller: localeController,
+        child: ListenableBuilder(
+          listenable: localeController,
+          builder: (context, _) {
+            return MaterialApp(
+              home: LevelArticlesScreen(
+                level: ArticleLevel.b1,
+                controller: articlesController,
+                readingProgressController: progressController,
+              ),
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey<String>('article_completed_badge_b1-done')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey<String>('article_completed_badge_b1-half')),
+      findsNothing,
+    );
+    expect(find.text('Tamamlandı'), findsOneWidget);
+
+    await localeController.setLanguage(AppLanguage.en);
+    await tester.pumpAndSettle();
+    expect(find.text('Completed'), findsOneWidget);
+
+    articlesController.dispose();
     localeController.dispose();
     progressController.dispose();
   });

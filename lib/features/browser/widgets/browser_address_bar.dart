@@ -197,9 +197,14 @@ class BrowserAddressBar extends StatelessWidget {
                     extentOffset: controller.text.length,
                   );
                 },
-                style: theme.textTheme.bodyMedium,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurface,
+                ),
                 decoration: InputDecoration(
                   hintText: 'Web adresi girin veya arama yapın',
+                  hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                   prefixIcon: Icon(
                     Icons.public_rounded,
                     size: 18,

@@ -52,13 +52,25 @@ abstract final class ApiConfig {
   static const String myMemoryBaseUrl =
       'https://api.mymemory.translated.net/get';
 
-  /// Makaleler için birincil uzak JSON veri kaynağı (Cloudflare Pages CDN).
-  /// İleride makale kaynağını değiştirmek için bu tek sabit güncellenebilir.
+  /// Kelime arama ekranı için D1 önbellekli doğal örnek cümle uç noktası (8–22 kelime).
+  static const String wordExamplesWorkerUrl =
+      'https://linereader-ai.xreasayaz21.workers.dev/examples';
+
+  /// Yedek ücretsiz insan çevirili cümle korpusu (Tatoeba).
+  static const String tatoebaSearchBaseUrl =
+      'https://tatoeba.org/en/api_v0/search';
+
+  /// Makaleler için birincil uzak JSON veri kaynağı (Cloudflare Worker + D1:
+  /// yayınlaya basıldığı anda 1 saniye altında güncellenir).
   static const String articlesJsonUrl =
+      'https://linereader-ai.xreasayaz21.workers.dev/articles.json';
+
+  /// Birincil Worker henüz boş veya erişilemezse devreye giren Cloudflare Pages CDN yedeği.
+  static const String articlesFallbackJsonUrl =
       'https://line-reader.pages.dev/articles.json';
 
-  /// Birincil CDN geçici olarak erişilemez olursa devreye giren yedek raw URL.
-  static const String articlesFallbackJsonUrl =
+  /// İkincil CDN de geçici olarak erişilemezse devreye giren GitHub raw yedeği.
+  static const String articlesGithubFallbackJsonUrl =
       'https://raw.githubusercontent.com/MustafaAyaz21/line_reader/main/articles.json';
 
   static const Duration requestTimeout = Duration(seconds: 12);

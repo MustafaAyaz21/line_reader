@@ -153,6 +153,43 @@ function Get-RepoStatus {
     }
 }
 
+function Publish-ArticlesToWorker([string]$RawJson) {
+    $cfg = Get-AdminConfig
+    if ([string]::IsNullOrWhiteSpace($cfg.adminSecret) -or [string]::IsNullOrWhiteSpace($cfg.workerUrl)) {
+        return @{
+            synced  = $false
+            skipped = $true
+            message = "ADMIN_SECRET kayıtlı değil (yalnızca GitHub'a yayınlandı)."
+        }
+    }
+
+    try {
+        $fwd = Forward-WorkerAdminRequest -RemotePath "/admin/articles" -HttpMethod "POST" -BodyText $RawJson
+        if ($fwd.StatusCode -ge 200 -and $fwd.StatusCode -lt 300) {
+            Write-Host "[Worker D1] Makaleler aninda yayinlandi!" -ForegroundColor Green
+            return @{
+                synced  = $true
+                skipped = $false
+                message = "Cloudflare D1'e anında yayınlandı!"
+            }
+        }
+        Write-Host "[Worker D1] Uyari (HTTP $($fwd.StatusCode)): $($fwd.Body)" -ForegroundColor Yellow
+        return @{
+            synced  = $false
+            skipped = $false
+            message = "Worker D1 yanıtı (HTTP $($fwd.StatusCode))"
+        }
+    }
+    catch {
+        Write-Host "[Worker D1] Hata: $($_.Exception.Message)" -ForegroundColor Yellow
+        return @{
+            synced  = $false
+            skipped = $false
+            message = $_.Exception.Message
+        }
+    }
+}
+
 function Publish-ArticlesToGitHub([int]$ArticleCount) {
     $pathsToStage = @("content/articles.json", "articles.json")
     if (Test-Path $ContentAudioDir) { $pathsToStage += "content/audio" }
@@ -1205,7 +1242,14 @@ try {
             elseif ($method -eq "POST" -and $path -eq "/api/publish") {
                 $body = Read-RequestBody $req
                 $count = Validate-And-SaveArticles $body
+                $savedJson = Read-Utf8Text $ContentArticlesPath
+                $workerResult = Publish-ArticlesToWorker $savedJson
                 $publishResult = Publish-ArticlesToGitHub -ArticleCount $count
+                if ($workerResult.synced) {
+                    $commitPart = if ($publishResult.commit) { " (GitHub: $($publishResult.commit))" } else { "" }
+                    $publishResult.message = "⚡ Anında yayınlandı ($count makale)$commitPart! Telefonda 1-2 saniye içinde görünür."
+                    $publishResult.published = $true
+                }
                 Send-JsonObject -Response $res -StatusCode 200 -Payload $publishResult
             }
             elseif ($method -eq "GET" -and $path -eq "/api/admin/config") {

@@ -38,6 +38,7 @@ class IpaAccentController extends ChangeNotifier {
       : _repository = repository;
 
   static const String _settingsKey = 'ipa_accent';
+  static const String _enabledSettingsKey = 'ipa_enabled';
 
   /// Uygulama genelinde tüm kelime ekranlarının ve Ayarlar'ın anında senkronize
   /// olması için paylaşılan tek örnek.
@@ -46,9 +47,11 @@ class IpaAccentController extends ChangeNotifier {
   final SettingsRepository? _repository;
 
   IpaAccent _accent = IpaAccent.us;
+  bool _isEnabled = true;
   bool _hasLoaded = false;
 
   IpaAccent get accent => _accent;
+  bool get isEnabled => _isEnabled;
 
   SettingsRepository _resolveRepository() {
     return _repository ?? SettingsRepository(AppDatabase.instance);
@@ -58,15 +61,46 @@ class IpaAccentController extends ChangeNotifier {
     if (_hasLoaded && !force) return;
     _hasLoaded = true;
     try {
-      final raw = await _resolveRepository().getString(_settingsKey);
-      final parsed = IpaAccent.fromStorage(raw);
-      if (parsed != _accent) {
-        _accent = parsed;
+      final repo = _resolveRepository();
+      final rawAccent = await repo.getString(_settingsKey);
+      final rawEnabled = await repo.getString(_enabledSettingsKey);
+      final parsedAccent = IpaAccent.fromStorage(rawAccent);
+      final parsedEnabled = _parseEnabled(rawEnabled);
+      var changed = false;
+      if (parsedAccent != _accent) {
+        _accent = parsedAccent;
+        changed = true;
+      }
+      if (parsedEnabled != _isEnabled) {
+        _isEnabled = parsedEnabled;
+        changed = true;
+      }
+      if (changed) {
         notifyListeners();
       }
     } catch (_) {
-      // Test veya DB henüz hazır değilse varsayılan US ile devam et.
+      // Test veya DB henüz hazır değilse varsayılan değerlerle devam et.
     }
+  }
+
+  static bool _parseEnabled(String? raw) {
+    final normalized = raw?.trim().toLowerCase();
+    if (normalized == 'false' || normalized == '0' || normalized == 'off') {
+      return false;
+    }
+    return true;
+  }
+
+  Future<void> setEnabled(bool next) async {
+    if (_isEnabled == next) return;
+    _isEnabled = next;
+    notifyListeners();
+    try {
+      await _resolveRepository().saveString(
+        _enabledSettingsKey,
+        next ? 'true' : 'false',
+      );
+    } catch (_) {}
   }
 
   Future<void> setAccent(IpaAccent next) async {

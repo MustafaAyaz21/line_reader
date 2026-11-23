@@ -8,6 +8,7 @@ import '../../auth/controllers/auth_controller.dart';
 import '../../browser/browser_screen.dart';
 import '../../translation/services/word_translation_service.dart';
 import '../../words/models/word_list.dart';
+import '../controllers/article_reading_progress_controller.dart';
 import '../controllers/articles_controller.dart';
 import '../data/article_reader_repository.dart';
 import '../models/article.dart';
@@ -24,6 +25,7 @@ class LevelArticlesScreen extends StatefulWidget {
     super.key,
     required this.level,
     required this.controller,
+    this.readingProgressController,
     this.readerStore,
     this.translationService,
     this.ttsService,
@@ -36,6 +38,7 @@ class LevelArticlesScreen extends StatefulWidget {
 
   final ArticleLevel level;
   final ArticlesController controller;
+  final ArticleReadingProgressController? readingProgressController;
   final ArticleReaderStore? readerStore;
   final WordTranslationService? translationService;
   final TtsService? ttsService;
@@ -50,10 +53,15 @@ class LevelArticlesScreen extends StatefulWidget {
 }
 
 class _LevelArticlesScreenState extends State<LevelArticlesScreen> {
+  ArticleReadingProgressController get _progressController =>
+      widget.readingProgressController ??
+      ArticleReadingProgressController.shared;
+
   @override
   void initState() {
     super.initState();
     widget.controller.startLiveCheck();
+    _progressController.load();
   }
 
   @override
@@ -96,6 +104,7 @@ class _LevelArticlesScreenState extends State<LevelArticlesScreen> {
         builder: (_) => ArticleReaderScreen(
           article: article,
           readerStore: widget.readerStore,
+          readingProgressController: _progressController,
           translationService: widget.translationService,
           ttsService: widget.ttsService,
           authController: widget.authController,
@@ -114,7 +123,10 @@ class _LevelArticlesScreenState extends State<LevelArticlesScreen> {
     final level = widget.level;
 
     return ListenableBuilder(
-      listenable: widget.controller,
+      listenable: Listenable.merge(<Listenable>[
+        widget.controller,
+        _progressController,
+      ]),
       builder: (context, _) {
         final levelArticles = widget.controller.articles
             .where((article) => article.parsedLevel == level)
@@ -154,9 +166,14 @@ class _LevelArticlesScreenState extends State<LevelArticlesScreen> {
                                   const SizedBox(height: 12),
                               itemBuilder: (context, index) {
                                 final article = levelArticles[index];
+                                final isCompleted = _progressController
+                                        .progressForArticle(article.id)
+                                        ?.isCompleted ??
+                                    false;
                                 return _LevelArticleCard(
                                   article: article,
                                   accentColor: level.accentColor,
+                                  isCompleted: isCompleted,
                                   onTap: () => _openArticleReader(article),
                                 );
                               },
@@ -256,20 +273,26 @@ class _LevelArticleCard extends StatelessWidget {
   const _LevelArticleCard({
     required this.article,
     required this.accentColor,
+    this.isCompleted = false,
     required this.onTap,
   });
 
   final Article article;
   final Color accentColor;
+  final bool isCompleted;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final s = context.l10n;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final completedColor =
+        isDark ? const Color(0xFF4ADE80) : const Color(0xFF15803D);
     final descriptionText = article.description.isNotEmpty
         ? article.description
-        : 'Okumak için dokunun.';
+        : s.t('Okumak için dokunun.', 'Tap to read.');
 
     return Card(
       margin: EdgeInsets.zero,
@@ -330,6 +353,40 @@ class _LevelArticleCard extends StatelessWidget {
                       ],
                     ),
                   ),
+                  if (isCompleted) ...<Widget>[
+                    const SizedBox(width: 8),
+                    Container(
+                      key: ValueKey<String>(
+                        'article_completed_badge_${article.id}',
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: completedColor.withAlpha(28),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          Icon(
+                            Icons.check_circle_rounded,
+                            size: 15,
+                            color: completedColor,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            s.t('Tamamlandı', 'Completed'),
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: completedColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const Spacer(),
                   Icon(
                     Icons.arrow_forward_ios_rounded,
