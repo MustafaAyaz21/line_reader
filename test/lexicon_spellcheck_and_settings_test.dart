@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:linereader/core/settings/ipa_accent_controller.dart';
 import 'package:linereader/features/articles/models/article.dart';
+import 'package:linereader/features/articles/services/article_word_lexicon_service.dart';
 import 'package:linereader/features/articles/services/article_word_translation_service.dart';
 import 'package:linereader/features/browser/widgets/word_preview_sheet.dart';
 import 'package:linereader/features/translation/models/word_lexicon_info.dart';
@@ -491,6 +492,65 @@ void main() {
       ).readAsStringSync();
       expect(overlayKt, contains('finishAndRemoveTask()'));
       expect(overlayKt, contains('onUserLeaveHint()'));
+    },
+  );
+
+  test(
+    'Article.wordRelations and ArticleWordLexiconService return exact contextual synonyms/antonyms while keeping verified US/UK IPA',
+    () async {
+      final article = Article.tryFromJson(<String, Object?>{
+        'id': 'ctx-rel-1',
+        'level': 'B1',
+        'title': 'A Bright Student',
+        'content': 'She is a bright student and always happy to help.',
+        'word_meanings': <String, Object?>{
+          'bright': 'zeki',
+          'happy': 'istekli, memnun',
+        },
+        'word_relations': <String, Object?>{
+          'bright': <String, Object?>{
+            'syn': <String>['clever', 'smart'],
+            'ant': <String>['dull', 'slow'],
+          },
+          'happy': <String, Object?>{
+            'syn': <String>['glad', 'willing'],
+            'ant': <String>['reluctant'],
+          },
+        },
+      });
+      expect(article, isNotNull);
+
+      // SQLite raw_json gidiş-dönüşünde word_relations korunmalı
+      final fromDb = Article.fromDbRow(article!.toDbRow(cachedAtMillis: 1));
+      expect(fromDb.findWordRelations('bright')?.synonyms, <String>['clever', 'smart']);
+      expect(fromDb.findWordRelations('bright')?.antonyms, <String>['dull', 'slow']);
+
+      final baseLexicon = WordLexiconService(
+        enableOnlineEnrichment: false,
+        testBundledEntries: const <String, WordLexiconInfo>{
+          'bright': WordLexiconInfo(
+            word: 'bright',
+            ipaUs: '/ˈbɹaɪt/',
+            ipaUk: '/bɹˈaɪt/',
+            synonyms: <String>['shiny', 'luminous'],
+            antonyms: <String>['dim', 'dark'],
+          ),
+        },
+      );
+
+      final articleLexicon = ArticleWordLexiconService(
+        article: fromDb,
+        baseService: baseLexicon,
+      );
+
+      final info = await articleLexicon.lookup('bright');
+      expect(info, isNotNull);
+      // IPA doğrulanmış sözlükten korunmalı
+      expect(info!.ipaUs, '/ˈbɹaɪt/');
+      expect(info.ipaUk, '/bɹˈaɪt/');
+      // Eş ve zıt anlamlar makaledeki bağlama özel olanlar olmalı (shiny/dim değil!)
+      expect(info.synonyms, <String>['clever', 'smart']);
+      expect(info.antonyms, <String>['dull', 'slow']);
     },
   );
 }

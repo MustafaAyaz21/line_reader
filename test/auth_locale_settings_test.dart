@@ -36,6 +36,7 @@ class _InMemoryAuthLocalStore implements AuthLocalStore {
   int quotaUsed = 0;
   bool cachedUnlimited = false;
   String? cachedCodeUsed;
+  String? cachedRole;
 
   @override
   Future<bool> isGuestModeEnabled() async => guestEnabled;
@@ -60,31 +61,41 @@ class _InMemoryAuthLocalStore implements AuthLocalStore {
   }
 
   @override
-  Future<({bool isUnlimited, String? codeUsed})> loadCachedEntitlement() async {
-    return (isUnlimited: cachedUnlimited, codeUsed: cachedCodeUsed);
+  Future<({bool isUnlimited, String? codeUsed, String? role})>
+      loadCachedEntitlement() async {
+    return (
+      isUnlimited: cachedUnlimited,
+      codeUsed: cachedCodeUsed,
+      role: cachedRole,
+    );
   }
 
   @override
   Future<void> saveCachedEntitlement({
     required bool isUnlimited,
     String? codeUsed,
+    String? role,
   }) async {
     cachedUnlimited = isUnlimited;
     cachedCodeUsed = isUnlimited ? codeUsed : null;
+    cachedRole = isUnlimited ? role : null;
   }
 }
 
 class _FakeEntitlementClient implements EntitlementClient {
   bool remoteUnlimited = false;
   String? remoteCodeUsed;
+  String? remoteRole;
+  String? remoteSource;
   final String validCode = 'READER2026';
 
   @override
   Future<EntitlementStatus?> fetchEntitlement(String idToken) async {
     return EntitlementStatus(
       isUnlimited: remoteUnlimited,
-      source: remoteUnlimited ? 'code' : 'none',
+      source: remoteSource ?? (remoteUnlimited ? 'code' : 'none'),
       codeUsed: remoteCodeUsed,
+      role: remoteRole,
     );
   }
 
@@ -524,6 +535,64 @@ void main() {
         expect(find.text('Yetkiyi Yenile'), findsNothing);
         expect(find.text('Çıkış Yap'), findsOneWidget);
         expect(find.textContaining('READER2026'), findsOneWidget);
+
+        apiKeyController.dispose();
+        authController.dispose();
+        localeController.dispose();
+      },
+    );
+
+    testWidgets(
+      'Yetkili (admin) rolündeki hesapta Ayarlar ekranında Premium Üye yerine Yetkili yazar',
+      (WidgetTester tester) async {
+        final localStore = _InMemoryAuthLocalStore();
+        final entitlementClient = _FakeEntitlementClient()
+          ..remoteUnlimited = true
+          ..remoteRole = 'admin'
+          ..remoteSource = 'admin';
+        final authController = AuthController(
+          backend: _FakeAuthBackend(),
+          localStore: localStore,
+          entitlementClient: entitlementClient,
+        );
+        await authController.initialize();
+        await authController.signInWithGoogle();
+        expect(authController.isUnlimited, isTrue);
+        expect(authController.isAuthorizedStaff, isTrue);
+
+        final localeController = AppLocaleController(
+          store: _InMemoryLanguageStore(),
+        );
+        final apiKeyController = ApiKeyController(
+          SettingsRepository(AppDatabase.instance),
+        );
+
+        await tester.pumpWidget(
+          AppLocaleScope(
+            controller: localeController,
+            child: ListenableBuilder(
+              listenable: localeController,
+              builder: (context, _) {
+                return MaterialApp(
+                  home: SettingsScreen(
+                    apiKeyController: apiKeyController,
+                    localeController: localeController,
+                    authController: authController,
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Yetkili'), findsOneWidget);
+        expect(find.text('Premium Üye'), findsNothing);
+
+        await localeController.setLanguage(AppLanguage.en);
+        await tester.pumpAndSettle();
+        expect(find.text('Authorized'), findsOneWidget);
+        expect(find.text('Premium Member'), findsNothing);
 
         apiKeyController.dispose();
         authController.dispose();

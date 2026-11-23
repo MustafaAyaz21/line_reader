@@ -1181,13 +1181,14 @@
         <!-- Sağ: Manuel Kullanıcı Yetki Yönetimi -->
         <div class="admin-card">
           <div>
-            <h3>Kullanıcı Yetkileri (Ver / Kaldır)</h3>
-            <p class="admin-sub">Kod paylaşmadan istediğiniz kullanıcının e-posta adresine anında sınırsız yetki verin veya tek tıkla yetkisini geri alın.</p>
+            <h3>Kullanıcı Yetkileri (Premium Üye / Yetkili)</h3>
+            <p class="admin-sub">Kod paylaşmadan istediğiniz e-postaya <b>Premium Üye</b> veya <b>Yetkili</b> rolü verin; mevcut kullanıcıları tek tıkla <b>Yetkili</b> yapın ya da yetkisini kaldırın.</p>
           </div>
 
           <div class="admin-form-row">
-            <input type="email" id="grantUserEmailInput" class="admin-input" style="flex:1;min-width:210px;" placeholder="kullanici@gmail.com" />
-            <button class="btn btn-primary" id="grantUserBtn">Yetki Ver</button>
+            <input type="email" id="grantUserEmailInput" class="admin-input" style="flex:1;min-width:200px;" placeholder="kullanici@gmail.com" />
+            <button class="btn btn-primary" id="grantUserBtn">⭐ Premium Üye Ver</button>
+            <button class="btn btn-ai" id="grantAdminBtn">🛡 Yetkili Yap</button>
           </div>
 
           <div class="admin-table" id="adminUsersList">
@@ -1350,6 +1351,65 @@
       return lines.join("\n");
     }
 
+    function parseWordRelationsText(rawText) {
+      const map = {};
+      const lines = (rawText || "").replace(/\r\n/g, "\n").split("\n");
+      for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line) continue;
+        const colonIdx = line.indexOf(":");
+        if (colonIdx <= 0) continue;
+        const key = line.slice(0, colonIdx).trim().toLowerCase();
+        const rest = line.slice(colonIdx + 1).trim();
+        if (!key || !rest) continue;
+
+        const parts = rest.split("|");
+        const cleanList = (part, maxCount) => {
+          const out = [];
+          const seen = new Set();
+          for (const piece of (part || "").split(",")) {
+            const term = piece.trim().toLowerCase();
+            if (!term || term === key || seen.has(term)) continue;
+            seen.add(term);
+            out.push(term);
+            if (out.length >= maxCount) break;
+          }
+          return out;
+        };
+
+        const syn = cleanList(parts[0], 5);
+        const ant = parts.length > 1 ? cleanList(parts[1], 4) : [];
+        if (syn.length > 0 || ant.length > 0) {
+          const entry = {};
+          if (syn.length > 0) entry.syn = syn;
+          if (ant.length > 0) entry.ant = ant;
+          map[key] = entry;
+        }
+      }
+      return { map, count: Object.keys(map).length };
+    }
+
+    function formatWordRelationsMap(rawMap) {
+      if (!rawMap || typeof rawMap !== "object" || Array.isArray(rawMap)) return "";
+      const lines = [];
+      for (const [k, v] of Object.entries(rawMap)) {
+        const cleanKey = String(k ?? "").trim().toLowerCase();
+        if (!cleanKey || !v || typeof v !== "object") continue;
+        const syn = Array.isArray(v.syn || v.synonyms)
+          ? (v.syn || v.synonyms).map(x => String(x ?? "").trim().toLowerCase()).filter(Boolean)
+          : [];
+        const ant = Array.isArray(v.ant || v.antonyms)
+          ? (v.ant || v.antonyms).map(x => String(x ?? "").trim().toLowerCase()).filter(Boolean)
+          : [];
+        if (syn.length === 0 && ant.length === 0) continue;
+        const right = ant.length > 0
+          ? `${syn.join(", ")} | ${ant.join(", ")}`
+          : syn.join(", ");
+        lines.push(`${cleanKey}: ${right}`);
+      }
+      return lines.join("\n");
+    }
+
     function parseSentenceTranslationsText(rawText) {
       const map = {};
       const lines = (rawText || "").replace(/\r\n/g, "\n").split("\n");
@@ -1387,6 +1447,7 @@
       const content = (raw.content || "").replace(/\r\n/g, "\n");
       const readingTime = (raw.reading_time || raw.reading_time_label || "").trim() || estimateReadingTime(content);
       const wordMeaningsRaw = formatWordMeaningsMap(raw.word_meanings);
+      const wordRelationsRaw = formatWordRelationsMap(raw.word_relations || raw.wordRelations);
       const rawParaTr = Array.isArray(raw.paragraph_translations)
         ? raw.paragraph_translations
         : (Array.isArray(raw.paragraphTranslations) ? raw.paragraphTranslations : []);
@@ -1414,6 +1475,7 @@
         language: (raw.language || "en").trim() || "en",
         content,
         word_meanings_text: wordMeaningsRaw,
+        word_relations_text: wordRelationsRaw,
         paragraph_translations_text: paragraphTranslationsText,
         sentence_translations_text: sentenceTranslationsText,
         audio_url: audioUrl,
@@ -1481,6 +1543,7 @@
         const words = countWords(a.content);
         const avgMinutes = words > 0 ? Math.max(1, Math.round(words / 150)) : 4;
         const parsedMeanings = parseWordMeaningsText(a.word_meanings_text || "");
+        const parsedRelations = parseWordRelationsText(a.word_relations_text || "");
         const parsedParaTr = splitParagraphs(a.paragraph_translations_text || "");
         const parsedSentTr = parseSentenceTranslationsText(a.sentence_translations_text || "");
         const obj = {
@@ -1497,6 +1560,7 @@
         if ((a.category || "").trim()) obj.category = a.category.trim();
         if ((a.author || "").trim()) obj.author = a.author.trim();
         if (parsedMeanings.count > 0) obj.word_meanings = parsedMeanings.map;
+        if (parsedRelations.count > 0) obj.word_relations = parsedRelations.map;
         if (parsedParaTr.length > 0) obj.paragraph_translations = parsedParaTr;
         if (parsedSentTr.count > 0) obj.sentence_translations = parsedSentTr.map;
         if ((a.audio_url || "").trim()) obj.audio_url = a.audio_url.trim();
@@ -1718,6 +1782,7 @@
       const words = countWords(article.content);
       const paragraphs = splitParagraphs(article.content).length;
       const parsedWm = parseWordMeaningsText(article.word_meanings_text || "");
+      const parsedWr = parseWordRelationsText(article.word_relations_text || "");
       const parsedParaTrCount = splitParagraphs(article.paragraph_translations_text || "").length;
       const parsedSentTr = parseSentenceTranslationsText(article.sentence_translations_text || "");
 
@@ -1836,6 +1901,18 @@
               <span class="wm-stats-warn" id="wmSkippedBadge" style="${parsedWm.skippedCount > 0 ? "" : "display:none;"}">${parsedWm.skippedCount} geçersiz satır atlanacak</span>
             </div>
             <textarea id="fieldWordMeanings" class="meanings-area" placeholder="make: bu cümlede karar vermek anlamında&#10;look closer: yakından incelemek&#10;custom: gelenek, görenek">${escapeHtml(article.word_meanings_text || "")}</textarea>
+          </div>
+
+          <div class="field">
+            <label>
+              <span>Bağlamsal Eş &amp; Zıt Anlamlar (word_relations)</span>
+              <span style="font-weight:500;color:var(--text-muted);">Her satır: kelime: eş1, eş2 | zıt1, zıt2 (o cümledeki anlama göre)</span>
+            </label>
+            <div class="content-toolbar">
+              <button type="button" class="btn btn-sm" id="formatRelationsBtn">Satırları Düzenle</button>
+              <span class="wm-stats-badge" id="wrCountBadge">${parsedWr.count} kelime eş/zıt anlamı</span>
+            </div>
+            <textarea id="fieldWordRelations" class="meanings-area" style="min-height:130px;" placeholder="bright: clever, smart | dull, slow&#10;happy: glad, willing | reluctant, unwilling">${escapeHtml(article.word_relations_text || "")}</textarea>
           </div>
 
           <div class="field">
@@ -2072,6 +2149,28 @@
       }
 
       wordMeaningsInput.addEventListener("input", onWordMeaningsChanged);
+
+      const wordRelationsInput = document.getElementById("fieldWordRelations");
+      const wrCountBadge = document.getElementById("wrCountBadge");
+      function onWordRelationsChanged() {
+        article.word_relations_text = wordRelationsInput.value;
+        const parsed = parseWordRelationsText(article.word_relations_text);
+        if (wrCountBadge) wrCountBadge.textContent = `${parsed.count} kelime eş/zıt anlamı`;
+        state.dirty = true;
+        updateStatusPill();
+      }
+      if (wordRelationsInput) {
+        wordRelationsInput.addEventListener("input", onWordRelationsChanged);
+      }
+      const formatRelationsBtn = document.getElementById("formatRelationsBtn");
+      if (formatRelationsBtn && wordRelationsInput) {
+        formatRelationsBtn.addEventListener("click", () => {
+          const parsed = parseWordRelationsText(wordRelationsInput.value);
+          wordRelationsInput.value = formatWordRelationsMap(parsed.map);
+          onWordRelationsChanged();
+          showToast(`${parsed.count} kelimenin eş/zıt anlamı düzenlendi.`);
+        });
+      }
 
       const paraTrInput = document.getElementById("fieldParagraphTranslations");
       const paraTrBadge = document.getElementById("paraTrCountBadge");
@@ -2357,7 +2456,8 @@
         `2) Description (1-2 sentence summary in English)`,
         `3) Category (1-2 words in English)`,
         `4) Content (4-5 English paragraphs, ~350 words)`,
-        `5) Word Meanings (35-45 key words from the article, each on a new line in "word: contextual Turkish meaning" format)`
+        `5) Word Meanings (35-45 key words from the article, each on a new line in "word: contextual Turkish meaning" format)`,
+        `6) Word Relations (same key words, each on a new line in "word: contextual synonym 1, synonym 2 | contextual antonym 1, antonym 2" format strictly matching the exact meaning in this article)`
       ].join("\n");
 
       try {
@@ -2473,6 +2573,7 @@
 
         const gen = data.article;
         const wmText = formatWordMeaningsMap(gen.word_meanings || {});
+        const wrText = formatWordRelationsMap(gen.word_relations || {});
         const paraTrText = Array.isArray(gen.paragraph_translations)
           ? gen.paragraph_translations.map(p => String(p ?? "").trim()).filter(Boolean).join("\n\n")
           : "";
@@ -2489,6 +2590,7 @@
           language: "en",
           content: contentText,
           word_meanings_text: wmText,
+          word_relations_text: wrText,
           paragraph_translations_text: paraTrText,
           sentence_translations_text: sentTrText,
           audio_url: "",
@@ -2763,6 +2865,7 @@
       codesList: document.getElementById("adminCodesList"),
       grantEmailInput: document.getElementById("grantUserEmailInput"),
       grantUserBtn: document.getElementById("grantUserBtn"),
+      grantAdminBtn: document.getElementById("grantAdminBtn"),
       usersList: document.getElementById("adminUsersList")
     };
 
@@ -2889,17 +2992,46 @@
           return;
         }
         accessEl.usersList.innerHTML = users.map(u => {
-          const badge = u.code_used ? `Kod: ${u.code_used}` : "Manuel Yetki";
+          const isAdmin = String(u.source || "").toLowerCase() === "admin";
+          const rolePill = isAdmin
+            ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:rgba(99,102,241,0.22);color:#c7d2fe;border:1px solid rgba(129,140,248,0.45);">🛡 Yetkili</span>`
+            : `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:rgba(34,197,94,0.16);color:#86efac;border:1px solid rgba(74,222,128,0.35);">⭐ Premium Üye</span>`;
+          const subLabel = isAdmin
+            ? "Ayarlar'da 'Yetkili' görünür"
+            : (u.code_used ? `Kod: ${u.code_used}` : "Manuel Premium Üye");
           return `
             <div class="admin-row">
-              <div style="min-width:160px;">
-                <div style="font-size:13.5px;font-weight:700;">${escapeHtml(u.email)}</div>
-                <div style="font-size:11.5px;color:var(--text-muted);">${escapeHtml(badge)}</div>
+              <div style="min-width:170px;">
+                <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
+                  <span style="font-size:13.5px;font-weight:700;">${escapeHtml(u.email)}</span>
+                  ${rolePill}
+                </div>
+                <div style="font-size:11.5px;color:var(--text-muted);margin-top:2px;">${escapeHtml(subLabel)}</div>
               </div>
-              <button class="mini-btn del" style="margin-left:auto;" data-revoke-email="${escapeHtml(u.email)}">Yetkiyi Kaldır</button>
+              <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;">
+                <button class="mini-btn" data-role-email="${escapeHtml(u.email)}" data-next-role="${isAdmin ? "premium" : "admin"}">
+                  ${isAdmin ? "⭐ Premium Yap" : "🛡 Yetkili Yap"}
+                </button>
+                <button class="mini-btn del" data-revoke-email="${escapeHtml(u.email)}">Yetkiyi Kaldır</button>
+              </div>
             </div>
           `;
         }).join("");
+
+        accessEl.usersList.querySelectorAll("button[data-role-email]").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const email = btn.dataset.roleEmail;
+            const nextRole = btn.dataset.nextRole;
+            const r = await fetch("/api/admin/users", {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email, role: nextRole })
+            });
+            const d = await r.json();
+            showToast(d.message || "Rol güncellendi.", r.ok ? "success" : "error");
+            await loadAdminUsers();
+          });
+        });
 
         accessEl.usersList.querySelectorAll("button[data-revoke-email]").forEach(btn => {
           btn.addEventListener("click", async () => {
@@ -2975,7 +3107,7 @@
       }
     });
 
-    accessEl.grantUserBtn.addEventListener("click", async () => {
+    async function grantUserWithRole(role) {
       const email = accessEl.grantEmailInput.value.trim().toLowerCase();
       if (!email || !email.includes("@")) {
         showToast("Geçerli bir e-posta adresi yazın.", "error");
@@ -2985,7 +3117,7 @@
         const res = await fetch("/api/admin/users", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email })
+          body: JSON.stringify({ email, role })
         });
         const data = await res.json();
         showToast(data.message || data.error || "İşlem tamamlandı.", res.ok ? "success" : "error");
@@ -2996,7 +3128,10 @@
       } catch (err) {
         showToast(err.message, "error");
       }
-    });
+    }
+
+    accessEl.grantUserBtn.addEventListener("click", () => grantUserWithRole("premium"));
+    accessEl.grantAdminBtn.addEventListener("click", () => grantUserWithRole("admin"));
 
     loadInitial();
     loadAiConfig();

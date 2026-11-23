@@ -355,6 +355,12 @@ Create ONE original English reading article and return ONLY a valid JSON object 
   "word_meanings": {
     "example_word": "contextual Turkish meaning (concise, 1-5 Turkish words)"
   },
+  "word_relations": {
+    "example_word": {
+      "syn": ["contextual English synonym 1", "contextual English synonym 2"],
+      "ant": ["contextual English antonym 1"]
+    }
+  },
   "paragraph_translations": [
     "Natural, fluent Turkish translation of paragraph 1.",
     "Natural, fluent Turkish translation of paragraph 2."
@@ -371,9 +377,10 @@ Strict requirements:
 4. Title, description, category, and content MUST all be in natural, well-edited English.
 5. Word count of "content" MUST be close to 350 words (320-385 words), split into 4-5 clear paragraphs separated by \n\n. Do NOT include the title inside "content".
 6. "word_meanings" MUST contain 35 to 45 important English words or short phrases that ACTUALLY appear verbatim in "content", with lowercase keys and accurate, natural Turkish meanings suited to the exact context of the article (no English explanations, just concise Turkish equivalents).
-7. "paragraph_translations" MUST be a JSON array with the exact same number of elements as the paragraphs in "content", providing fluent Turkish translations in order.
-8. "sentence_translations" MUST map every sentence of "content" (verbatim English sentence as key) to its fluent, contextual Turkish translation.
-9. Output raw JSON only—no markdown fences, no commentary.
+7. "word_relations" MUST cover the same key words from "word_meanings" with lowercase keys. For each word, provide 2 to 3 natural English synonyms ("syn") and 1 to 2 natural English antonyms ("ant") that STRICTLY match the exact sense/meaning of the word inside THIS article's sentence context (never unrelated dictionary senses; use an empty array [] for "ant" only when a concrete noun has no natural opposite).
+8. "paragraph_translations" MUST be a JSON array with the exact same number of elements as the paragraphs in "content", providing fluent Turkish translations in order.
+9. "sentence_translations" MUST map every sentence of "content" (verbatim English sentence as key) to its fluent, contextual Turkish translation.
+10. Output raw JSON only—no markdown fences, no commentary.
 "@
 
     $requestObj = @{
@@ -494,6 +501,39 @@ Strict requirements:
                     }
                 }
 
+                $wrOrdered = [ordered]@{}
+                if ($null -ne $articleObj.PSObject.Properties["word_relations"] -and $null -ne $articleObj.word_relations) {
+                    foreach ($prop in $articleObj.word_relations.PSObject.Properties) {
+                        $rk = ([string]$prop.Name).Trim().ToLowerInvariant()
+                        $rv = $prop.Value
+                        if ([string]::IsNullOrWhiteSpace($rk) -or $null -eq $rv) { continue }
+                        $synArr = New-Object System.Collections.ArrayList
+                        $antArr = New-Object System.Collections.ArrayList
+                        $rawSyn = if ($null -ne $rv.PSObject.Properties["syn"]) { $rv.syn } elseif ($null -ne $rv.PSObject.Properties["synonyms"]) { $rv.synonyms } else { @() }
+                        $rawAnt = if ($null -ne $rv.PSObject.Properties["ant"]) { $rv.ant } elseif ($null -ne $rv.PSObject.Properties["antonyms"]) { $rv.antonyms } else { @() }
+                        foreach ($item in @($rawSyn)) {
+                            $clean = ([string]$item).Trim().ToLowerInvariant()
+                            if (-not [string]::IsNullOrWhiteSpace($clean) -and $clean -ne $rk -and -not $synArr.Contains($clean)) {
+                                [void]$synArr.Add($clean)
+                                if ($synArr.Count -ge 5) { break }
+                            }
+                        }
+                        foreach ($item in @($rawAnt)) {
+                            $clean = ([string]$item).Trim().ToLowerInvariant()
+                            if (-not [string]::IsNullOrWhiteSpace($clean) -and $clean -ne $rk -and -not $antArr.Contains($clean)) {
+                                [void]$antArr.Add($clean)
+                                if ($antArr.Count -ge 4) { break }
+                            }
+                        }
+                        if ($synArr.Count -gt 0 -or $antArr.Count -gt 0) {
+                            $entryObj = [ordered]@{}
+                            if ($synArr.Count -gt 0) { $entryObj["syn"] = @($synArr) }
+                            if ($antArr.Count -gt 0) { $entryObj["ant"] = @($antArr) }
+                            $wrOrdered[$rk] = $entryObj
+                        }
+                    }
+                }
+
                 $paraTrList = New-Object System.Collections.ArrayList
                 if ($null -ne $articleObj.PSObject.Properties["paragraph_translations"] -and $null -ne $articleObj.paragraph_translations) {
                     foreach ($pt in @($articleObj.paragraph_translations)) {
@@ -528,6 +568,7 @@ Strict requirements:
                         language               = "en"
                         content                = $genContent
                         word_meanings          = $wmOrdered
+                        word_relations         = $wrOrdered
                         paragraph_translations = @($paraTrList)
                         sentence_translations  = $sentTrOrdered
                     }
@@ -1185,7 +1226,7 @@ try {
                 $fwd = Forward-WorkerAdminRequest -RemotePath "/admin/codes" -HttpMethod $method -BodyText $body
                 Send-Response -Response $res -StatusCode $fwd.StatusCode -Body $fwd.Body -ContentType "application/json; charset=utf-8"
             }
-            elseif ($path -eq "/api/admin/users" -and ($method -in @("GET", "POST", "DELETE"))) {
+            elseif ($path -eq "/api/admin/users" -and ($method -in @("GET", "POST", "PATCH", "DELETE"))) {
                 $body = if ($method -eq "GET") { "" } else { Read-RequestBody $req }
                 $fwd = Forward-WorkerAdminRequest -RemotePath "/admin/users" -HttpMethod $method -BodyText $body
                 Send-Response -Response $res -StatusCode $fwd.StatusCode -Body $fwd.Body -ContentType "application/json; charset=utf-8"

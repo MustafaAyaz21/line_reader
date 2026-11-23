@@ -19,6 +19,7 @@ import '../../translation/data/translation_cache_repository.dart';
 import '../../translation/models/word_lexicon_info.dart';
 import '../../translation/models/word_meaning.dart';
 import '../../translation/services/cached_translation_service.dart';
+import '../../translation/services/word_lexicon_service.dart';
 import '../../translation/services/word_translation_service.dart';
 import '../../words/data/word_repository.dart';
 import '../../words/models/saved_word.dart';
@@ -30,6 +31,7 @@ import '../models/article.dart';
 import '../models/article_level.dart';
 import '../models/article_reader_models.dart';
 import '../services/article_passage_translation_service.dart';
+import '../services/article_word_lexicon_service.dart';
 import '../services/article_word_translation_service.dart';
 import '../utils/article_text_parser.dart';
 import '../widgets/article_audio_player_bar.dart';
@@ -52,6 +54,7 @@ class ArticleReaderScreen extends StatefulWidget {
     required this.article,
     this.readerStore,
     this.translationService,
+    this.lexiconService,
     this.passageTranslator,
     this.ttsService,
     this.audioController,
@@ -66,6 +69,7 @@ class ArticleReaderScreen extends StatefulWidget {
   final Article article;
   final ArticleReaderStore? readerStore;
   final WordTranslationService? translationService;
+  final WordLexiconService? lexiconService;
   final ArticlePassageTranslator? passageTranslator;
   final TtsService? ttsService;
   final ArticleAudioController? audioController;
@@ -84,6 +88,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
   late final ArticleReaderStore _readerStore;
   late final WordTranslationService _baseTranslationService;
   late final WordTranslationService _translationService;
+  late final WordLexiconService _lexiconService;
   late final bool _ownsTranslationService;
   late final ArticlePassageTranslator _passageTranslator;
   late final bool _ownsPassageTranslator;
@@ -144,6 +149,10 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
     _translationService = ArticleWordTranslationService(
       article: widget.article,
       fallbackService: _baseTranslationService,
+    );
+    _lexiconService = ArticleWordLexiconService(
+      article: widget.article,
+      baseService: widget.lexiconService,
     );
     _ownsPassageTranslator = widget.passageTranslator == null;
     _passageTranslator =
@@ -694,6 +703,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
         word: word,
         contextSentence: contextSentence,
         translationService: _translationService,
+        lexiconService: _lexiconService,
         ttsService: widget.ttsService,
         authController: widget.authController,
         loadWordLists: widget.loadWordLists,

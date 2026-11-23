@@ -1,7 +1,7 @@
 {
-    "latest_version":  "0.1.20",
-    "version_code":  21,
+    "latest_version":  "0.1.21",
+    "version_code":  22,
     "min_version_code":  0,
-    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.20/app-release.apk",
-    "release_notes":  "4 yeni kod tabanlı tema (Pastel Şafak, Gece Derinliği, Hafif Sis, Elektrik Mercan), Ana Menü Kaldığın yerden devam et kartı, US/UK IPA ve seçilebilir eş/zıt anlamlar, yazım düzeltme önerisi, makale gizleme/planlı yayınlama, Podcast/TTS ses iyileştirmeleri, arka plan ikileşme düzeltmesi, Ayarlar sadeleştirmesi ve karanlık mod PC Makale Stüdyosu."
+    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.21/app-release.apk",
+    "release_notes":  "Uygulama içi iyileştirmeler."
 }

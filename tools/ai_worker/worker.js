@@ -168,12 +168,16 @@ async function getUserEntitlement(db, user) {
 async function handleGetMe(env, user) {
   try {
     const ent = await getUserEntitlement(env.DB, user);
+    const role = ent.isUnlimited
+      ? (String(ent.source || "").toLowerCase() === "admin" ? "admin" : "premium")
+      : "standard";
     return jsonResponse({
       ok: true,
       uid: user.uid,
       email: user.email,
       is_unlimited: ent.isUnlimited,
       source: ent.source,
+      role,
       code_used: ent.codeUsed,
     });
   } catch (err) {
@@ -453,19 +457,26 @@ async function handleAdminRequest(request, env, path, method) {
       return jsonResponse({ ok: false, message: "Geçerli bir e-posta adresi girin." }, 400);
     }
 
-    if (method === "POST") {
+    if (method === "POST" || method === "PATCH") {
+      const requestedRole = String(body?.role || "").trim().toLowerCase();
+      const targetSource = requestedRole === "admin" ? "admin" : "manual";
+      const roleLabel = targetSource === "admin" ? "Yetkili" : "Premium Üye";
       await env.DB
         .prepare(`
           INSERT INTO user_entitlements (email, uid, is_unlimited, source, code_used, granted_at)
-          VALUES (?, NULL, 1, 'manual', NULL, ?)
+          VALUES (?, NULL, 1, ?, NULL, ?)
           ON CONFLICT(email) DO UPDATE SET
             is_unlimited = 1,
-            source = 'manual',
+            source = excluded.source,
             granted_at = excluded.granted_at
         `)
-        .bind(email, new Date().toISOString())
+        .bind(email, targetSource, new Date().toISOString())
         .run();
-      return jsonResponse({ ok: true, message: `${email} hesabına sınırsız yetki verildi.` });
+      return jsonResponse({
+        ok: true,
+        role: targetSource === "admin" ? "admin" : "premium",
+        message: `${email} hesabına ${roleLabel} yetkisi tanımlandı.`,
+      });
     }
 
     if (method === "DELETE") {

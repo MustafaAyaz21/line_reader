@@ -50,6 +50,60 @@ class ArticleAudioSegment {
   }
 }
 
+/// Makale içindeki bir kelimenin o cümledeki anlamına birebir uyan bağlamsal
+/// eş anlamlı (`synonyms`) ve zıt anlamlı (`antonyms`) kayıtları.
+class ArticleWordRelations {
+  const ArticleWordRelations({
+    this.synonyms = const <String>[],
+    this.antonyms = const <String>[],
+  });
+
+  final List<String> synonyms;
+  final List<String> antonyms;
+
+  bool get hasAny => synonyms.isNotEmpty || antonyms.isNotEmpty;
+
+  static ArticleWordRelations? tryFromJson(Object? raw) {
+    if (raw is! Map) return null;
+    final map = Map<String, Object?>.from(raw);
+    final syn = _parseTerms(map['syn'] ?? map['synonyms'], maxCount: 6);
+    final ant = _parseTerms(map['ant'] ?? map['antonyms'], maxCount: 5);
+    if (syn.isEmpty && ant.isEmpty) return null;
+    return ArticleWordRelations(
+      synonyms: List<String>.unmodifiable(syn),
+      antonyms: List<String>.unmodifiable(ant),
+    );
+  }
+
+  Map<String, Object?> toJson() => <String, Object?>{
+        if (synonyms.isNotEmpty) 'syn': synonyms,
+        if (antonyms.isNotEmpty) 'ant': antonyms,
+      };
+
+  static List<String> _parseTerms(Object? raw, {required int maxCount}) {
+    final Iterable<Object?> items;
+    if (raw is List) {
+      items = raw;
+    } else if (raw is String && raw.trim().isNotEmpty) {
+      items = raw.split(',');
+    } else {
+      return const <String>[];
+    }
+
+    final result = <String>[];
+    final seen = <String>{};
+    for (final item in items) {
+      final cleaned = item?.toString().trim().toLowerCase() ?? '';
+      if (cleaned.isEmpty || cleaned.length > 48) continue;
+      if (seen.add(cleaned)) {
+        result.add(cleaned);
+        if (result.length >= maxCount) break;
+      }
+    }
+    return result;
+  }
+}
+
 /// Uzak `articles.json` kaynağından çekilen ve yerel SQLite önbelleğinde
 /// saklanan makale veri modeli.
 class Article {
@@ -70,6 +124,7 @@ class Article {
     this.readingTimeLabel = '',
     this.tags = const <String>[],
     this.wordMeanings = const <String, String>{},
+    this.wordRelations = const <String, ArticleWordRelations>{},
     this.sentenceTranslations = const <String, String>{},
     this.paragraphTranslations = const <String>[],
     this.isHidden = false,
@@ -108,6 +163,10 @@ class Article {
   /// Makale içinde yazar/editör tarafından tanımlanmış bağlamsal kelime
   /// anlamları (`word_meanings` haritası; küçük harfe normalleştirilmiş anahtar).
   final Map<String, String> wordMeanings;
+
+  /// Makale içindeki kelimelerin o cümledeki anlamına birebir uyan bağlamsal
+  /// eş ve zıt anlamları (`word_relations` haritası).
+  final Map<String, ArticleWordRelations> wordRelations;
 
   /// Makale verisinde hazır tutulan cümle çevirileri (`sentence_translations`).
   /// Anahtarlar normalize edilmiş İngilizce cümle, değerler Türkçe çeviridir.
@@ -152,6 +211,20 @@ class Article {
       final value = wordMeanings[candidate];
       if (value != null && value.trim().isNotEmpty) {
         return (matchedKey: candidate, meaning: value.trim());
+      }
+    }
+    return null;
+  }
+
+  /// Açık makalenin `word_relations` haritasında kelimenin (veya kökünün)
+  /// o cümledeki bağlamsal eş/zıt anlamlarını arar.
+  ArticleWordRelations? findWordRelations(String rawWord) {
+    if (wordRelations.isEmpty) return null;
+    final candidates = EnglishMorphologyResolver.resolveCandidates(rawWord);
+    for (final candidate in candidates) {
+      final value = wordRelations[candidate];
+      if (value != null && value.hasAny) {
+        return value;
       }
     }
     return null;
@@ -366,6 +439,9 @@ class Article {
     final wordMeanings = _readWordMeanings(
       json['word_meanings'] ?? json['wordMeanings'],
     );
+    final wordRelations = _readWordRelations(
+      json['word_relations'] ?? json['wordRelations'],
+    );
     final sentenceTranslations = _readSentenceTranslations(
       json['sentence_translations'] ?? json['sentenceTranslations'],
     );
@@ -413,6 +489,8 @@ class Article {
       readingTimeLabel: readingTimeLabel,
       tags: List<String>.unmodifiable(tags),
       wordMeanings: Map<String, String>.unmodifiable(wordMeanings),
+      wordRelations:
+          Map<String, ArticleWordRelations>.unmodifiable(wordRelations),
       sentenceTranslations:
           Map<String, String>.unmodifiable(sentenceTranslations),
       paragraphTranslations: List<String>.unmodifiable(paragraphTranslations),
@@ -453,6 +531,9 @@ class Article {
       ),
       wordMeanings: Map<String, String>.unmodifiable(
         _extractWordMeaningsFromRawJson(rawJson),
+      ),
+      wordRelations: Map<String, ArticleWordRelations>.unmodifiable(
+        _extractWordRelationsFromRawJson(rawJson),
       ),
       sentenceTranslations: extractedTranslations.sentenceTranslations,
       paragraphTranslations: extractedTranslations.paragraphTranslations,
@@ -512,6 +593,11 @@ class Article {
       if (readingTimeLabel.isNotEmpty) 'reading_time': readingTimeLabel,
       'tags': tags,
       if (wordMeanings.isNotEmpty) 'word_meanings': wordMeanings,
+      if (wordRelations.isNotEmpty)
+        'word_relations': <String, Object?>{
+          for (final entry in wordRelations.entries)
+            entry.key: entry.value.toJson(),
+        },
       if (sentenceTranslations.isNotEmpty)
         'sentence_translations': sentenceTranslations,
       if (paragraphTranslations.isNotEmpty)
@@ -521,6 +607,39 @@ class Article {
       if (publishedAt != null) 'published_at': publishedAt!.toIso8601String(),
       if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
     };
+  }
+
+  static Map<String, ArticleWordRelations> _readWordRelations(Object? raw) {
+    if (raw is! Map) return const <String, ArticleWordRelations>{};
+    final result = <String, ArticleWordRelations>{};
+    for (final entry in raw.entries) {
+      final key = EnglishMorphologyResolver.normalize(
+        entry.key.toString(),
+      );
+      if (key.isEmpty) continue;
+      final parsed = ArticleWordRelations.tryFromJson(entry.value);
+      if (parsed != null && parsed.hasAny) {
+        result[key] = parsed;
+      }
+    }
+    return result;
+  }
+
+  static Map<String, ArticleWordRelations> _extractWordRelationsFromRawJson(
+    String rawJson,
+  ) {
+    if (rawJson.trim().isEmpty || rawJson == '{}') {
+      return const <String, ArticleWordRelations>{};
+    }
+    try {
+      final decoded = jsonDecode(rawJson);
+      if (decoded is Map) {
+        return _readWordRelations(
+          decoded['word_relations'] ?? decoded['wordRelations'],
+        );
+      }
+    } catch (_) {}
+    return const <String, ArticleWordRelations>{};
   }
 
   static ({bool isHidden, DateTime? publishAt}) _extractVisibilityFromRawJson(

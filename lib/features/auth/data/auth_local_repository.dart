@@ -14,11 +14,13 @@ abstract class AuthLocalStore {
     required int usedCount,
   });
 
-  Future<({bool isUnlimited, String? codeUsed})> loadCachedEntitlement();
+  Future<({bool isUnlimited, String? codeUsed, String? role})>
+      loadCachedEntitlement();
 
   Future<void> saveCachedEntitlement({
     required bool isUnlimited,
     String? codeUsed,
+    String? role,
   });
 }
 
@@ -32,6 +34,7 @@ class AuthLocalRepository implements AuthLocalStore {
   static const String _guestQuotaUsedKey = 'auth_guest_quota_used';
   static const String _entitlementUnlimitedKey = 'auth_entitlement_unlimited';
   static const String _entitlementCodeKey = 'auth_entitlement_code';
+  static const String _entitlementRoleKey = 'auth_entitlement_role';
 
   final SettingsRepository _settingsRepository;
 
@@ -71,17 +74,24 @@ class AuthLocalRepository implements AuthLocalStore {
   }
 
   @override
-  Future<({bool isUnlimited, String? codeUsed})> loadCachedEntitlement() async {
+  Future<({bool isUnlimited, String? codeUsed, String? role})>
+      loadCachedEntitlement() async {
     final rawUnlimited =
         await _settingsRepository.getString(_entitlementUnlimitedKey);
     final codeUsed = await _settingsRepository.getString(_entitlementCodeKey);
-    return (isUnlimited: rawUnlimited == 'true', codeUsed: codeUsed);
+    final role = await _settingsRepository.getString(_entitlementRoleKey);
+    return (
+      isUnlimited: rawUnlimited == 'true',
+      codeUsed: codeUsed,
+      role: role,
+    );
   }
 
   @override
   Future<void> saveCachedEntitlement({
     required bool isUnlimited,
     String? codeUsed,
+    String? role,
   }) async {
     await _settingsRepository.saveString(
       _entitlementUnlimitedKey,
@@ -94,6 +104,14 @@ class AuthLocalRepository implements AuthLocalStore {
       );
     } else {
       await _settingsRepository.deleteKey(_entitlementCodeKey);
+    }
+    if (isUnlimited && role != null && role.trim().isNotEmpty) {
+      await _settingsRepository.saveString(
+        _entitlementRoleKey,
+        role.trim().toLowerCase(),
+      );
+    } else {
+      await _settingsRepository.deleteKey(_entitlementRoleKey);
     }
   }
 }

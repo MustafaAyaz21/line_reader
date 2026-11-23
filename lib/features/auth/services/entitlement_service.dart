@@ -13,6 +13,7 @@ class EntitlementStatus {
     required this.isUnlimited,
     this.source,
     this.codeUsed,
+    this.role,
   });
 
   static const EntitlementStatus standard = EntitlementStatus(isUnlimited: false);
@@ -20,6 +21,14 @@ class EntitlementStatus {
   final bool isUnlimited;
   final String? source;
   final String? codeUsed;
+
+  /// Yetki rolü (`'admin'` -> Yetkili, `'premium'` -> Premium Üye).
+  final String? role;
+
+  bool get isAuthorizedStaff =>
+      isUnlimited &&
+      ((role?.trim().toLowerCase() == 'admin') ||
+          (source?.trim().toLowerCase() == 'admin'));
 }
 
 /// Aktivasyon kodu kullanma sonucu.
@@ -96,6 +105,7 @@ class CloudflareEntitlementService implements EntitlementClient {
         isUnlimited: decoded['is_unlimited'] == true,
         source: decoded['source']?.toString(),
         codeUsed: decoded['code_used']?.toString(),
+        role: decoded['role']?.toString(),
       );
     } catch (error) {
       debugPrint('[CloudflareEntitlementService] /me kontrol hatasi: $error');

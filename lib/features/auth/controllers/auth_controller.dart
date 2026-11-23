@@ -46,6 +46,7 @@ class AuthController extends ChangeNotifier {
   bool _isSyncingEntitlement = false;
   bool _isUnlimited = false;
   String? _entitlementCodeUsed;
+  String? _entitlementRole;
   String _quotaDateKey = '';
   int _dailyUsedToday = 0;
   int _sessionLookupCount = 0;
@@ -66,6 +67,12 @@ class AuthController extends ChangeNotifier {
   /// hesaplarda `true` döner: sınırsız çeviri, reklamsız kullanım ve Tarayıcı AI.
   bool get isUnlimited => isAuthenticated && _isUnlimited;
   String? get entitlementCodeUsed => isUnlimited ? _entitlementCodeUsed : null;
+  String? get entitlementRole => isUnlimited ? _entitlementRole : null;
+
+  /// Panelden "Yetkili" olarak işaretlenen hesaplarda `true` döner;
+  /// Ayarlar'da "Premium Üye" yerine "Yetkili" olarak gösterilir.
+  bool get isAuthorizedStaff =>
+      isUnlimited && _entitlementRole?.trim().toLowerCase() == 'admin';
 
   /// Aktif oturum için günlük çeviri limiti (Misafir: 40, Kayıtlı standart: 80).
   int get dailyTranslationLimit =>
@@ -133,11 +140,13 @@ class AuthController extends ChangeNotifier {
         _status = AuthSessionStatus.authenticated;
         _isUnlimited = cachedEnt.isUnlimited;
         _entitlementCodeUsed = cachedEnt.codeUsed;
+        _entitlementRole = cachedEnt.role;
       } else {
         final guestEnabled = await _localStore.isGuestModeEnabled();
         _user = null;
         _isUnlimited = false;
         _entitlementCodeUsed = null;
+        _entitlementRole = null;
         _status = guestEnabled
             ? AuthSessionStatus.guest
             : AuthSessionStatus.unauthenticated;
@@ -154,6 +163,7 @@ class AuthController extends ChangeNotifier {
           _user = null;
           _isUnlimited = false;
           _entitlementCodeUsed = null;
+          _entitlementRole = null;
           _status = AuthSessionStatus.unauthenticated;
           _safeNotify();
         }
@@ -185,9 +195,13 @@ class AuthController extends ChangeNotifier {
 
       _isUnlimited = remote.isUnlimited;
       _entitlementCodeUsed = remote.codeUsed;
+      _entitlementRole = remote.isAuthorizedStaff
+          ? 'admin'
+          : (remote.isUnlimited ? 'premium' : null);
       await _localStore.saveCachedEntitlement(
         isUnlimited: _isUnlimited,
         codeUsed: _entitlementCodeUsed,
+        role: _entitlementRole,
       );
     } catch (error) {
       debugPrint('[AuthController] Yetki yenileme hatasi: $error');
@@ -233,9 +247,11 @@ class AuthController extends ChangeNotifier {
       if (result.isSuccess) {
         _isUnlimited = true;
         _entitlementCodeUsed = result.code ?? _entitlementCodeUsed;
+        _entitlementRole ??= 'premium';
         await _localStore.saveCachedEntitlement(
           isUnlimited: true,
           codeUsed: _entitlementCodeUsed,
+          role: _entitlementRole,
         );
       }
       return result;
@@ -299,6 +315,7 @@ class AuthController extends ChangeNotifier {
     _user = null;
     _isUnlimited = false;
     _entitlementCodeUsed = null;
+    _entitlementRole = null;
     _sessionLookupCount = 0;
     _status = AuthSessionStatus.guest;
     _resetQuotaInMemoryIfNewDay();
@@ -396,9 +413,13 @@ class AuthController extends ChangeNotifier {
       if (remote != null) {
         _isUnlimited = remote.isUnlimited;
         _entitlementCodeUsed = remote.codeUsed;
+        _entitlementRole = remote.isAuthorizedStaff
+            ? 'admin'
+            : (remote.isUnlimited ? 'premium' : null);
         await _localStore.saveCachedEntitlement(
           isUnlimited: _isUnlimited,
           codeUsed: _entitlementCodeUsed,
+          role: _entitlementRole,
         );
       }
     } catch (_) {}
@@ -436,6 +457,7 @@ class AuthController extends ChangeNotifier {
       _user = null;
       _isUnlimited = false;
       _entitlementCodeUsed = null;
+      _entitlementRole = null;
       _sessionLookupCount = 0;
       _status = AuthSessionStatus.guest;
     } finally {

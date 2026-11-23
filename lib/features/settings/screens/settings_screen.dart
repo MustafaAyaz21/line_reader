@@ -559,6 +559,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       if (auth.isUnlimited) {
         final codeUsed = auth.entitlementCodeUsed;
+        final isStaff = auth.isAuthorizedStaff;
         return Card(
           margin: EdgeInsets.zero,
           child: Padding(
@@ -572,7 +573,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       radius: 24,
                       backgroundColor: colorScheme.primaryContainer,
                       child: Icon(
-                        Icons.workspace_premium_rounded,
+                        isStaff
+                            ? Icons.verified_user_rounded
+                            : Icons.workspace_premium_rounded,
                         color: colorScheme.onPrimaryContainer,
                       ),
                     ),
@@ -641,14 +644,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Row(
                         children: <Widget>[
                           Icon(
-                            Icons.workspace_premium_rounded,
+                            isStaff
+                                ? Icons.verified_user_rounded
+                                : Icons.workspace_premium_rounded,
                             size: 22,
                             color: colorScheme.primary,
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              s.t('Premium Üye', 'Premium Member'),
+                              isStaff
+                                  ? s.t('Yetkili', 'Authorized')
+                                  : s.t('Premium Üye', 'Premium Member'),
                               style: theme.textTheme.titleMedium?.copyWith(
                                 color: colorScheme.onPrimaryContainer,
                                 fontWeight: FontWeight.w800,
