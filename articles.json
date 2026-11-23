@@ -1,7 +1,361 @@
 {
   "version": 1,
-  "updated_at": "2026-11-23T01:35:44.409Z",
+  "updated_at": "2026-11-23T01:58:30.540Z",
   "articles": [
+    {
+      "id": "a2-making-sculptures-from-everyday-trash-and-bottle",
+      "level": "A2",
+      "title": "Making Sculptures From Everyday Trash and Bottles",
+      "description": "Discover how creative artists transform ordinary discarded plastic bottles and household trash into stunning, colorful public art sculptures that inspire environmental awareness.",
+      "reading_time": "1 - 3 dk",
+      "reading_time_minutes": 2,
+      "language": "en",
+      "content": "Modern artists often find inspiration in unusual places. Instead of traditional materials like expensive marble or fine wood, some creators choose to use everyday garbage. Plastic bottles, broken toys, and old metal cans become the foundation for amazing works of art. This creative approach allows people to look at waste differently and appreciate the beauty hidden inside ordinary items.\n\nThe process begins when the artist collects hundreds of colorful plastic containers from local recycling bins and streets. Every single piece is carefully washed, sorted by size, and dried before the actual building starts. When the materials are ready, the sculptor uses wire and strong glue to connect the pieces together. This step requires a lot of patience because plastic is slippery and difficult to shape properly.\n\nMany of these large sculptures represent animals, flowers, or imaginary creatures from nature. For example, a giant sea turtle might be built entirely from blue and green water bottles. When the bright sunlight shines through the translucent plastic, the whole sculpture glows with vibrant colors. Viewers are often amazed to realize that such a beautiful object was once just unwanted rubbish.\n\nThis unique art form also teaches important lessons about environmental protection and sustainability. When people see beautiful public displays made from trash, they start to think about their own daily habits. They might decide to recycle more often or reduce the amount of single-use plastic they buy. Art becomes a powerful voice that speaks loudly for our planet.\n\nVisiting a trash sculpture exhibition is a fun and educational experience for both adults and children. It proves that creativity has no limits and that imagination can turn anything into something valuable. Next time you finish a drink, think twice before throwing away the bottle because it might just be a future masterpiece waiting to be born.",
+      "published_at": "2026-11-23T01:57:54.570Z",
+      "category": "Art",
+      "author": "Line Reader",
+      "word_meanings": {
+        "inspiration": "ilham",
+        "materials": "malzemeler",
+        "garbage": "çöp",
+        "foundation": "temel",
+        "beauty": "güzellik",
+        "process": "süreç",
+        "collects": "toplar",
+        "containers": "kaplar",
+        "washed": "yıkandı",
+        "sorted": "sıralandı",
+        "dried": "kurutuldu",
+        "sculptor": "heykeltıraş",
+        "wire": "tel",
+        "glue": "yapıştırıcı",
+        "patience": "sabır",
+        "slippery": "kaygan",
+        "shape": "şekil vermek",
+        "creatures": "canlılar",
+        "giant": "dev",
+        "translucent": "yarı saydam",
+        "glows": "parlar",
+        "vibrant": "canlı",
+        "rubbish": "çöp",
+        "protection": "koruma",
+        "sustainability": "sürdürülebilirlik",
+        "displays": "sergiler",
+        "habits": "alışkanlıklar",
+        "reduce": "azaltmak",
+        "powerful": "güçlü",
+        "planet": "gezegen",
+        "educational": "eğitici",
+        "experience": "deneyim",
+        "limits": "sınırlar",
+        "valuable": "değerli",
+        "masterpiece": "şaheser"
+      },
+      "word_relations": {
+        "inspiration": {
+          "syn": [
+            "motivation",
+            "stimulus"
+          ],
+          "ant": [
+            "discouragement"
+          ]
+        },
+        "materials": {
+          "syn": [
+            "substances",
+            "supplies"
+          ]
+        },
+        "garbage": {
+          "syn": [
+            "trash",
+            "waste"
+          ],
+          "ant": [
+            "treasure"
+          ]
+        },
+        "foundation": {
+          "syn": [
+            "basis",
+            "base"
+          ],
+          "ant": [
+            "top"
+          ]
+        },
+        "beauty": {
+          "syn": [
+            "attractiveness",
+            "elegance"
+          ],
+          "ant": [
+            "ugliness"
+          ]
+        },
+        "process": {
+          "syn": [
+            "procedure",
+            "method"
+          ]
+        },
+        "collects": {
+          "syn": [
+            "gathers",
+            "accumulates"
+          ],
+          "ant": [
+            "scatters"
+          ]
+        },
+        "containers": {
+          "syn": [
+            "vessels",
+            "holders"
+          ]
+        },
+        "washed": {
+          "syn": [
+            "cleaned",
+            "rinsed"
+          ],
+          "ant": [
+            "dirtied"
+          ]
+        },
+        "sorted": {
+          "syn": [
+            "organized",
+            "categorized"
+          ],
+          "ant": [
+            "mixed"
+          ]
+        },
+        "dried": {
+          "syn": [
+            "dehydrated"
+          ],
+          "ant": [
+            "wetted"
+          ]
+        },
+        "sculptor": {
+          "syn": [
+            "artist",
+            "creator"
+          ]
+        },
+        "wire": {
+          "syn": [
+            "metal thread"
+          ]
+        },
+        "glue": {
+          "syn": [
+            "adhesive",
+            "paste"
+          ]
+        },
+        "patience": {
+          "syn": [
+            "endurance",
+            "perseverance"
+          ],
+          "ant": [
+            "impatience"
+          ]
+        },
+        "slippery": {
+          "syn": [
+            "slick",
+            "sliding"
+          ],
+          "ant": [
+            "sticky"
+          ]
+        },
+        "shape": {
+          "syn": [
+            "form",
+            "mold"
+          ]
+        },
+        "creatures": {
+          "syn": [
+            "beings",
+            "animals"
+          ]
+        },
+        "giant": {
+          "syn": [
+            "huge",
+            "massive"
+          ],
+          "ant": [
+            "tiny"
+          ]
+        },
+        "translucent": {
+          "syn": [
+            "semi-transparent",
+            "clear"
+          ],
+          "ant": [
+            "opaque"
+          ]
+        },
+        "glows": {
+          "syn": [
+            "shines",
+            "radiates"
+          ],
+          "ant": [
+            "dims"
+          ]
+        },
+        "vibrant": {
+          "syn": [
+            "bright",
+            "colorful"
+          ],
+          "ant": [
+            "dull"
+          ]
+        },
+        "rubbish": {
+          "syn": [
+            "refuse",
+            "waste"
+          ],
+          "ant": [
+            "valuable"
+          ]
+        },
+        "protection": {
+          "syn": [
+            "preservation",
+            "defense"
+          ],
+          "ant": [
+            "endangerment"
+          ]
+        },
+        "sustainability": {
+          "syn": [
+            "durability",
+            "viability"
+          ],
+          "ant": [
+            "unsustainability"
+          ]
+        },
+        "displays": {
+          "syn": [
+            "exhibitions",
+            "shows"
+          ],
+          "ant": [
+            "concealments"
+          ]
+        },
+        "habits": {
+          "syn": [
+            "routines",
+            "customs"
+          ]
+        },
+        "reduce": {
+          "syn": [
+            "decrease",
+            "lower"
+          ],
+          "ant": [
+            "increase"
+          ]
+        },
+        "powerful": {
+          "syn": [
+            "strong",
+            "potent"
+          ],
+          "ant": [
+            "weak"
+          ]
+        },
+        "planet": {
+          "syn": [
+            "earth",
+            "world"
+          ]
+        },
+        "educational": {
+          "syn": [
+            "informative",
+            "instructive"
+          ],
+          "ant": [
+            "uneducational"
+          ]
+        },
+        "experience": {
+          "syn": [
+            "event",
+            "occurrence"
+          ]
+        },
+        "limits": {
+          "syn": [
+            "boundaries",
+            "restrictions"
+          ]
+        },
+        "valuable": {
+          "syn": [
+            "precious",
+            "useful"
+          ],
+          "ant": [
+            "worthless"
+          ]
+        },
+        "masterpiece": {
+          "syn": [
+            "classic",
+            "opus"
+          ]
+        }
+      },
+      "paragraph_translations": [
+        "Modern sanatçılar genellikle alışılmadık yerlerde ilham bulurlar. Pahalı mermer veya kaliteli ahşap gibi geleneksel malzemeler yerine bazı yaratıcılar günlük çöpleri kullanmayı seçer. Plastik şişeler, kırık oyuncaklar ve eski metal kutular harika sanat eserlerinin temeli haline gelir. Bu yaratıcı yaklaşım insanların atıklara farklı bir gözle bakmasını ve sıradan eşyaların içinde saklı güzelliği takdir etmesini sağlar.",
+        "Süreç, sanatçının yerel geri dönüşüm kutularından ve sokaklardan yüzlerce renkli plastik kap toplamasıyla başlar. Gerçek yapım başlamadan önce her bir parça dikkatlice yıkanır, boyutuna göre sıralanır ve kurutulur. Malzemeler hazır olduğunda heykeltıraş, parçaları birbirine bağlamak için tel ve güçlü yapıştırıcı kullanır. Bu adım çok fazla sabır gerektirir çünkü plastik kaygandır ve düzgün şekil vermesi zordur.",
+        "Bu büyük heykellerin birçoğu doğadan hayvanları, çiçekleri veya hayali varlıkları temsil eder. Örneğin, dev bir deniz kaplumbağası tamamen mavi ve yeşil su şişelerinden yapılabilir. Parlak güneş ışığı yarı saydam plastiğin içinden parladığında, bütün heykele canlı renkler yayılır. İzleyiciler böyle güzel bir nesnenin bir zamanlar sadece istenmeyen bir çöp olduğunu fark edince genellikle şaşırırlar.",
+        "Bu benzersiz sanat formu aynı zamanda çevre koruma ve sürdürülebilirlik hakkında önemli dersler öğretir. İnsanlar çöpten yapılan güzel halk sergilerini gördüklerinde, kendi günlük alışkanlıklarını düşünmeye başlarlar. Daha sık geri dönüşüm yapmaya veya satın aldıkları tek kullanımlık plastik miktarını azaltmaya karar verebilirler. Sanat, gezegenimiz için yüksek sesle konuşan güçlü bir ses haline gelir.",
+        "Bir çöp heykel sergisini ziyaret etmek hem yetişkinler hem de çocuklar için eğlenceli ve öğretici bir deneyimdir. Bu, yaratıcılığın hiçbir sınırının olmadığını ve hayal gücünün herhangi bir şeyi değerli bir şeye dönüştürebileceğini kanıtlar. Bir sonraki sefere bir içeceği bitirdiğinizde, şişeyi çöpe atmadan önce iki kez düşünün çünkü o sadece doğmayı bekleyen gelecekteki bir şaheser olabilir."
+      ],
+      "sentence_translations": {
+        "Modern artists often find inspiration in unusual places.": "Modern sanatçılar genellikle alışılmadık yerlerde ilham bulurlar.",
+        "Instead of traditional materials like expensive marble or fine wood, some creators choose to use everyday garbage.": "Pahalı mermer veya kaliteli ahşap gibi geleneksel malzemeler yerine bazı yaratıcılar günlük çöpleri kullanmayı seçer.",
+        "Plastic bottles, broken toys, and old metal cans become the foundation for amazing works of art.": "Plastik şişeler, kırık oyuncaklar ve eski metal kutular harika sanat eserlerinin temeli haline gelir.",
+        "This creative approach allows people to look at waste differently and appreciate the beauty hidden inside ordinary items.": "Bu yaratıcı yaklaşım insanların atıklara farklı bir gözle bakmasını ve sıradan eşyaların içinde saklı güzelliği takdir etmesini sağlar.",
+        "The process begins when the artist collects hundreds of colorful plastic containers from local recycling bins and streets.": "Süreç, sanatçının yerel geri dönüşüm kutularından ve sokaklardan yüzlerce renkli plastik kap toplamasıyla başlar.",
+        "Every single piece is carefully washed, sorted by size, and dried before the actual building starts.": "Gerçek yapım başlamadan önce her bir parça dikkatlice yıkanır, boyutuna göre sıralanır ve kurutulur.",
+        "When the materials are ready, the sculptor uses wire and strong glue to connect the pieces together.": "Malzemeler hazır olduğunda heykeltıraş, parçaları birbirine bağlamak için tel ve güçlü yapıştırıcı kullanır.",
+        "This step requires a lot of patience because plastic is slippery and difficult to shape properly.": "Bu adım çok fazla sabır gerektirir çünkü plastik kaygandır ve düzgün şekil vermesi zordur.",
+        "Many of these large sculptures represent animals, flowers, or imaginary creatures from nature.": "Bu büyük heykellerin birçoğu doğadan hayvanları, çiçekleri veya hayali varlıkları temsil eder.",
+        "For example, a giant sea turtle might be built entirely from blue and green water bottles.": "Örneğin, dev bir deniz kaplumbağası tamamen mavi ve yeşil su şişelerinden yapılabilir.",
+        "When the bright sunlight shines through the translucent plastic, the whole sculpture glows with vibrant colors.": "Parlak güneş ışığı yarı saydam plastiğin içinden parladığında, bütün heykele canlı renkler yayılır.",
+        "Viewers are often amazed to realize that such a beautiful object was once just unwanted rubbish.": "İzleyiciler böyle güzel bir nesnenin bir zamanlar sadece istenmeyen bir çöp olduğunu fark edince genellikle şaşırırlar.",
+        "This unique art form also teaches important lessons about environmental protection and sustainability.": "Bu benzersiz sanat formu aynı zamanda çevre koruma ve sürdürülebilirlik hakkında önemli dersler öğretir.",
+        "When people see beautiful public displays made from trash, they start to think about their own daily habits.": "İnsanlar çöpten yapılan güzel halk sergilerini gördüklerinde, kendi günlük alışkanlıklarını düşünmeye başlarlar.",
+        "They might decide to recycle more often or reduce the amount of single-use plastic they buy.": "Daha sık geri dönüşüm yapmaya veya satın aldıkları tek kullanımlık plastik miktarını azaltmaya karar verebilirler.",
+        "Art becomes a powerful voice that speaks loudly for our planet.": "Sanat, gezegenimiz için yüksek sesle konuşan güçlü bir ses haline gelir.",
+        "Visiting a trash sculpture exhibition is a fun and educational experience for both adults and children.": "Bir çöp heykel sergisini ziyaret etmek hem yetişkinler hem de çocuklar için eğlenceli ve öğretici bir deneyimdir.",
+        "It proves that creativity has no limits and that imagination can turn anything into something valuable.": "Bu, yaratıcılığın hiçbir sınırının olmadığını ve hayal gücünün herhangi bir şeyi değerli bir şeye dönüştürebileceğini kanıtlar.",
+        "Next time you finish a drink, think twice before throwing away the bottle because it might just be a future masterpiece waiting to be born.": "Bir sonraki sefere bir içeceği bitirdiğinizde, şişeyi çöpe atmadan önce iki kez düşünün çünkü o sadece doğmayı bekleyen gelecekteki bir şaheser olabilir."
+      }
+    },
     {
       "id": "b1-the-secret-architecture-of-coral-reef-nursery-gr",
       "level": "B1",
