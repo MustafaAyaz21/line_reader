@@ -437,6 +437,7 @@ Strict requirements:
     $requestBody = $requestObj | ConvertTo-Json -Depth 8 -Compress
 
     $discoveredFlashModels = @()
+    $discoveredProModels = @()
     try {
         [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
         $listUrl = "https://generativelanguage.googleapis.com/v1beta/models?key=$([System.Uri]::EscapeDataString($cfg.geminiApiKey))"
@@ -451,22 +452,20 @@ Strict requirements:
             foreach ($m in $listJson.models) {
                 $mName = ([string]$m.name) -replace '^models/', ''
                 $methods = @($m.supportedGenerationMethods)
-                if (($methods -contains "generateContent") -and ($mName -like "*gemini*") -and ($mName -like "*flash*") -and ($mName -notlike "*tts*") -and ($mName -notlike "*image*")) {
-                    $discoveredFlashModels += $mName
+                if (($methods -contains "generateContent") -and ($mName -like "*gemini*") -and ($mName -notlike "*tts*") -and ($mName -notlike "*image*") -and ($mName -notlike "*omni*")) {
+                    if ($mName -like "*flash*") {
+                        $discoveredFlashModels += $mName
+                    } elseif ($mName -like "*pro*") {
+                        $discoveredProModels += $mName
+                    }
                 }
             }
         }
     } catch {}
 
-    $modelsToTry = @(
-        $cfg.geminiModel,
-        "gemini-flash-latest",
-        "gemini-3.8-flash",
-        "gemini-3-flash-preview",
-        "gemini-2.5-flash",
-        "gemini-2.5-flash-lite",
-        "gemini-flash-lite-latest"
-    ) + $discoveredFlashModels | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
+    $flashCandidates = (@($cfg.geminiModel, "gemini-flash-latest", "gemini-3.8-flash", "gemini-3-flash-preview") + $discoveredFlashModels | Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and ($_ -notlike "*2.5*") } | Select-Object -Unique | Select-Object -First 4)
+    $proCandidates = (@("gemini-pro-latest") + $discoveredProModels | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique | Select-Object -First 2)
+    $modelsToTry = @($flashCandidates + $proCandidates) | Select-Object -Unique
     [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
 
     $lastErrorMsg = "Gemini API yanıt vermedi."
@@ -686,8 +685,41 @@ Strict requirements:
         if ($abortAll) { break }
     }
 
+    # 3. Katman Yedek: Google Gemini yoğun/503 ise Cloudflare Workers AI (Llama 3.3 70B) üzerinden üret!
+    if (-not [string]::IsNullOrWhiteSpace($cfg.workerUrl) -and -not [string]::IsNullOrWhiteSpace($cfg.adminSecret)) {
+        try {
+            Write-Host "[Cloudflare AI] Gemini yanit vermedi; Llama 3.3 70B yedegi deneniyor..." -ForegroundColor Cyan
+            $wfBody = (@{ level = $level; topic = $topic } | ConvertTo-Json -Compress)
+            $wfUrl = "$($cfg.workerUrl.TrimEnd('/'))/admin/generate-article"
+            $wfReq = [System.Net.HttpWebRequest]::Create($wfUrl)
+            $wfReq.Method = "POST"
+            $wfReq.Timeout = 60000
+            $wfReq.Accept = "application/json"
+            $wfReq.ContentType = "application/json; charset=utf-8"
+            $wfReq.Headers.Add("X-Admin-Secret", $cfg.adminSecret)
+            $wfBytes = [System.Text.Encoding]::UTF8.GetBytes($wfBody)
+            $wfReq.ContentLength = $wfBytes.Length
+            $wfStream = $wfReq.GetRequestStream()
+            try { $wfStream.Write($wfBytes, 0, $wfBytes.Length) } finally { $wfStream.Dispose() }
+            $wfRes = $wfReq.GetResponse()
+            $wfReader = New-Object System.IO.StreamReader($wfRes.GetResponseStream(), [System.Text.Encoding]::UTF8)
+            try { $wfText = $wfReader.ReadToEnd() } finally { $wfReader.Dispose(); $wfRes.Close() }
+            $wfJson = $wfText | ConvertFrom-Json
+            if ($wfJson.ok -and $null -ne $wfJson.article) {
+                Write-Host "[Cloudflare AI] Makale hazir ($($wfJson.model)): $($wfJson.article.title)" -ForegroundColor Green
+                return @{
+                    StatusCode = 200
+                    Body       = (@{ ok = $true; model = [string]$wfJson.model; article = $wfJson.article } | ConvertTo-Json -Depth 10 -Compress)
+                }
+            }
+        }
+        catch {
+            Write-Host "[Cloudflare AI] Yedek uretim hatasi: $($_.Exception.Message)" -ForegroundColor Yellow
+        }
+    }
+
     if ($lastStatus -eq 503) {
-        $lastErrorMsg = "Google Gemini sunucuları şu an geçici olarak çok yoğun (HTTP 503). 5-10 saniye sonra tekrar deneyin veya Gemini Ayarı'ndan 'gemini-2.5-flash-lite' seçin."
+        $lastErrorMsg = "Google Gemini sunucuları şu an geçici olarak çok yoğun (HTTP 503). Cloudflare Worker güncelleyip (Deploy) tekrar deneyin — otomatik Llama 3.3 70B yedeği devreye girecektir."
     }
 
     return @{

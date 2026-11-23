@@ -757,24 +757,17 @@ async function handleDeveloperPanelRequest(request, env, verifiedUser, path, met
   }
 
   if (path === "/dev/articles/generate" && method === "POST") {
-    if (!env.GEMINI_API_KEY) {
-      return jsonResponse({
-        ok: false,
-        error: "gemini_key_missing",
-        message: "Cloudflare Worker içinde GEMINI_API_KEY tanımlı değil. Settings → Variables and Secrets bölümünden ekleyin.",
-      }, 503);
-    }
     const body = await safeReadJson(request);
     const rawLevel = String(body?.level || "B1").trim().toUpperCase();
     const level = ["A1", "A2", "B1", "B2", "C1", "C2"].includes(rawLevel) ? rawLevel : "B1";
     const topic = String(body?.topic || "").trim().slice(0, 160);
     try {
-      const generated = await generateArticleWithGemini(String(env.GEMINI_API_KEY).trim(), level, topic);
+      const generated = await generateArticleResilient(env, level, topic);
       return jsonResponse({ ok: true, article: generated });
     } catch (err) {
       return jsonResponse({
         ok: false,
-        error: "gemini_generate_failed",
+        error: "article_generate_failed",
         message: `Makale üretilemedi: ${String(err?.message || err)}`,
       }, 502);
     }
@@ -976,7 +969,28 @@ async function saveArticlesList(env, articles, commitMessage) {
   return { etag, githubSynced };
 }
 
-async function generateArticleWithGemini(apiKey, level, topic) {
+async function generateArticleResilient(env, level, topic) {
+  let geminiErr = null;
+  if (env && env.GEMINI_API_KEY) {
+    try {
+      return await generateArticleWithGemini(String(env.GEMINI_API_KEY).trim(), level, topic);
+    } catch (err) {
+      geminiErr = err;
+    }
+  }
+  if (env && env.AI) {
+    try {
+      return await generateArticleWithWorkersAi(env.AI, level, topic);
+    } catch (aiErr) {
+      throw new Error(
+        `Gemini ve Cloudflare AI yanıt vermedi (${String(geminiErr?.message || "")} | ${String(aiErr?.message || aiErr)})`
+      );
+    }
+  }
+  throw geminiErr || new Error("GEMINI_API_KEY veya Workers AI yapılandırılmamış.");
+}
+
+function buildArticleGenerationPrompt(level, topic) {
   const topicInstruction = topic
     ? `Write the article specifically about this topic: "${topic}".`
     : "Choose an engaging, fresh, real-world topic suitable for English learners (science, psychology, culture, technology, daily life, history, or nature).";
@@ -990,7 +1004,7 @@ async function generateArticleWithGemini(apiKey, level, topic) {
     C2: "320 to 420 words in 4 to 5 paragraphs using nuanced, idiomatic mastery-level English",
   }[level] || "230 to 300 words in 4 paragraphs";
 
-  const prompt = [
+  return [
     `You are an expert English curriculum author creating a CEFR ${level} reading article for Turkish learners of English.`,
     topicInstruction,
     `Length & style: ${levelWordTarget}. Separate paragraphs with \\n\\n.`,
@@ -1009,14 +1023,92 @@ async function generateArticleWithGemini(apiKey, level, topic) {
     "2. Include EVERY sentence from content in sentence_translations with exact punctuation.",
     "3. Include 25 to 60 key content words in word_relations with ONLY synonyms and antonyms that match the EXACT sense used in this article's sentences.",
   ].join("\n");
+}
 
-  const models = [
-    "gemini-flash-latest",
-    "gemini-3-flash-preview",
-    "gemini-2.5-flash",
-    "gemini-2.5-pro",
+function finalizeGeneratedArticle(parsed, level, providerName) {
+  const title = String(parsed?.title || "").trim();
+  const content = String(parsed?.content || "").trim();
+  if (!title || content.length < 40) return null;
+
+  const description =
+    String(parsed.description || "").trim() || buildFallbackDescription(content);
+  const category =
+    String(parsed.category || "").trim() || inferArticleCategory(title, content);
+  const wordCount = content.split(/\s+/).filter(Boolean).length;
+  const readingMin = Math.max(1, Math.round(wordCount / 145));
+  const readingTime = readingMin <= 1 ? "1 - 2 dk" : `${readingMin} - ${readingMin + 1} dk`;
+  return {
+    id: `${level.toLowerCase()}-${slugifyArticleId(title)}`,
+    level,
+    title,
+    description,
+    category,
+    author: "Line Reader",
+    reading_time: readingTime,
+    reading_time_minutes: readingMin,
+    language: "en",
+    published_at: new Date().toISOString(),
+    content,
+    word_meanings: parsed.word_meanings && typeof parsed.word_meanings === "object" ? parsed.word_meanings : {},
+    sentence_translations: parsed.sentence_translations && typeof parsed.sentence_translations === "object" ? parsed.sentence_translations : {},
+    word_relations: parsed.word_relations && typeof parsed.word_relations === "object" ? parsed.word_relations : {},
+    is_hidden: false,
+    publish_at: null,
+    _provider: providerName,
+  };
+}
+
+async function generateArticleWithWorkersAi(ai, level, topic) {
+  const prompt = buildArticleGenerationPrompt(level, topic);
+  const cfModels = [
+    "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    "@cf/meta/llama-3.1-8b-instruct",
   ];
-  // Eğer sabit modellerin hepsi 404 verirse API anahtarının desteklediği aktif Flash modelini otomatik keşfet.
+  let lastErr = "Cloudflare Workers AI yanıt vermedi.";
+  for (const model of cfModels) {
+    try {
+      const rawOut = await ai.run(model, {
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert English-Turkish curriculum author. Output ONLY valid JSON with no markdown or commentary.",
+          },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.55,
+        max_tokens: 3200,
+      });
+      const text = extractModelText(rawOut);
+      const cleaned = String(text).replace(/```json\s*/gi, "").replace(/```/g, "").trim();
+      const start = cleaned.indexOf("{");
+      const end = cleaned.lastIndexOf("}");
+      if (start === -1 || end <= start) {
+        lastErr = `Geçersiz JSON (${model})`;
+        continue;
+      }
+      const parsed = JSON.parse(cleaned.slice(start, end + 1));
+      const finalized = finalizeGeneratedArticle(parsed, level, model);
+      if (finalized) return finalized;
+      lastErr = `Eksik başlık/metin (${model})`;
+    } catch (e) {
+      lastErr = `${model}: ${String(e?.message || e)}`;
+    }
+  }
+  throw new Error(lastErr);
+}
+
+async function generateArticleWithGemini(apiKey, level, topic) {
+  const prompt = buildArticleGenerationPrompt(level, topic);
+
+  const flashModels = [
+    "gemini-flash-latest",
+    "gemini-3.8-flash",
+    "gemini-3-flash-preview",
+  ];
+  const proModels = [
+    "gemini-pro-latest",
+  ];
+  // API anahtarının desteklediği aktif Flash ve Pro modellerini otomatik keşfet.
   try {
     const listRes = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`
@@ -1030,19 +1122,24 @@ async function generateArticleWithGemini(apiKey, level, topic) {
           ? m.supportedGenerationMethods
           : [];
         if (
-          methods.includes("generateContent") &&
-          name.includes("gemini") &&
-          name.includes("flash") &&
-          !name.includes("tts") &&
-          !name.includes("image") &&
-          !models.includes(name)
+          !methods.includes("generateContent") ||
+          !name.includes("gemini") ||
+          name.includes("tts") ||
+          name.includes("image") ||
+          name.includes("omni")
         ) {
-          models.push(name);
+          continue;
+        }
+        if (name.includes("flash") && !flashModels.includes(name)) {
+          flashModels.push(name);
+        } else if (name.includes("pro") && !proModels.includes(name)) {
+          proModels.push(name);
         }
       }
     }
   } catch (_) {}
 
+  const models = [...flashModels.slice(0, 4), ...proModels.slice(0, 3)];
   let lastError = "Gemini yanıt vermedi.";
 
   for (const model of models) {
@@ -1073,37 +1170,12 @@ async function generateArticleWithGemini(apiKey, level, topic) {
       continue;
     }
     const parsed = JSON.parse(cleaned.slice(start, end + 1));
-    const title = String(parsed.title || "").trim();
-    const content = String(parsed.content || "").trim();
-    if (!title || content.length < 40) {
+    const finalized = finalizeGeneratedArticle(parsed, level, model);
+    if (!finalized) {
       lastError = "Başlık veya metin eksik geldi.";
       continue;
     }
-    const description =
-      String(parsed.description || "").trim() || buildFallbackDescription(content);
-    const category =
-      String(parsed.category || "").trim() || inferArticleCategory(title, content);
-    const wordCount = content.split(/\s+/).filter(Boolean).length;
-    const readingMin = Math.max(1, Math.round(wordCount / 145));
-    const readingTime = readingMin <= 1 ? "1 - 2 dk" : `${readingMin} - ${readingMin + 1} dk`;
-    return {
-      id: `${level.toLowerCase()}-${slugifyArticleId(title)}`,
-      level,
-      title,
-      description,
-      category,
-      author: "Line Reader",
-      reading_time: readingTime,
-      reading_time_minutes: readingMin,
-      language: "en",
-      published_at: new Date().toISOString(),
-      content,
-      word_meanings: parsed.word_meanings && typeof parsed.word_meanings === "object" ? parsed.word_meanings : {},
-      sentence_translations: parsed.sentence_translations && typeof parsed.sentence_translations === "object" ? parsed.sentence_translations : {},
-      word_relations: parsed.word_relations && typeof parsed.word_relations === "object" ? parsed.word_relations : {},
-      is_hidden: false,
-      publish_at: null,
-    };
+    return finalized;
   }
 
   throw new Error(lastError);
@@ -1410,6 +1482,23 @@ async function handleAdminRequest(request, env, path, method) {
   }
 
   await ensureSchema(env.DB);
+
+  // PC Makale Stüdyosu yedek makale üretimi (Google Gemini 503 verdiğinde Cloudflare Llama 3.3 70B)
+  if (path === "/admin/generate-article" && method === "POST") {
+    const body = await safeReadJson(request);
+    const rawLevel = String(body?.level || "B1").trim().toUpperCase();
+    const level = ["A1", "A2", "B1", "B2", "C1", "C2"].includes(rawLevel) ? rawLevel : "B1";
+    const topic = String(body?.topic || "").trim().slice(0, 160);
+    if (!env.AI) {
+      return jsonResponse({ ok: false, message: "Workers AI bağlı değil." }, 503);
+    }
+    try {
+      const article = await generateArticleWithWorkersAi(env.AI, level, topic);
+      return jsonResponse({ ok: true, article, model: article._provider || "cloudflare-llama-3.3" });
+    } catch (err) {
+      return jsonResponse({ ok: false, message: String(err?.message || err) }, 502);
+    }
+  }
 
   // PC Makale Stüdyosu Podcast AI ses hizalama (Cloudflare Workers AI Whisper)
   if (path === "/admin/align-audio" && method === "POST") {
