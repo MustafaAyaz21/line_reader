@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-11-23T17:19:23.147Z",
+  "updated_at": "2026-11-23T17:25:02.682Z",
   "articles": [
     {
       "id": "a2-making-sculptures-from-everyday-trash-and-bottle",
@@ -3718,6 +3718,438 @@
           "end_ms": 139771
         }
       ]
+    },
+    {
+      "id": "b1-the-rise-of-urban-vertical-farming",
+      "level": "B1",
+      "title": "The Rise of Urban Vertical Farming",
+      "description": "In many large cities around the world today, open space is becoming extremely rare and expensive.",
+      "reading_time": "2 - 3 dk",
+      "reading_time_minutes": 2,
+      "language": "en",
+      "content": "In many large cities around the world today, open space is becoming extremely rare and expensive. As global populations continue to grow, farmers and scientists are searching for innovative ways to produce fresh food close to urban centers. One exciting modern solution to this growing problem is vertical farming. Instead of using traditional horizontal fields, vertical farms grow healthy plants indoors in tall, stacked layers inside modern buildings.\n\nThese high-tech indoor facilities use powerful artificial lights, carefully controlled temperatures, and smart water systems instead of natural soil. Because the internal environment is constantly monitored, crops can grow steadily all year round, regardless of the harsh weather outside. Furthermore, vertical farms consume up to ninety percent less water than traditional farms, making them exceptionally environmentally friendly and sustainable for our planet.\n\nAnother major advantage of vertical farming is transport efficiency and reduced waste. Since these modern facilities are located directly inside urban neighborhoods, fresh vegetables do not need to travel long distances in heavy diesel trucks. This significantly reduces air pollution and ensures that local consumers receive much fresher produce. Consequently, many city restaurants and supermarkets are already buying crisp vegetables straight from nearby vertical farms.\n\nOf course, vertical farming still faces some serious economic challenges, such as high electricity costs for continuous lighting and climate control systems. However, as renewable energy sources become cheaper and agricultural technology continues to improve rapidly, vertical farms will likely play a crucial role in securing the future of global food production.",
+      "published_at": "2026-11-23T17:25:02.577Z",
+      "category": "Science",
+      "author": "Line Reader",
+      "word_meanings": {
+        "rare": "nadir",
+        "expensive": "pahalı",
+        "global": "küresel",
+        "population": "nüfus",
+        "innovative": "yenilikçi",
+        "produce": "üretmek",
+        "solution": "çözüm",
+        "vertical": "dikey",
+        "farming": "tarım",
+        "traditional": "geleneksel",
+        "horizontal": "yatay",
+        "stacked": "üst üste dizilmiş",
+        "layer": "katman",
+        "facility": "tesis",
+        "artificial": "yapay",
+        "temperature": "sıcaklık",
+        "soil": "toprak",
+        "environment": "ortam",
+        "monitor": "izlemek",
+        "crop": "ürün",
+        "harsh": "sert",
+        "consume": "tüketmek",
+        "sustainable": "sürdürülebilir",
+        "advantage": "avantaj",
+        "efficiency": "verimlilik",
+        "reduced": "azaltılmış",
+        "waste": "atık",
+        "neighborhood": "mahalle",
+        "distance": "mesafe",
+        "pollution": "kirlilik",
+        "ensure": "sağlamak",
+        "consumer": "tüketici",
+        "receive": "almak",
+        "crisp": "taze ve gevrek",
+        "challenge": "zorluk",
+        "continuous": "kesintisiz",
+        "renewable": "yenilenebilir",
+        "source": "kaynak",
+        "agricultural": "tarımsal",
+        "improve": "gelişmek",
+        "rapidly": "hızla",
+        "crucial": "çok önemli",
+        "secure": "güvenceye almak",
+        "exciting": "heyecan verici",
+        "steadily": "istikrarlı bir şekilde",
+        "heavy": "ağır"
+      },
+      "sentence_translations": {
+        "In many large cities around the world today, open space is becoming extremely rare and expensive.": "Günümüzde dünyadaki birçok büyük şehirde açık alanlar son derece nadir ve pahalı hale geliyor.",
+        "As global populations continue to grow, farmers and scientists are searching for innovative ways to produce fresh food close to urban centers.": "Küresel nüfus büyümeye devam ettikçe, çiftçiler ve bilim insanları kent merkezlerine yakın taze gıda üretmek için yenilikçi yollar arıyorlar.",
+        "One exciting modern solution to this growing problem is vertical farming.": "Giderek büyüyen bu soruna heyecan verici modern bir çözüm dikey tarımdır.",
+        "Instead of using traditional horizontal fields, vertical farms grow healthy plants indoors in tall, stacked layers inside modern buildings.": "Geleneksel yatay tarlaları kullanmak yerine dikey çiftlikler, sağlıklı bitkileri modern binaların içinde yüksek, üst üste dizilmiş katlarda kapalı mekanda yetiştirir.",
+        "These high-tech indoor facilities use powerful artificial lights, carefully controlled temperatures, and smart water systems instead of natural soil.": "Bu yüksek teknolojili kapalı tesisler, doğal toprak yerine güçlü yapay ışıklar, dikkatle kontrol edilen sıcaklıklar ve akıllı su sistemleri kullanır.",
+        "Because the internal environment is constantly monitored, crops can grow steadily all year round, regardless of the harsh weather outside.": "İç ortam sürekli izlendiği için, dışarıdaki sert hava koşullarına bakılmaksızın ürünler yıl boyunca istikrarlı bir şekilde büyüyebilir.",
+        "Furthermore, vertical farms consume up to ninety percent less water than traditional farms, making them exceptionally environmentally friendly and sustainable for our planet.": "Dahası, dikey çiftlikler geleneksel çiftliklere göre yüzde doksana kadar daha az su tüketerek onları gezegenimiz için son derece çevre dostu ve sürdürülebilir kılar.",
+        "Another major advantage of vertical farming is transport efficiency and reduced waste.": "Dikey tarımın bir diğer önemli avantajı ise taşıma verimliliği ve azaltılmış atıktır.",
+        "Since these modern facilities are located directly inside urban neighborhoods, fresh vegetables do not need to travel long distances in heavy diesel trucks.": "Bu modern tesisler doğrudan şehir mahallelerinin içinde yer aldığından, taze sebzelerin ağır dizel kamyonlarla uzun mesafeler kat etmesine gerek kalmaz.",
+        "This significantly reduces air pollution and ensures that local consumers receive much fresher produce.": "Bu durum hava kirliliğini önemli ölçüde azaltır ve yerel tüketicilerin çok daha taze ürünler almasını sağlar.",
+        "Consequently, many city restaurants and supermarkets are already buying crisp vegetables straight from nearby vertical farms.": "Sonuç olarak, birçok şehir restoranı ve süpermarket taze sebzeleri doğrudan yakındaki dikey çiftliklerden satın alıyor.",
+        "Of course, vertical farming still faces some serious economic challenges, such as high electricity costs for continuous lighting and climate control systems.": "Elbette dikey tarım, kesintisiz aydınlatma ve iklim kontrol sistemleri için yüksek elektrik maliyetleri gibi bazı ciddi ekonomik zorluklarla hâlâ karşı karşıyadır.",
+        "However, as renewable energy sources become cheaper and agricultural technology continues to improve rapidly, vertical farms will likely play a crucial role in securing the future of global food production.": "Ancak, yenilenebilir enerji kaynakları ucuzladıkça ve tarım teknolojisi hızla gelişmeye devam ettikçe, dikey çiftlikler küresel gıda üretiminin geleceğini güvence altına almada muhtemelen çok önemli bir rol oynayacaktır."
+      },
+      "word_relations": {
+        "rare": {
+          "syn": [
+            "uncommon",
+            "scarce"
+          ],
+          "ant": [
+            "common",
+            "abundant"
+          ]
+        },
+        "expensive": {
+          "syn": [
+            "costly",
+            "pricey"
+          ],
+          "ant": [
+            "cheap",
+            "inexpensive"
+          ]
+        },
+        "innovative": {
+          "syn": [
+            "inventive",
+            "creative"
+          ],
+          "ant": [
+            "unoriginal",
+            "traditional"
+          ]
+        },
+        "produce": {
+          "syn": [
+            "generate",
+            "yield"
+          ],
+          "ant": [
+            "consume",
+            "destroy"
+          ]
+        },
+        "solution": {
+          "syn": [
+            "answer",
+            "resolution"
+          ],
+          "ant": [
+            "problem",
+            "issue"
+          ]
+        },
+        "traditional": {
+          "syn": [
+            "conventional",
+            "classic"
+          ],
+          "ant": [
+            "modern",
+            "unconventional"
+          ]
+        },
+        "horizontal": {
+          "syn": [
+            "flat",
+            "level"
+          ],
+          "ant": [
+            "vertical"
+          ]
+        },
+        "vertical": {
+          "syn": [
+            "upright",
+            "stacked"
+          ],
+          "ant": [
+            "horizontal"
+          ]
+        },
+        "healthy": {
+          "syn": [
+            "wholesome",
+            "flourishing"
+          ],
+          "ant": [
+            "unhealthy",
+            "sick"
+          ]
+        },
+        "powerful": {
+          "syn": [
+            "strong",
+            "potent"
+          ],
+          "ant": [
+            "weak"
+          ]
+        },
+        "artificial": {
+          "syn": [
+            "man-made",
+            "synthetic"
+          ],
+          "ant": [
+            "natural",
+            "genuine"
+          ]
+        },
+        "constantly": {
+          "syn": [
+            "continuously",
+            "always"
+          ],
+          "ant": [
+            "rarely",
+            "occasionally"
+          ]
+        },
+        "harsh": {
+          "syn": [
+            "severe",
+            "rough"
+          ],
+          "ant": [
+            "mild",
+            "gentle"
+          ]
+        },
+        "consume": {
+          "syn": [
+            "use",
+            "absorb"
+          ],
+          "ant": [
+            "produce",
+            "save"
+          ]
+        },
+        "sustainable": {
+          "syn": [
+            "renewable",
+            "eco-friendly"
+          ],
+          "ant": [
+            "unsustainable"
+          ]
+        },
+        "advantage": {
+          "syn": [
+            "benefit",
+            "asset"
+          ],
+          "ant": [
+            "disadvantage",
+            "drawback"
+          ]
+        },
+        "efficiency": {
+          "syn": [
+            "productivity",
+            "effectiveness"
+          ],
+          "ant": [
+            "inefficiency"
+          ]
+        },
+        "fresh": {
+          "syn": [
+            "crisp",
+            "new"
+          ],
+          "ant": [
+            "stale",
+            "spoiled"
+          ]
+        },
+        "ensure": {
+          "syn": [
+            "guarantee",
+            "make certain"
+          ],
+          "ant": [
+            "jeopardize"
+          ]
+        },
+        "serious": {
+          "syn": [
+            "severe",
+            "major"
+          ],
+          "ant": [
+            "minor",
+            "trivial"
+          ]
+        },
+        "continuous": {
+          "syn": [
+            "uninterrupted",
+            "constant"
+          ],
+          "ant": [
+            "intermittent",
+            "sporadic"
+          ]
+        },
+        "cheaper": {
+          "syn": [
+            "less expensive",
+            "more affordable"
+          ],
+          "ant": [
+            "more expensive"
+          ]
+        },
+        "rapidly": {
+          "syn": [
+            "quickly",
+            "fast"
+          ],
+          "ant": [
+            "slowly"
+          ]
+        },
+        "crucial": {
+          "syn": [
+            "vital",
+            "essential"
+          ],
+          "ant": [
+            "unimportant",
+            "trivial"
+          ]
+        },
+        "exciting": {
+          "syn": [
+            "thrilling",
+            "inspiring"
+          ],
+          "ant": [
+            "boring",
+            "dull"
+          ]
+        },
+        "improve": {
+          "syn": [
+            "enhance",
+            "advance"
+          ],
+          "ant": [
+            "worsen",
+            "decline"
+          ]
+        },
+        "secure": {
+          "syn": [
+            "protect",
+            "guarantee"
+          ],
+          "ant": [
+            "endanger",
+            "lose"
+          ]
+        },
+        "future": {
+          "syn": [
+            "prospect"
+          ],
+          "ant": [
+            "past"
+          ]
+        }
+      },
+      "audio_url": "https://raw.githubusercontent.com/MustafaAyaz21/line_reader/main/audio/b1-the-rise-of-urban-vertical-farming.wav",
+      "audio_voice": "Kore",
+      "audio_duration_sec": 98,
+      "audio_segments": [
+        {
+          "p": 0,
+          "s": 0,
+          "start_ms": 0,
+          "end_ms": 6900
+        },
+        {
+          "p": 0,
+          "s": 1,
+          "start_ms": 7020,
+          "end_ms": 15380
+        },
+        {
+          "p": 0,
+          "s": 2,
+          "start_ms": 15560,
+          "end_ms": 19620
+        },
+        {
+          "p": 0,
+          "s": 3,
+          "start_ms": 19980,
+          "end_ms": 28760
+        },
+        {
+          "p": 1,
+          "s": 0,
+          "start_ms": 28760,
+          "end_ms": 36600
+        },
+        {
+          "p": 1,
+          "s": 1,
+          "start_ms": 37560,
+          "end_ms": 45140
+        },
+        {
+          "p": 1,
+          "s": 2,
+          "start_ms": 45440,
+          "end_ms": 54080
+        },
+        {
+          "p": 2,
+          "s": 0,
+          "start_ms": 54340,
+          "end_ms": 59120
+        },
+        {
+          "p": 2,
+          "s": 1,
+          "start_ms": 59260,
+          "end_ms": 67280
+        },
+        {
+          "p": 2,
+          "s": 2,
+          "start_ms": 67280,
+          "end_ms": 72960
+        },
+        {
+          "p": 2,
+          "s": 3,
+          "start_ms": 72960,
+          "end_ms": 79240
+        },
+        {
+          "p": 3,
+          "s": 0,
+          "start_ms": 79420,
+          "end_ms": 87300
+        },
+        {
+          "p": 3,
+          "s": 1,
+          "start_ms": 87560,
+          "end_ms": 97560
+        }
+      ],
+      "is_hidden": false
     }
   ]
 }
