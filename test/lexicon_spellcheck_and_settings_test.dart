@@ -680,4 +680,55 @@ void main() {
       }
     },
   );
+
+  test(
+    'WordLexiconService completes missing UK/US IPA from Wiktionary so both accents display together',
+    () async {
+      final mockClient = MockClient((request) async {
+        final url = request.url.toString();
+        if (url.contains('en.wiktionary.org')) {
+          return http.Response(
+            jsonEncode(<String, Object?>{
+              'parse': <String, Object?>{
+                'wikitext': <String, Object?>{
+                  '*': '''==English==
+===Pronunciation===
+* {{a|RP}} {{IPA|en|/ˈʃɛd.juːl/}}
+* {{a|GA}} {{IPA|en|/ˈskɛdʒ.uːl/}}
+
+==French==
+* {{IPA|fr|/fake/}}''',
+                },
+              },
+            }),
+            200,
+            headers: const <String, String>{
+              'content-type': 'application/json; charset=utf-8',
+            },
+          );
+        }
+        return http.Response('{}', 404);
+      });
+
+      final service = WordLexiconService(
+        httpClient: mockClient,
+        enableOnlineEnrichment: true,
+        testBundledEntries: const <String, WordLexiconInfo>{
+          'schedule': WordLexiconInfo(
+            word: 'schedule',
+            ipaUs: '/ˈskɛdʒ.uːl/',
+            ipaUk: null,
+            synonyms: <String>['timetable'],
+            antonyms: <String>['chaos'],
+          ),
+        },
+      );
+
+      final info = await service.lookup('schedule');
+      expect(info, isNotNull);
+      expect(info!.ipaUs, '/ˈskɛdʒ.uːl/');
+      expect(info.ipaUk, '/ˈʃɛd.juːl/');
+      expect(info.hasBothIpas, isTrue);
+    },
+  );
 }

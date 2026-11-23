@@ -319,6 +319,8 @@ class WordLexiconService {
   }) async {
     String? ipaUs;
     String? ipaUk;
+    String? wiktUs;
+    String? wiktUk;
     final synonyms = <String>[];
     final antonyms = <String>[];
 
@@ -332,6 +334,15 @@ class WordLexiconService {
         ipaUk ??= dict.ipaUk;
         synonyms.addAll(dict.synonyms);
         antonyms.addAll(dict.antonyms);
+      }());
+    }
+
+    if (needIpa) {
+      tasks.add(() async {
+        final wikt = await _fetchFromWiktionaryIpa(word);
+        if (wikt == null) return;
+        wiktUs = wikt.ipaUs;
+        wiktUk = wikt.ipaUk;
       }());
     }
 
@@ -350,6 +361,16 @@ class WordLexiconService {
     }
 
     await Future.wait<void>(tasks);
+
+    // Wiktionary'de açık aksan etiketli US/UK IPA varsa eksik aksanları tamamla.
+    ipaUs ??= wiktUs;
+    ipaUk ??= wiktUk;
+    if (ipaUs != null && ipaUk == null && wiktUk != null) {
+      ipaUk = wiktUk;
+    }
+    if (ipaUk != null && ipaUs == null && wiktUs != null) {
+      ipaUs = wiktUs;
+    }
 
     final cleanSyn = _parseTermList(synonyms, excludeWord: word, maxCount: 6);
     final cleanAnt = _parseTermList(antonyms, excludeWord: word, maxCount: 5);
@@ -455,6 +476,115 @@ class WordLexiconService {
         synonyms: _parseTermList(synonyms, excludeWord: word, maxCount: 6),
         antonyms: _parseTermList(antonyms, excludeWord: word, maxCount: 5),
       );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// İngilizce Wiktionary üzerinden doğrulanmış US (`GA`/`US`) ve UK (`RP`/`UK`)
+  /// IPA okunuşlarını çeker. Eksik kalan aksanı tamamlayarak iki aksanın da
+  /// birlikte görünmesini sağlar.
+  Future<({String? ipaUs, String? ipaUk})?> _fetchFromWiktionaryIpa(
+    String word,
+  ) async {
+    try {
+      final uri = Uri.parse('https://en.wiktionary.org/w/api.php').replace(
+        queryParameters: <String, String>{
+          'action': 'parse',
+          'page': word,
+          'prop': 'wikitext',
+          'format': 'json',
+          'redirects': '1',
+        },
+      );
+      final response = await _httpClient.get(
+        uri,
+        headers: const <String, String>{
+          'Accept': 'application/json',
+          'User-Agent': 'LineReader/1.0',
+        },
+      ).timeout(_timeout);
+      if (response.statusCode != 200) return null;
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      if (decoded is! Map) return null;
+      final parseObj = decoded['parse'];
+      if (parseObj is! Map) return null;
+      final wikitextObj = parseObj['wikitext'];
+      final wikitext = wikitextObj is Map
+          ? (wikitextObj['*']?.toString() ?? '')
+          : (wikitextObj?.toString() ?? '');
+      if (wikitext.isEmpty) return null;
+
+      // Yalnızca `==English==` bölümünü incele (diğer dillerin IPA'sı karışmasın).
+      final enStart = wikitext.indexOf('==English==');
+      final enSection = enStart >= 0 ? wikitext.substring(enStart) : wikitext;
+      final nextLangMatch =
+          RegExp(r'\n==[^=\n]+==\s*\n').firstMatch(enSection.substring(11));
+      final scoped = nextLangMatch != null
+          ? enSection.substring(0, 11 + nextLangMatch.start)
+          : enSection;
+
+      String? ipaUs;
+      String? ipaUk;
+      String? sharedIpa;
+
+      final ipaTemplateRe = RegExp(r'\{\{IPA\|en\|([^}]+)\}\}');
+      final accentRe = RegExp(r'\{\{(?:a|accent)\|([^}]+)\}\}');
+
+      for (final line in scoped.split('\n')) {
+        final ipaMatch = ipaTemplateRe.firstMatch(line);
+        if (ipaMatch == null) continue;
+
+        final rawParams = ipaMatch.group(1) ?? '';
+        String? extractedIpa;
+        for (final part in rawParams.split('|')) {
+          final trimmed = part.trim();
+          if (trimmed.isEmpty || trimmed.contains('=')) continue;
+          if (trimmed.startsWith('/') || trimmed.startsWith('[')) {
+            extractedIpa = _normalizeIpa(trimmed);
+            if (extractedIpa != null) break;
+          }
+        }
+        if (extractedIpa == null) continue;
+
+        final accentMatch = accentRe.firstMatch(line);
+        if (accentMatch == null) {
+          sharedIpa ??= extractedIpa;
+          continue;
+        }
+
+        final tags = (accentMatch.group(1) ?? '')
+            .split('|')
+            .map((t) => t.trim().toLowerCase())
+            .toSet();
+
+        final isUs = tags.contains('us') ||
+            tags.contains('ga') ||
+            tags.contains('genam') ||
+            tags.contains('general american') ||
+            tags.contains('north america');
+        final isUk = tags.contains('uk') ||
+            tags.contains('rp') ||
+            tags.contains('received pronunciation') ||
+            tags.contains('britain') ||
+            tags.contains('gb');
+
+        if (isUs) ipaUs ??= extractedIpa;
+        if (isUk) ipaUk ??= extractedIpa;
+        if (!isUs && !isUk) {
+          sharedIpa ??= extractedIpa;
+        }
+        if (ipaUs != null && ipaUk != null) break;
+      }
+
+      if (sharedIpa != null) {
+        ipaUs ??= sharedIpa;
+        ipaUk ??= sharedIpa;
+      }
+
+      if (ipaUs == null && ipaUk == null) return null;
+      return (ipaUs: ipaUs, ipaUk: ipaUk);
     } catch (_) {
       return null;
     }

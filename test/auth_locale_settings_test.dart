@@ -634,6 +634,7 @@ void main() {
           },
         ];
         final codes = <Map<String, Object?>>[];
+        final articles = <Map<String, Object?>>[];
         String? capturedAuthHeader;
 
         final mockClient = MockClient((request) async {
@@ -692,6 +693,77 @@ void main() {
               headers: const <String, String>{'content-type': 'application/json'},
             );
           }
+          if (path.endsWith('/dev/articles') && request.method == 'GET') {
+            return http.Response(
+              jsonEncode(<String, Object?>{'ok': true, 'articles': articles}),
+              200,
+              headers: const <String, String>{'content-type': 'application/json'},
+            );
+          }
+          if (path.endsWith('/dev/articles/generate') &&
+              request.method == 'POST') {
+            return http.Response(
+              jsonEncode(<String, Object?>{
+                'ok': true,
+                'article': <String, Object?>{
+                  'id': 'b1-mobile-space-travel',
+                  'level': 'B1',
+                  'title': 'Future of Space Travel',
+                  'content':
+                      'Modern rockets are changing how humans explore space every year.\n\nScientists are planning new missions to the Moon and Mars.',
+                  'word_meanings': <String, String>{'rockets': 'roketler'},
+                  'sentence_translations': <String, String>{
+                    'Modern rockets are changing how humans explore space every year.':
+                        'Modern roketler insanların uzayı keşfetme biçimini her yıl değiştiriyor.',
+                  },
+                  'word_relations': <String, Object?>{
+                    'modern': <String, Object?>{
+                      'syn': <String>['contemporary'],
+                      'ant': <String>['ancient'],
+                    },
+                  },
+                },
+              }),
+              200,
+              headers: const <String, String>{'content-type': 'application/json'},
+            );
+          }
+          if (path.endsWith('/dev/articles/audio') && request.method == 'POST') {
+            return http.Response(
+              jsonEncode(<String, Object?>{
+                'ok': true,
+                'audio_url':
+                    'https://raw.githubusercontent.com/MustafaAyaz21/line_reader/main/audio/b1-mobile-space-travel.wav',
+                'audio_voice': 'Kore',
+                'audio_duration_sec': 42,
+                'message': 'Podcast AI sesi oluşturuldu (42 sn).',
+              }),
+              200,
+              headers: const <String, String>{'content-type': 'application/json'},
+            );
+          }
+          if (path.endsWith('/dev/articles/publish') &&
+              request.method == 'POST') {
+            final body = jsonDecode(request.body) as Map<String, dynamic>;
+            final art = body['article'] as Map<String, dynamic>;
+            articles.add(<String, Object?>{
+              'id': art['id'],
+              'level': art['level'],
+              'title': art['title'],
+              'is_hidden': art['is_hidden'] == true,
+              'has_audio': art['audio_url'] != null,
+              'audio_url': art['audio_url'],
+            });
+            return http.Response(
+              jsonEncode(<String, Object?>{
+                'ok': true,
+                'id': art['id'],
+                'message': '"${art['title']}" anında yayınlandı!',
+              }),
+              200,
+              headers: const <String, String>{'content-type': 'application/json'},
+            );
+          }
           return http.Response('{}', 404);
         });
 
@@ -727,8 +799,8 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('arkadas@gmail.com'), findsOneWidget);
 
-        // 2) Aktivasyon Kodları sekmesine geç, rastgele kod üret ve oluştur
-        await tester.tap(find.text('Aktivasyon Kodları'));
+        // 2) Kodlar sekmesine geç, rastgele kod üret ve oluştur
+        await tester.tap(find.text('Kodlar'));
         await tester.pumpAndSettle();
         await tester.tap(
           find.byKey(const ValueKey<String>('dev_panel_random_code_btn')),
@@ -740,6 +812,35 @@ void main() {
         await tester.pumpAndSettle();
         expect(codes.length, 1);
         expect(find.text(codes.first['code']! as String), findsOneWidget);
+
+        // 3) Makaleler sekmesine geç: Gemini üret -> Podcast AI sesi üret -> Anında yayınla
+        await tester.tap(find.text('Makaleler'));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey<String>('dev_panel_generate_article_btn')),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Taslak Hazır'), findsOneWidget);
+
+        await tester.drag(find.byType(ListView).last, const Offset(0, -420));
+        await tester.pumpAndSettle();
+        final audioBtn = find.byKey(
+          const ValueKey<String>('dev_panel_generate_audio_btn'),
+        );
+        await tester.tap(audioBtn);
+        await tester.pumpAndSettle();
+        expect(find.textContaining('Podcast Hazır (42 sn)'), findsOneWidget);
+
+        await tester.drag(find.byType(ListView).last, const Offset(0, -250));
+        await tester.pumpAndSettle();
+        final publishBtn = find.byKey(
+          const ValueKey<String>('dev_panel_publish_article_btn'),
+        );
+        await tester.tap(publishBtn);
+        await tester.pumpAndSettle();
+        expect(articles.length, 1);
+        expect(articles.first['has_audio'], isTrue);
+        expect(find.text('Future of Space Travel'), findsOneWidget);
 
         authController.dispose();
         localeController.dispose();

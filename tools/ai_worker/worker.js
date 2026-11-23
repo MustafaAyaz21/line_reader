@@ -692,7 +692,492 @@ async function handleDeveloperPanelRequest(request, env, verifiedUser, path, met
     }
   }
 
+  // 3) Mobil Makale Üretme, Podcast AI Ses & Anında Yayınlama
+  if (path === "/dev/articles") {
+    if (method === "GET") {
+      const list = await loadArticlesList(env);
+      const summary = list.map((a) => ({
+        id: a.id,
+        level: a.level,
+        title: a.title,
+        is_hidden: Boolean(a.is_hidden),
+        publish_at: a.publish_at || null,
+        has_audio: Boolean(a.audio_url && String(a.audio_url).trim().length > 0),
+        audio_url: a.audio_url || null,
+      }));
+      return jsonResponse({
+        ok: true,
+        articles: summary,
+        has_gemini_key: Boolean(env.GEMINI_API_KEY),
+        has_github_token: Boolean(env.GITHUB_TOKEN),
+      });
+    }
+
+    const body = await safeReadJson(request);
+    const id = String(body?.id || "").trim();
+    if (!id) {
+      return jsonResponse({ ok: false, message: "Makale kimliği (id) gerekli." }, 400);
+    }
+
+    if (method === "PATCH") {
+      const list = await loadArticlesList(env);
+      const idx = list.findIndex((a) => String(a?.id || "") === id);
+      if (idx === -1) {
+        return jsonResponse({ ok: false, message: "Makale bulunamadı." }, 404);
+      }
+      if (typeof body?.is_hidden === "boolean") {
+        list[idx].is_hidden = body.is_hidden;
+      }
+      if (body && Object.prototype.hasOwnProperty.call(body, "publish_at")) {
+        list[idx].publish_at = body.publish_at || null;
+      }
+      await saveArticlesList(env, list, `Update article ${id} from mobile dev panel`);
+      return jsonResponse({
+        ok: true,
+        message: list[idx].is_hidden ? "Makale gizlendi." : "Makale görünür yapıldı.",
+      });
+    }
+
+    if (method === "DELETE") {
+      const list = await loadArticlesList(env);
+      const next = list.filter((a) => String(a?.id || "") !== id);
+      if (next.length === list.length) {
+        return jsonResponse({ ok: false, message: "Makale bulunamadı." }, 404);
+      }
+      await saveArticlesList(env, next, `Delete article ${id} from mobile dev panel`);
+      return jsonResponse({ ok: true, message: "Makale silindi." });
+    }
+  }
+
+  if (path === "/dev/articles/generate" && method === "POST") {
+    if (!env.GEMINI_API_KEY) {
+      return jsonResponse({
+        ok: false,
+        error: "gemini_key_missing",
+        message: "Cloudflare Worker içinde GEMINI_API_KEY tanımlı değil. Settings → Variables and Secrets bölümünden ekleyin.",
+      }, 503);
+    }
+    const body = await safeReadJson(request);
+    const rawLevel = String(body?.level || "B1").trim().toUpperCase();
+    const level = ["A1", "A2", "B1", "B2", "C1", "C2"].includes(rawLevel) ? rawLevel : "B1";
+    const topic = String(body?.topic || "").trim().slice(0, 160);
+    try {
+      const generated = await generateArticleWithGemini(String(env.GEMINI_API_KEY).trim(), level, topic);
+      return jsonResponse({ ok: true, article: generated });
+    } catch (err) {
+      return jsonResponse({
+        ok: false,
+        error: "gemini_generate_failed",
+        message: `Makale üretilemedi: ${String(err?.message || err)}`,
+      }, 502);
+    }
+  }
+
+  if (path === "/dev/articles/audio" && method === "POST") {
+    if (!env.GEMINI_API_KEY) {
+      return jsonResponse({
+        ok: false,
+        error: "gemini_key_missing",
+        message: "Cloudflare Worker içinde GEMINI_API_KEY tanımlı değil.",
+      }, 503);
+    }
+    if (!env.GITHUB_TOKEN) {
+      return jsonResponse({
+        ok: false,
+        error: "github_token_missing",
+        message: "Podcast sesini kaydetmek için Cloudflare Worker içinde GITHUB_TOKEN tanımlayın.",
+      }, 503);
+    }
+    const body = await safeReadJson(request);
+    const articleId = slugifyArticleId(String(body?.id || body?.title || "article"));
+    const title = String(body?.title || "").trim();
+    const content = String(body?.content || "").trim();
+    const voice = String(body?.voice || "Kore").trim() || "Kore";
+    if (!content || content.length < 30) {
+      return jsonResponse({ ok: false, message: "Ses üretmek için geçerli makale metni gerekli." }, 400);
+    }
+    try {
+      const audioMeta = await generatePodcastAudioWithGemini(env, articleId, title, content, voice);
+      return jsonResponse({
+        ok: true,
+        ...audioMeta,
+        message: `Podcast AI sesi oluşturuldu (${audioMeta.audio_duration_sec} sn).`,
+      });
+    } catch (err) {
+      return jsonResponse({
+        ok: false,
+        error: "tts_generate_failed",
+        message: `Podcast sesi üretilemedi: ${String(err?.message || err)}`,
+      }, 502);
+    }
+  }
+
+  if (path === "/dev/articles/publish" && method === "POST") {
+    const body = await safeReadJson(request);
+    const rawArticle = body?.article;
+    if (!rawArticle || typeof rawArticle !== "object") {
+      return jsonResponse({ ok: false, message: "Yayınlanacak makale verisi eksik." }, 400);
+    }
+    const level = String(rawArticle.level || "B1").trim().toUpperCase();
+    const title = String(rawArticle.title || "").trim();
+    const content = String(rawArticle.content || "").trim();
+    if (!title || content.length < 30) {
+      return jsonResponse({ ok: false, message: "Başlık ve makale metni boş olamaz." }, 400);
+    }
+    const id = String(rawArticle.id || "").trim() || `${level.toLowerCase()}-${slugifyArticleId(title)}`;
+    const articleObj = {
+      id,
+      level,
+      title,
+      content,
+      word_meanings: rawArticle.word_meanings && typeof rawArticle.word_meanings === "object" ? rawArticle.word_meanings : {},
+      sentence_translations: rawArticle.sentence_translations && typeof rawArticle.sentence_translations === "object" ? rawArticle.sentence_translations : {},
+      word_relations: rawArticle.word_relations && typeof rawArticle.word_relations === "object" ? rawArticle.word_relations : {},
+      ...(rawArticle.audio_url ? { audio_url: String(rawArticle.audio_url).trim() } : {}),
+      ...(rawArticle.audio_voice ? { audio_voice: String(rawArticle.audio_voice).trim() } : {}),
+      ...(rawArticle.audio_duration_sec ? { audio_duration_sec: Number(rawArticle.audio_duration_sec) } : {}),
+      is_hidden: Boolean(rawArticle.is_hidden),
+      ...(rawArticle.publish_at ? { publish_at: String(rawArticle.publish_at).trim() } : {}),
+    };
+
+    const list = await loadArticlesList(env);
+    const existingIdx = list.findIndex((a) => String(a?.id || "") === id);
+    if (existingIdx >= 0) {
+      list[existingIdx] = articleObj;
+    } else {
+      list.push(articleObj);
+    }
+
+    const syncInfo = await saveArticlesList(env, list, `Publish article ${id} from mobile dev panel`);
+    return jsonResponse({
+      ok: true,
+      id,
+      count: list.length,
+      github_synced: syncInfo.githubSynced,
+      message: articleObj.is_hidden
+        ? `"${title}" gizli olarak kaydedildi.`
+        : `"${title}" anında yayınlandı!`,
+    });
+  }
+
   return jsonResponse({ ok: false, error: "not_found" }, 404);
+}
+
+const GITHUB_REPO_OWNER = "MustafaAyaz21";
+const GITHUB_REPO_NAME = "line_reader";
+const GITHUB_ARTICLES_RAW_URL = `https://raw.githubusercontent.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/main/articles.json`;
+
+function slugifyArticleId(raw) {
+  const cleaned = String(raw || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 52);
+  return cleaned || `article-${Date.now()}`;
+}
+
+async function loadArticlesList(env) {
+  if (env && env.DB) {
+    try {
+      await ensureSchema(env.DB);
+      const row = await env.DB
+        .prepare("SELECT payload_json FROM articles_feed WHERE id = 1 LIMIT 1")
+        .first();
+      if (row && row.payload_json) {
+        const parsed = JSON.parse(row.payload_json);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (_) {}
+  }
+
+  try {
+    const res = await fetch(`${GITHUB_ARTICLES_RAW_URL}?t=${Date.now()}`);
+    if (res.ok) {
+      const parsed = await res.json();
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (_) {}
+
+  return [];
+}
+
+async function saveArticlesList(env, articles, commitMessage) {
+  const payloadText = JSON.stringify(articles, null, 2);
+  const etag = `"articles-${Date.now()}-${payloadText.length}"`;
+  await ensureSchema(env.DB);
+  await env.DB
+    .prepare(`
+      INSERT INTO articles_feed (id, payload_json, etag, updated_at)
+      VALUES (1, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        payload_json = excluded.payload_json,
+        etag = excluded.etag,
+        updated_at = excluded.updated_at
+    `)
+    .bind(payloadText, etag, new Date().toISOString())
+    .run();
+
+  let githubSynced = false;
+  if (env.GITHUB_TOKEN) {
+    try {
+      const bytes = new TextEncoder().encode(payloadText);
+      await upsertGitHubFile(
+        String(env.GITHUB_TOKEN).trim(),
+        "articles.json",
+        bytesToBase64(bytes),
+        commitMessage || "Update articles.json from mobile dev panel"
+      );
+      githubSynced = true;
+    } catch (_) {}
+  }
+  return { etag, githubSynced };
+}
+
+async function generateArticleWithGemini(apiKey, level, topic) {
+  const topicInstruction = topic
+    ? `Write the article specifically about this topic: "${topic}".`
+    : "Choose an engaging, fresh, real-world topic suitable for English learners (science, psychology, culture, technology, daily life, history, or nature).";
+
+  const levelWordTarget = {
+    A1: "140 to 190 words in 3 short paragraphs using simple everyday vocabulary and short clear sentences",
+    A2: "180 to 240 words in 3 to 4 paragraphs using clear pre-intermediate vocabulary",
+    B1: "230 to 300 words in 4 paragraphs using natural intermediate English",
+    B2: "270 to 350 words in 4 paragraphs using rich upper-intermediate English",
+    C1: "300 to 390 words in 4 to 5 paragraphs using sophisticated advanced English",
+    C2: "320 to 420 words in 4 to 5 paragraphs using nuanced, idiomatic mastery-level English",
+  }[level] || "230 to 300 words in 4 paragraphs";
+
+  const prompt = [
+    `You are an expert English curriculum author creating a CEFR ${level} reading article for Turkish learners of English.`,
+    topicInstruction,
+    `Length & style: ${levelWordTarget}. Separate paragraphs with \\n\\n.`,
+    "Return ONLY one valid JSON object (no markdown fences) with these EXACT keys:",
+    "{",
+    '  "title": "Engaging English title",',
+    '  "content": "Full English article text with paragraphs separated by \\n\\n",',
+    '  "word_meanings": { "lowercase_word": "exact contextual Turkish meaning in this article (for verbs use -mak/-mek)" },',
+    '  "sentence_translations": { "Exact English sentence from content": "Natural, fluent Turkish translation" },',
+    '  "word_relations": { "lowercase_word": { "syn": ["1-3 exact contextual English synonyms"], "ant": ["1-2 exact contextual English antonyms"] } }',
+    "}",
+    "Rules:",
+    "1. Include ALL meaningful content words from the article in word_meanings (40 to 120 words, lowercase base/appeared forms) with their EXACT contextual Turkish meaning in this article.",
+    "2. Include EVERY sentence from content in sentence_translations with exact punctuation.",
+    "3. Include 25 to 60 key content words in word_relations with ONLY synonyms and antonyms that match the EXACT sense used in this article's sentences.",
+  ].join("\n");
+
+  const models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-flash-lite"];
+  let lastError = "Gemini yanıt vermedi.";
+
+  for (const model of models) {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.65,
+          responseMimeType: "application/json",
+        },
+      }),
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      lastError = `HTTP ${res.status} (${model}): ${errText.slice(0, 160)}`;
+      continue;
+    }
+    const data = await res.json();
+    const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const cleaned = String(rawText).replace(/```json\s*/gi, "").replace(/```/g, "").trim();
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
+    if (start === -1 || end <= start) {
+      lastError = "Geçerli JSON üretilemedi.";
+      continue;
+    }
+    const parsed = JSON.parse(cleaned.slice(start, end + 1));
+    const title = String(parsed.title || "").trim();
+    const content = String(parsed.content || "").trim();
+    if (!title || content.length < 40) {
+      lastError = "Başlık veya metin eksik geldi.";
+      continue;
+    }
+    return {
+      id: `${level.toLowerCase()}-${slugifyArticleId(title)}`,
+      level,
+      title,
+      content,
+      word_meanings: parsed.word_meanings && typeof parsed.word_meanings === "object" ? parsed.word_meanings : {},
+      sentence_translations: parsed.sentence_translations && typeof parsed.sentence_translations === "object" ? parsed.sentence_translations : {},
+      word_relations: parsed.word_relations && typeof parsed.word_relations === "object" ? parsed.word_relations : {},
+      is_hidden: false,
+      publish_at: null,
+    };
+  }
+
+  throw new Error(lastError);
+}
+
+async function generatePodcastAudioWithGemini(env, articleId, title, content, voiceName) {
+  const apiKey = String(env.GEMINI_API_KEY).trim();
+  const githubToken = String(env.GITHUB_TOKEN).trim();
+  const ttsText = title ? `${title}.\n\n${content}` : content;
+
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              text: `Read the following English article aloud in a clear, warm, natural podcast narrator voice with comfortable pacing:\n\n${ttsText}`,
+            },
+          ],
+        },
+      ],
+      generationConfig: {
+        responseModalities: ["AUDIO"],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: {
+              voiceName: voiceName || "Kore",
+            },
+          },
+        },
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`Gemini TTS HTTP ${res.status}: ${errText.slice(0, 180)}`);
+  }
+
+  const data = await res.json();
+  const parts = data?.candidates?.[0]?.content?.parts || [];
+  let inlineAudio = null;
+  for (const p of parts) {
+    if (p?.inlineData?.data) {
+      inlineAudio = p.inlineData;
+      break;
+    }
+  }
+  if (!inlineAudio) {
+    throw new Error("Gemini TTS ses verisi döndürmedi.");
+  }
+
+  const mime = String(inlineAudio.mimeType || "audio/L16;rate=24000").toLowerCase();
+  const rawBytes = base64ToBytes(inlineAudio.data);
+  let wavBytes = rawBytes;
+  let durationSec = 0;
+
+  if (mime.includes("wav")) {
+    durationSec = Math.max(1, Math.round((rawBytes.length - 44) / (24000 * 2)));
+  } else {
+    const rateMatch = mime.match(/rate=(\d+)/);
+    const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
+    wavBytes = pcmToWavBytes(rawBytes, sampleRate);
+    durationSec = Math.max(1, Math.round(rawBytes.length / (sampleRate * 2)));
+  }
+
+  const repoPath = `audio/${articleId}.wav`;
+  await upsertGitHubFile(
+    githubToken,
+    repoPath,
+    bytesToBase64(wavBytes),
+    `Add podcast audio for ${articleId}`
+  );
+
+  return {
+    audio_url: `https://raw.githubusercontent.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/main/${repoPath}`,
+    audio_voice: voiceName || "Kore",
+    audio_duration_sec: durationSec,
+  };
+}
+
+async function upsertGitHubFile(githubToken, repoPath, contentBase64, commitMessage) {
+  const apiUrl = `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/contents/${repoPath}`;
+  const headers = {
+    Authorization: `Bearer ${githubToken}`,
+    Accept: "application/vnd.github+json",
+    "Content-Type": "application/json",
+    "User-Agent": "LineReader-Worker",
+  };
+
+  let existingSha = null;
+  const getRes = await fetch(apiUrl, { method: "GET", headers });
+  if (getRes.ok) {
+    const meta = await getRes.json();
+    existingSha = meta?.sha || null;
+  }
+
+  const putBody = {
+    message: commitMessage,
+    content: contentBase64,
+    branch: "main",
+    ...(existingSha ? { sha: existingSha } : {}),
+  };
+
+  const putRes = await fetch(apiUrl, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify(putBody),
+  });
+  if (!putRes.ok) {
+    const errText = await putRes.text().catch(() => "");
+    throw new Error(`GitHub yükleme hatası (HTTP ${putRes.status}): ${errText.slice(0, 160)}`);
+  }
+}
+
+function pcmToWavBytes(pcmBytes, sampleRate = 24000) {
+  const header = new Uint8Array(44);
+  const view = new DataView(header.buffer);
+  const dataLen = pcmBytes.length;
+  const writeStr = (offset, str) => {
+    for (let i = 0; i < str.length; i++) {
+      header[offset + i] = str.charCodeAt(i);
+    }
+  };
+  writeStr(0, "RIFF");
+  view.setUint32(4, 36 + dataLen, true);
+  writeStr(8, "WAVE");
+  writeStr(12, "fmt ");
+  view.setUint32(16, 16, true); // PCM chunk size
+  view.setUint16(20, 1, true); // PCM format
+  view.setUint16(22, 1, true); // Mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true); // Byte rate
+  view.setUint16(32, 2, true); // Block align
+  view.setUint16(34, 16, true); // Bits per sample
+  writeStr(36, "data");
+  view.setUint32(40, dataLen, true);
+
+  const out = new Uint8Array(44 + dataLen);
+  out.set(header, 0);
+  out.set(pcmBytes, 44);
+  return out;
+}
+
+function base64ToBytes(b64) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) {
+    bytes[i] = bin.charCodeAt(i);
+  }
+  return bytes;
+}
+
+function bytesToBase64(bytes) {
+  const chunkSize = 0x8000;
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const slice = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+    binary += String.fromCharCode(...slice);
+  }
+  return btoa(binary);
 }
 
 /* ---------------- Admin Uç Noktaları (PC Makale Paneli) ---------------- */

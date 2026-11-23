@@ -728,11 +728,11 @@ class ArticleAudioController extends ChangeNotifier {
   List<String> _candidateAudioUrls(String rawUrl) {
     final primary = _resolveAbsoluteAudioUrl(rawUrl);
     final urls = <String>[primary];
-    // Cloudflare Pages başarısız olursa GitHub raw yedek adresini dene.
+    // Cloudflare Pages henüz yayınlamadıysa GitHub raw yedek adresini dene.
     const pagesPrefix = 'https://line-reader.pages.dev/';
     if (primary.startsWith(pagesPrefix)) {
       final relPath = primary.substring(pagesPrefix.length);
-      final rawBase = ApiConfig.articlesFallbackJsonUrl
+      final rawBase = ApiConfig.articlesGithubFallbackJsonUrl
           .replaceFirst(RegExp(r'/articles\.json$'), '');
       urls.add('$rawBase/$relPath');
     }
@@ -753,7 +753,10 @@ class ArticleAudioController extends ChangeNotifier {
       }
 
       final safeId = article.id.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
-      final ext = rawUrl.toLowerCase().endsWith('.mp3') ? '.mp3' : '.m4a';
+      final lowerUrl = rawUrl.toLowerCase();
+      final ext = lowerUrl.endsWith('.wav')
+          ? '.wav'
+          : (lowerUrl.endsWith('.mp3') ? '.mp3' : '.m4a');
       final cacheFile = File(p.join(cacheDir.path, '$safeId$ext'));
       if (await cacheFile.exists() && await cacheFile.length() > 1024) {
         return cacheFile.path;
