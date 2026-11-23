@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-11-23T01:58:30.540Z",
+  "updated_at": "2026-11-23T01:59:13.836Z",
   "articles": [
     {
       "id": "a2-making-sculptures-from-everyday-trash-and-bottle",
@@ -354,7 +354,124 @@
         "Visiting a trash sculpture exhibition is a fun and educational experience for both adults and children.": "Bir çöp heykel sergisini ziyaret etmek hem yetişkinler hem de çocuklar için eğlenceli ve öğretici bir deneyimdir.",
         "It proves that creativity has no limits and that imagination can turn anything into something valuable.": "Bu, yaratıcılığın hiçbir sınırının olmadığını ve hayal gücünün herhangi bir şeyi değerli bir şeye dönüştürebileceğini kanıtlar.",
         "Next time you finish a drink, think twice before throwing away the bottle because it might just be a future masterpiece waiting to be born.": "Bir sonraki sefere bir içeceği bitirdiğinizde, şişeyi çöpe atmadan önce iki kez düşünün çünkü o sadece doğmayı bekleyen gelecekteki bir şaheser olabilir."
-      }
+      },
+      "audio_url": "https://line-reader.pages.dev/audio/a2-making-sculptures-from-everyday-trash-and-bottle.m4a",
+      "audio_segments": [
+        {
+          "p": 0,
+          "s": 0,
+          "start_ms": 0,
+          "end_ms": 4400
+        },
+        {
+          "p": 0,
+          "s": 1,
+          "start_ms": 4400,
+          "end_ms": 11880
+        },
+        {
+          "p": 0,
+          "s": 2,
+          "start_ms": 11880,
+          "end_ms": 17600
+        },
+        {
+          "p": 0,
+          "s": 3,
+          "start_ms": 17600,
+          "end_ms": 24960
+        },
+        {
+          "p": 1,
+          "s": 4,
+          "start_ms": 24960,
+          "end_ms": 32820
+        },
+        {
+          "p": 1,
+          "s": 5,
+          "start_ms": 32820,
+          "end_ms": 39240
+        },
+        {
+          "p": 1,
+          "s": 6,
+          "start_ms": 39240,
+          "end_ms": 45640
+        },
+        {
+          "p": 1,
+          "s": 7,
+          "start_ms": 45640,
+          "end_ms": 51220
+        },
+        {
+          "p": 2,
+          "s": 8,
+          "start_ms": 51220,
+          "end_ms": 58100
+        },
+        {
+          "p": 2,
+          "s": 9,
+          "start_ms": 58100,
+          "end_ms": 63800
+        },
+        {
+          "p": 2,
+          "s": 10,
+          "start_ms": 63800,
+          "end_ms": 70520
+        },
+        {
+          "p": 2,
+          "s": 11,
+          "start_ms": 70520,
+          "end_ms": 76360
+        },
+        {
+          "p": 3,
+          "s": 12,
+          "start_ms": 76360,
+          "end_ms": 82500
+        },
+        {
+          "p": 3,
+          "s": 13,
+          "start_ms": 82500,
+          "end_ms": 89980
+        },
+        {
+          "p": 3,
+          "s": 14,
+          "start_ms": 89980,
+          "end_ms": 95020
+        },
+        {
+          "p": 3,
+          "s": 15,
+          "start_ms": 95020,
+          "end_ms": 98840
+        },
+        {
+          "p": 4,
+          "s": 16,
+          "start_ms": 98840,
+          "end_ms": 106480
+        },
+        {
+          "p": 4,
+          "s": 17,
+          "start_ms": 106480,
+          "end_ms": 112660
+        },
+        {
+          "p": 4,
+          "s": 18,
+          "start_ms": 112660,
+          "end_ms": 120411
+        }
+      ]
     },
     {
       "id": "b1-the-secret-architecture-of-coral-reef-nursery-gr",
