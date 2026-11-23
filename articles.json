@@ -1,7 +1,549 @@
 {
   "version": 1,
-  "updated_at": "2026-11-23T00:23:57.537Z",
+  "updated_at": "2026-11-23T00:25:44.810Z",
   "articles": [
+    {
+      "id": "a1-painting-with-light-and-bright-colors",
+      "level": "A1",
+      "title": "Painting with Light and Bright Colors",
+      "description": "Discover how a young artist uses bright colors and natural light to paint beautiful pictures in her small studio every day.",
+      "reading_time": "2 - 4 dk",
+      "reading_time_minutes": 3,
+      "language": "en",
+      "content": "Maria is a young artist who loves to paint every single day. She lives in a small house near a big blue sea. Her house has a very big window. This window lets a lot of warm sunlight into her room. Sunlight is very important for her art because it helps her see all the true colors clearly. Maria wakes up early in the morning when the sky is blue and pink. She drinks a cup of hot tea and eats some sweet bread for breakfast. After breakfast, she goes straight to her art studio. She puts on an old blue shirt to keep her clothes clean from paint. Then she stands in front of a big blank canvas and smiles happily.\n\nShe looks out the window at the tall green trees and the bright flowers in her small garden. She wants to capture this lovely view on her canvas. She picks up a thin wooden brush with soft brown hair. She mixes red and yellow paint on a white ceramic plate to make a warm orange color. She moves her hand slowly across the white surface. Every single brushstroke feels very calm and peaceful to her heart. She paints the yellow flowers with great care. She adds a little bit of dark green for the long stems and the leaves. She loves to mix different colors together to create something new and wonderful.\n\nArt is not just a simple hobby for Maria; it is her favorite way to share her feelings with the world. Sometimes people visit her small studio to look at her finished paintings. They always smile when they see the bright colors and happy scenes. A kind old man named Peter comes to visit her today. He looks at a big painting of the ocean and says that the water looks very real. Maria feels very proud and happy when people like her creative work. She gives Peter a small smile and thanks him for his kind words.\n\nWhen the afternoon sun starts to go down, the light in the room changes from bright yellow to soft orange. Maria knows that the day is coming to an end. She washes her dirty brushes carefully in a bucket of clean water. She puts her paints away neatly on a wooden shelf. She looks at her canvas one last time before she turns off the light. She feels tired but very happy with what she did today. Painting makes her soul feel complete and full of joy. She cannot wait to wake up tomorrow and start a brand new art project.",
+      "published_at": "2026-11-23T00:24:26.538Z",
+      "category": "Art",
+      "author": "Line Reader",
+      "word_meanings": {
+        "artist": "sanatçı",
+        "paints": "boyar",
+        "sea": "deniz",
+        "window": "pencere",
+        "sunlight": "güneş ışığı",
+        "colors": "renkler",
+        "morning": "sabah",
+        "tea": "çay",
+        "breakfast": "kahvaltı",
+        "studio": "atölye",
+        "shirt": "gömlek",
+        "canvas": "tuval",
+        "garden": "bahçe",
+        "view": "manzara",
+        "brush": "fırça",
+        "plate": "tabak",
+        "surface": "yüzey",
+        "heart": "kalp",
+        "flowers": "çiçekler",
+        "leaves": "yapraklar",
+        "hobby": "hobi",
+        "feelings": "duygular",
+        "world": "dünya",
+        "paintings": "tablolar",
+        "ocean": "okyanus",
+        "water": "su",
+        "work": "çalışma",
+        "sun": "güneş",
+        "room": "oda",
+        "day": "gün",
+        "brushes": "fırçalar",
+        "shelf": "raf",
+        "light": "ışık",
+        "joy": "neşe"
+      },
+      "word_relations": {
+        "artist": {
+          "syn": [
+            "painter",
+            "creator"
+          ]
+        },
+        "paints": {
+          "syn": [
+            "colors",
+            "creates"
+          ],
+          "ant": [
+            "destroys"
+          ]
+        },
+        "sea": {
+          "syn": [
+            "ocean",
+            "water"
+          ],
+          "ant": [
+            "land"
+          ]
+        },
+        "window": {
+          "syn": [
+            "glass",
+            "opening"
+          ],
+          "ant": [
+            "wall"
+          ]
+        },
+        "sunlight": {
+          "syn": [
+            "sunshine",
+            "daylight"
+          ],
+          "ant": [
+            "darkness"
+          ]
+        },
+        "colors": {
+          "syn": [
+            "hues",
+            "shades"
+          ]
+        },
+        "morning": {
+          "syn": [
+            "dawn",
+            "early hours"
+          ],
+          "ant": [
+            "night"
+          ]
+        },
+        "tea": {
+          "syn": [
+            "hot drink",
+            "beverage"
+          ]
+        },
+        "breakfast": {
+          "syn": [
+            "morning meal"
+          ],
+          "ant": [
+            "dinner"
+          ]
+        },
+        "studio": {
+          "syn": [
+            "workshop",
+            "workspace"
+          ]
+        },
+        "shirt": {
+          "syn": [
+            "top",
+            "garment"
+          ]
+        },
+        "canvas": {
+          "syn": [
+            "board",
+            "fabric"
+          ]
+        },
+        "garden": {
+          "syn": [
+            "yard",
+            "lawn"
+          ]
+        },
+        "view": {
+          "syn": [
+            "sight",
+            "scene"
+          ]
+        },
+        "brush": {
+          "syn": [
+            "paintbrush",
+            "tool"
+          ]
+        },
+        "plate": {
+          "syn": [
+            "dish",
+            "saucer"
+          ]
+        },
+        "surface": {
+          "syn": [
+            "top",
+            "area"
+          ]
+        },
+        "heart": {
+          "syn": [
+            "spirit",
+            "soul"
+          ]
+        },
+        "flowers": {
+          "syn": [
+            "blossoms",
+            "blooms"
+          ]
+        },
+        "leaves": {
+          "syn": [
+            "foliage",
+            "fronds"
+          ]
+        },
+        "hobby": {
+          "syn": [
+            "pastime",
+            "activity"
+          ],
+          "ant": [
+            "job"
+          ]
+        },
+        "feelings": {
+          "syn": [
+            "emotions",
+            "sentiments"
+          ]
+        },
+        "world": {
+          "syn": [
+            "earth",
+            "globe"
+          ]
+        },
+        "paintings": {
+          "syn": [
+            "artworks",
+            "pictures"
+          ]
+        },
+        "ocean": {
+          "syn": [
+            "sea",
+            "deep water"
+          ],
+          "ant": [
+            "land"
+          ]
+        },
+        "water": {
+          "syn": [
+            "liquid",
+            "fluid"
+          ]
+        },
+        "work": {
+          "syn": [
+            "labor",
+            "creation"
+          ],
+          "ant": [
+            "rest"
+          ]
+        },
+        "sun": {
+          "syn": [
+            "star",
+            "daystar"
+          ],
+          "ant": [
+            "moon"
+          ]
+        },
+        "room": {
+          "syn": [
+            "chamber",
+            "space"
+          ]
+        },
+        "day": {
+          "syn": [
+            "daytime",
+            "date"
+          ],
+          "ant": [
+            "night"
+          ]
+        },
+        "brushes": {
+          "syn": [
+            "paintbrushes",
+            "tools"
+          ]
+        },
+        "shelf": {
+          "syn": [
+            "ledge",
+            "rack"
+          ]
+        },
+        "light": {
+          "syn": [
+            "illumination",
+            "brightness"
+          ],
+          "ant": [
+            "darkness"
+          ]
+        },
+        "joy": {
+          "syn": [
+            "happiness",
+            "delight"
+          ],
+          "ant": [
+            "sadness"
+          ]
+        }
+      },
+      "paragraph_translations": [
+        "Maria, her gün resim yapmayı çok seven genç bir sanatçıdır. Büyük mavi bir denizin yakınında küçük bir evde yaşar. Evinin çok büyük bir penceresi vardır. Bu pencere odasına çok fazla sıcak güneş ışığı alır. Güneş ışığı onun sanatı için çok önemlidir çünkü tüm gerçek renkleri net bir şekilde görmesine yardımcı olur. Maria gökyüzünün mavi ve pembe olduğu sabah erken saatlerde uyanır. Bir fincan sıcak çay içer ve kahvaltıda biraz tatlı ekmek yer. Kahvaltıdan sonra hemen sanat atölyesine gider. Kıyafetlerini boyadan temiz tutmak için eski mavi bir gömlek giyer. Sonra büyük boş bir tuvalin önünde durur ve mutlu bir şekilde gülümser.",
+        "Pencereden dışarıya, küçük bahçesindeki uzun yeşil ağaçlara ve parlak çiçeklere bakar. Bu güzel manzara tuvaline aktarmak ister. Yumuşak kahverengi kıllara sahip ince tahta bir fırça eline alır. Sıcak bir turuncu renk yapmak için beyaz bir seramik tabak üzerinde kırmızı ve sarı boyayı karıştırır. Elini beyaz yüzey üzerinde yavaşça hareket ettirir. Her bir fırça darbesi kalbinde çok sakin ve huzurlu hissettirir. Sarı çiçekleri büyük bir özenle boyar. Uzun saplar ve yapraklar için biraz koyu yeşil ekler. Yeni ve harika bir şey yaratmak için farklı renkleri birbirine karıştırmayı çok sever.",
+        "Sanat Maria için sadece basit bir hobi değildir; duygularını dünyayla paylaşmanın en sevdiği yoludur. Bazen insanlar bitmiş tablolarına bakmak için küçük stüdyosunu ziyaret ederler. Parlak renkleri ve mutlu manzaraları gördüklerinde her zaman gülümserler. Peter adında nazik yaşlı bir adam bugün onu ziyarete gelir. Okyanusun büyük bir resmine bakar ve suyun çok gerçek görünür olduğunu söyler. İnsanlar yaratıcı çalışmalarını beğendiğinde Maria çok gururlu ve mutlu hisseder. Peter'a hafifçe gülümser ve nazik sözleri için ona teşekkür eder.",
+        "Öğleden sonra güneşi batmaya başladığında odadaki ışık parlak sarıdan yumuşak turuncuya dönüşür. Maria günün sona ermekte olduğunu bilir. Kirli fırçalarını temiz su dolu bir kovada dikkatlice yıkar. Boyalarını tahta bir rafa düzenli olarak kaldırır. Işığı kapatmadan önce tuvaline son bir kez bakar. Kendini yorgun ama bugün yaptıklarıyla çok mutlu hisseder. Resim yapmak onun ruhunu bütün ve neşeyle dolu hissettirir. Yarın uyanıp yepyeni bir sanat projesine başlamak için sabırsızlanıyor."
+      ],
+      "sentence_translations": {
+        "Maria is a young artist who loves to paint every single day.": "Maria, her gün resim yapmayı çok seven genç bir sanatçıdır.",
+        "She lives in a small house near a big blue sea.": "Büyük mavi bir denizin yakınında küçük bir evde yaşar.",
+        "Her house has a very big window.": "Evinin çok büyük bir penceresi vardır.",
+        "This window lets a lot of warm sunlight into her room.": "Bu pencere odasına çok fazla sıcak güneş ışığı alır.",
+        "Sunlight is very important for her art because it helps her see all the true colors clearly.": "Güneş ışığı onun sanatı için çok önemlidir çünkü tüm gerçek renkleri net bir şekilde görmesine yardımcı olur.",
+        "Maria wakes up early in the morning when the sky is blue and pink.": "Maria gökyüzünün mavi ve pembe olduğu sabah erken saatlerde uyanır.",
+        "She drinks a cup of hot tea and eats some sweet bread for breakfast.": "Bir fincan sıcak çay içer ve kahvaltıda biraz tatlı ekmek yer.",
+        "After breakfast, she goes straight to her art studio.": "Kahvaltıdan sonra hemen sanat atölyesine gider.",
+        "She puts on an old blue shirt to keep her clothes clean from paint.": "Kıyafetlerini boyadan temiz tutmak için eski mavi bir gömlek giyer.",
+        "Then she stands in front of a big blank canvas and smiles happily.": "Sonra büyük boş bir tuvalin önünde durur ve mutlu bir şekilde gülümser.",
+        "She looks out the window at the tall green trees and the bright flowers in her small garden.": "Pencereden dışarıya, küçük bahçesindeki uzun yeşil ağaçlara ve parlak çiçeklere bakar.",
+        "She wants to capture this lovely view on her canvas.": "Bu güzel manzara tuvaline aktarmak ister.",
+        "She picks up a thin wooden brush with soft brown hair.": "Yumuşak kahverengi kıllara sahip ince tahta bir fırça eline alır.",
+        "She mixes red and yellow paint on a white ceramic plate to make a warm orange color.": "Sıcak bir turuncu renk yapmak için beyaz bir seramik tabak üzerinde kırmızı ve sarı boyayı karıştırır.",
+        "She moves her hand slowly across the white surface.": "Elini beyaz yüzey üzerinde yavaşça hareket ettirir.",
+        "Every single brushstroke feels very calm and peaceful to her heart.": "Her bir fırça darbesi kalbinde çok sakin ve huzurlu hissettirir.",
+        "She paints the yellow flowers with great care.": "Sarı çiçekleri büyük bir özenle boyar.",
+        "She adds a little bit of dark green for the long stems and the leaves.": "Uzun saplar ve yapraklar için biraz koyu yeşil ekler.",
+        "She loves to mix different colors together to create something new and wonderful.": "Yeni ve harika bir şey yaratmak için farklı renkleri birbirine karıştırmayı çok sever.",
+        "Art is not just a simple hobby for Maria; it is her favorite way to share her feelings with the world.": "Sanat Maria için sadece basit bir hobi değildir; duygularını dünyayla paylaşmanın en sevdiği yoludur.",
+        "Sometimes people visit her small studio to look at her finished paintings.": "Bazen insanlar bitmiş tablolarına bakmak için küçük stüdyosunu ziyaret ederler.",
+        "They always smile when they see the bright colors and happy scenes.": "Parlak renkleri ve mutlu manzaraları gördüklerinde her zaman gülümserler.",
+        "A kind old man named Peter comes to visit her today.": "Peter adında nazik yaşlı bir adam bugün onu ziyarete gelir.",
+        "He looks at a big painting of the ocean and says that the water looks very real.": "Okyanusun büyük bir resmine bakar ve suyun çok gerçek görünür olduğunu söyler.",
+        "Maria feels very proud and happy when people like her creative work.": "İnsanlar yaratıcı çalışmalarını beğendiğinde Maria çok gururlu ve mutlu hisseder.",
+        "She gives Peter a small smile and thanks him for his kind words.": "Peter'a hafifçe gülümser ve nazik sözleri için ona teşekkür eder.",
+        "When the afternoon sun starts to go down, the light in the room changes from bright yellow to soft orange.": "Öğleden sonra güneşi batmaya başladığında odadaki ışık parlak sarıdan yumuşak turuncuya dönüşür.",
+        "Maria knows that the day is coming to an end.": "Maria günün sona ermekte olduğunu bilir.",
+        "She washes her dirty brushes carefully in a bucket of clean water.": "Kirli fırçalarını temiz su dolu bir kovada dikkatlice yıkar.",
+        "She puts her paints away neatly on a wooden shelf.": "Boyalarını tahta bir rafa düzenli olarak kaldırır.",
+        "She looks at her canvas one last time before she turns off the light.": "Işığı kapatmadan önce tuvaline son bir kez bakar.",
+        "She feels tired but very happy with what she did today.": "Kendini yorgun ama bugün yaptıklarıyla çok mutlu hisseder.",
+        "Painting makes her soul feel complete and full of joy.": "Resim yapmak onun ruhunu bütün ve neşeyle dolu hissettirir.",
+        "She cannot wait to wake up tomorrow and start a brand new art project.": "Yarın uyanıp yepyeni bir sanat projesine başlamak için sabırsızlanıyor."
+      },
+      "audio_url": "https://line-reader.pages.dev/audio/a1-painting-with-light-and-bright-colors.m4a",
+      "audio_segments": [
+        {
+          "p": 0,
+          "s": 0,
+          "start_ms": 0,
+          "end_ms": 2900
+        },
+        {
+          "p": 0,
+          "s": 1,
+          "start_ms": 2900,
+          "end_ms": 7320
+        },
+        {
+          "p": 0,
+          "s": 2,
+          "start_ms": 7320,
+          "end_ms": 8880
+        },
+        {
+          "p": 0,
+          "s": 3,
+          "start_ms": 8880,
+          "end_ms": 11680
+        },
+        {
+          "p": 0,
+          "s": 4,
+          "start_ms": 11680,
+          "end_ms": 18340
+        },
+        {
+          "p": 0,
+          "s": 5,
+          "start_ms": 18340,
+          "end_ms": 21860
+        },
+        {
+          "p": 0,
+          "s": 6,
+          "start_ms": 21860,
+          "end_ms": 26720
+        },
+        {
+          "p": 0,
+          "s": 7,
+          "start_ms": 26720,
+          "end_ms": 31340
+        },
+        {
+          "p": 0,
+          "s": 8,
+          "start_ms": 31340,
+          "end_ms": 34660
+        },
+        {
+          "p": 0,
+          "s": 9,
+          "start_ms": 34660,
+          "end_ms": 38700
+        },
+        {
+          "p": 1,
+          "s": 10,
+          "start_ms": 38700,
+          "end_ms": 45700
+        },
+        {
+          "p": 1,
+          "s": 11,
+          "start_ms": 45700,
+          "end_ms": 49400
+        },
+        {
+          "p": 1,
+          "s": 12,
+          "start_ms": 49400,
+          "end_ms": 52900
+        },
+        {
+          "p": 1,
+          "s": 13,
+          "start_ms": 52900,
+          "end_ms": 56720
+        },
+        {
+          "p": 1,
+          "s": 14,
+          "start_ms": 56720,
+          "end_ms": 62300
+        },
+        {
+          "p": 1,
+          "s": 15,
+          "start_ms": 62300,
+          "end_ms": 65840
+        },
+        {
+          "p": 1,
+          "s": 16,
+          "start_ms": 65840,
+          "end_ms": 69800
+        },
+        {
+          "p": 1,
+          "s": 17,
+          "start_ms": 69800,
+          "end_ms": 73160
+        },
+        {
+          "p": 1,
+          "s": 18,
+          "start_ms": 73160,
+          "end_ms": 77140
+        },
+        {
+          "p": 2,
+          "s": 19,
+          "start_ms": 77140,
+          "end_ms": 85320
+        },
+        {
+          "p": 2,
+          "s": 20,
+          "start_ms": 85320,
+          "end_ms": 88900
+        },
+        {
+          "p": 2,
+          "s": 21,
+          "start_ms": 88900,
+          "end_ms": 95080
+        },
+        {
+          "p": 2,
+          "s": 22,
+          "start_ms": 95080,
+          "end_ms": 96900
+        },
+        {
+          "p": 2,
+          "s": 23,
+          "start_ms": 96900,
+          "end_ms": 102520
+        },
+        {
+          "p": 2,
+          "s": 24,
+          "start_ms": 102520,
+          "end_ms": 107120
+        },
+        {
+          "p": 2,
+          "s": 25,
+          "start_ms": 107120,
+          "end_ms": 111320
+        },
+        {
+          "p": 3,
+          "s": 26,
+          "start_ms": 111320,
+          "end_ms": 119060
+        },
+        {
+          "p": 3,
+          "s": 27,
+          "start_ms": 119060,
+          "end_ms": 120500
+        },
+        {
+          "p": 3,
+          "s": 28,
+          "start_ms": 120500,
+          "end_ms": 127300
+        },
+        {
+          "p": 3,
+          "s": 29,
+          "start_ms": 127300,
+          "end_ms": 130360
+        },
+        {
+          "p": 3,
+          "s": 30,
+          "start_ms": 130360,
+          "end_ms": 134340
+        },
+        {
+          "p": 3,
+          "s": 31,
+          "start_ms": 134340,
+          "end_ms": 137420
+        },
+        {
+          "p": 3,
+          "s": 32,
+          "start_ms": 137420,
+          "end_ms": 141340
+        },
+        {
+          "p": 3,
+          "s": 33,
+          "start_ms": 141340,
+          "end_ms": 145371
+        }
+      ]
+    },
     {
       "id": "c2-the-silent-tyranny-of-unfinished-psychological-t",
       "level": "C2",
