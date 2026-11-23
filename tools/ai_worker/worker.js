@@ -1347,6 +1347,24 @@ async function handleAdminRequest(request, env, path, method) {
 
   await ensureSchema(env.DB);
 
+  // PC Makale Stüdyosu Podcast AI ses hizalama (Cloudflare Workers AI Whisper)
+  if (path === "/admin/align-audio" && method === "POST") {
+    const body = await safeReadJson(request);
+    const audioB64 = String(body?.audio_base64 || "").trim();
+    const content = String(body?.content || "").trim();
+    const durationMs = Number(body?.duration_ms || 0);
+    if (!audioB64 || !content) {
+      return jsonResponse({ ok: false, message: "audio_base64 ve content gerekli." }, 400);
+    }
+    try {
+      const wavBytes = base64ToBytes(audioB64);
+      const segments = await alignAudioSegmentsWithWhisper(env, wavBytes, content, durationMs);
+      return jsonResponse({ ok: true, audio_segments: segments, count: segments.length });
+    } catch (err) {
+      return jsonResponse({ ok: false, message: String(err?.message || err) }, 502);
+    }
+  }
+
   // Anlık makale akışı güncelleme (PC Makale Paneli -> 1 saniyede canlı yayın)
   if (path === "/admin/articles" && method === "POST") {
     const body = await safeReadJson(request);

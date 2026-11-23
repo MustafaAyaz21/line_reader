@@ -13,6 +13,7 @@ import '../../auth/controllers/auth_controller.dart';
 import '../../auth/models/auth_user.dart';
 import '../../auth/screens/auth_screen.dart';
 import 'developer_panel_screen.dart';
+import 'how_to_use_screen.dart';
 
 /// Dil seçimi (Türkçe / İngilizce), çeviri önbelleği, hesap/yetki yönetimi
 /// ("Kod Kullan" ile sınırsız yetki + 3 katmanlı kota gösterimi) sayfası.
@@ -297,6 +298,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     bodyBuilder: (ctx, th, cs, ls) =>
                         _buildQuickLookupBody(th, cs, ls),
                   ),
+                ),
+                const SizedBox(height: 12),
+                _SettingsCategoryCard(
+                  key: const ValueKey<String>('settings_cat_how_to_use'),
+                  icon: Icons.help_outline_rounded,
+                  iconBg: colorScheme.secondaryContainer.withAlpha(210),
+                  iconColor: colorScheme.onSecondaryContainer,
+                  title: s.t('Nasıl Kullanılır?', 'How to Use'),
+                  subtitle: s.t(
+                    'Tüm özelliklerin adım adım hızlı rehberi',
+                    'Step-by-step quick guide to every feature',
+                  ),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const HowToUseScreen(),
+                      ),
+                    );
+                  },
                 ),
               ],
             );

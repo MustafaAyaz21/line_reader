@@ -13,6 +13,7 @@ import '../../articles/models/article_reading_progress.dart';
 import '../../articles/screens/article_reader_screen.dart';
 import '../../auth/controllers/auth_controller.dart';
 import '../../browser/browser_screen.dart';
+import '../../settings/screens/how_to_use_screen.dart';
 import '../../settings/widgets/api_key_dialog.dart';
 import '../../settings/widgets/settings_action_button.dart';
 import '../../translation/services/word_translation_service.dart';
@@ -125,6 +126,18 @@ class MainMenuScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(s.mainMenuTitle),
         actions: [
+          IconButton(
+            key: const ValueKey<String>('main_menu_how_to_use_button'),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const HowToUseScreen(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.help_outline_rounded),
+            tooltip: s.t('Nasıl Kullanılır?', 'How to Use'),
+          ),
           if (updateController != null)
             UpdateActionButton(controller: updateController!),
           if (localeController != null && authController != null)

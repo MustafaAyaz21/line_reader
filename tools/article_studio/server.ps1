@@ -1022,8 +1022,11 @@ function Invoke-GeminiGenerateAudio([string]$RawJson) {
             $wavBytes = if ($isAlreadyWav) { $rawAudioBytes } else { Convert-PcmToWavBytes -PcmBytes $pcmBytes -SampleRate $sampleRate }
 
             $m4aBytes = Convert-WavBytesToM4aBytes -WavBytes $wavBytes
-            $segments = Compute-AudioSentenceSegments -Content $content -PcmBytes $pcmBytes -SampleRate $sampleRate
             $durationMs = [int][math]::Round((($pcmBytes.Length / 2.0) * 1000.0) / $sampleRate)
+            $segments = Try-AlignAudioSegmentsViaWorker -WavBytes $wavBytes -Content $content -DurationMs $durationMs
+            if ($null -eq $segments -or $segments.Count -eq 0) {
+                $segments = Compute-AudioSentenceSegments -Content $content -PcmBytes $pcmBytes -SampleRate $sampleRate
+            }
 
             if (-not (Test-Path $ContentAudioDir)) { New-Item -ItemType Directory -Path $ContentAudioDir -Force | Out-Null }
             if (-not (Test-Path $RootAudioDir)) { New-Item -ItemType Directory -Path $RootAudioDir -Force | Out-Null }
@@ -1088,6 +1091,56 @@ function Invoke-GeminiGenerateAudio([string]$RawJson) {
         StatusCode = $lastStatus
         Body       = (@{ ok = $false; message = $lastErrorMsg } | ConvertTo-Json -Compress)
     }
+}
+
+function Try-AlignAudioSegmentsViaWorker {
+    param(
+        [byte[]]$WavBytes,
+        [string]$Content,
+        [int]$DurationMs
+    )
+
+    try {
+        $cfg = Get-AdminConfig
+        if ([string]::IsNullOrWhiteSpace($cfg.workerUrl) -or [string]::IsNullOrWhiteSpace($cfg.adminSecret)) {
+            return $null
+        }
+        $audioB64 = [Convert]::ToBase64String($WavBytes)
+        $bodyObj = @{
+            audio_base64 = $audioB64
+            content      = $Content
+            duration_ms  = $DurationMs
+        }
+        $bodyJson = $bodyObj | ConvertTo-Json -Depth 4 -Compress
+        $targetUrl = "$($cfg.workerUrl.TrimEnd('/'))/admin/align-audio"
+
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
+        $webReq = [System.Net.HttpWebRequest]::Create($targetUrl)
+        $webReq.Method = "POST"
+        $webReq.Timeout = 45000
+        $webReq.Accept = "application/json"
+        $webReq.ContentType = "application/json; charset=utf-8"
+        $webReq.Headers.Add("X-Admin-Secret", $cfg.adminSecret)
+
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($bodyJson)
+        $webReq.ContentLength = $bytes.Length
+        $reqStream = $webReq.GetRequestStream()
+        try { $reqStream.Write($bytes, 0, $bytes.Length) } finally { $reqStream.Dispose() }
+
+        $webRes = $webReq.GetResponse()
+        $reader = New-Object System.IO.StreamReader($webRes.GetResponseStream(), [System.Text.Encoding]::UTF8)
+        try { $resText = $reader.ReadToEnd() } finally { $reader.Dispose(); $webRes.Close() }
+
+        $parsed = $resText | ConvertFrom-Json
+        if ($parsed.ok -and $null -ne $parsed.audio_segments -and $parsed.audio_segments.Count -gt 0) {
+            Write-Host "[Podcast AI] Whisper gercek cumle zaman damgalari hizalandi ($($parsed.audio_segments.Count) cumle)." -ForegroundColor Cyan
+            return @($parsed.audio_segments)
+        }
+    }
+    catch {
+        Write-Host "[Podcast AI] Whisper hizalama atlandi, yerel tahmine gecildi: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+    return $null
 }
 
 function Forward-WorkerAdminRequest {
