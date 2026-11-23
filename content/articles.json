@@ -1,7 +1,524 @@
 {
   "version": 1,
-  "updated_at": "2026-11-23T00:30:25.599Z",
+  "updated_at": "2026-11-23T01:26:23.681Z",
   "articles": [
+    {
+      "id": "b1-the-secret-architecture-of-coral-reef-nursery-gr",
+      "level": "B1",
+      "title": "The Secret Architecture of Coral Reef Nursery Grounds",
+      "description": "Discover how tiny marine organisms build intricate underwater ecosystems that protect coastlines and support thousands of ocean species worldwide through remarkable natural cooperation.",
+      "reading_time": "1 - 3 dk",
+      "reading_time_minutes": 2,
+      "language": "en",
+      "content": "Deep beneath the sunlit surface of tropical oceans lies a vibrant world built entirely by tiny, soft-bodied animals known as coral polyps. These microscopic creatures extract calcium from seawater to construct hard limestone skeletons around themselves, forming sprawling underwater structures over hundreds of years. Far from being mere rocks, these coral reefs function as bustling marine cities, providing essential shelter, breeding grounds, and hunting territory for approximately one quarter of all known ocean life species.\n\nThe complex architecture of a healthy reef features countless nooks, crannies, and branching structures that serve as safe nurseries for vulnerable baby fish. Without these protective hiding spots, countless small aquatic creatures would easily fall prey to larger predators before reaching maturity. Furthermore, this intricate design acts as a natural buffer against powerful ocean waves and tropical storms. By absorbing the tremendous energy of incoming surges, coral barriers significantly reduce coastal erosion and safeguard vulnerable human settlements built near the shorelines.\n\nRegrettably, modern marine ecosystems face severe threats from rising ocean temperatures, industrial pollution, and destructive fishing practices that trigger widespread coral bleaching. When water temperatures remain abnormally high for extended periods, corals expel the colorful microscopic algae living inside their tissues, losing their primary food source and turning completely white. If these harsh conditions persist without interruption, the affected colonies will eventually starve and die, leaving behind barren skeletal ruins where thriving communities once flourished.\n\nConservation scientists around the globe are currently developing innovative restoration techniques to rescue these endangered underwater habitats from total collapse. Marine biologists now grow resilient coral fragments in protected underwater nurseries before transplanting them onto damaged reef areas to accelerate natural recovery. Additionally, local communities are establishing strict marine protected areas to limit harmful human activities and allow fragile populations time to rebuild. Protecting these vital ocean foundations requires urgent global cooperation, financial investment, and a deeper appreciation for the delicate balance sustaining marine biodiversity.",
+      "published_at": "2026-11-23T01:24:11.484Z",
+      "category": "Nature",
+      "author": "Line Reader",
+      "word_meanings": {
+        "surface": "yüzey",
+        "vibrant": "canlı",
+        "extract": "çıkarmak",
+        "sprawling": "yaygın",
+        "mere": "sadece",
+        "bustling": "hareketli",
+        "shelter": "barınak",
+        "territory": "bölge",
+        "vulnerable": "savunmasız",
+        "prey": "av",
+        "maturity": "yetişkinlik",
+        "buffer": "tampon",
+        "surge": "dalga dalgası",
+        "erosion": "erozyon",
+        "safeguard": "korumak",
+        "shoreline": "sahil şeridi",
+        "severe": "şiddetli",
+        "trigger": "tetiklemek",
+        "bleaching": "ağarma",
+        "abnormally": "anormal şekilde",
+        "expel": "dışarı atmak",
+        "persist": "devam etmek",
+        "starve": "aç kalmak",
+        "barren": "verimsiz",
+        "ruin": "yıkıntı",
+        "flourish": "gelişmek",
+        "conservation": "koruma",
+        "innovative": "yenilikçi",
+        "technique": "teknik",
+        "habitat": "yaşam alanı",
+        "collapse": "çöküş",
+        "resilient": "dayanıklı",
+        "transplant": "nakletmek",
+        "accelerate": "hızlandırmak",
+        "recovery": "iyileşme",
+        "fragile": "kırılgan",
+        "urgent": "acil",
+        "balance": "denge"
+      },
+      "word_relations": {
+        "surface": {
+          "syn": [
+            "exterior",
+            "top"
+          ],
+          "ant": [
+            "interior",
+            "depths"
+          ]
+        },
+        "vibrant": {
+          "syn": [
+            "lively",
+            "colorful"
+          ],
+          "ant": [
+            "dull",
+            "lifeless"
+          ]
+        },
+        "extract": {
+          "syn": [
+            "remove",
+            "obtain"
+          ],
+          "ant": [
+            "insert",
+            "absorb"
+          ]
+        },
+        "sprawling": {
+          "syn": [
+            "extensive",
+            "spreading"
+          ],
+          "ant": [
+            "compact",
+            "confined"
+          ]
+        },
+        "mere": {
+          "syn": [
+            "simple",
+            "just"
+          ],
+          "ant": [
+            "significant",
+            "substantial"
+          ]
+        },
+        "bustling": {
+          "syn": [
+            "busy",
+            "active"
+          ],
+          "ant": [
+            "empty",
+            "deserted"
+          ]
+        },
+        "shelter": {
+          "syn": [
+            "refuge",
+            "protection"
+          ],
+          "ant": [
+            "exposure"
+          ]
+        },
+        "territory": {
+          "syn": [
+            "area",
+            "domain"
+          ]
+        },
+        "vulnerable": {
+          "syn": [
+            "exposed",
+            "defenseless"
+          ],
+          "ant": [
+            "protected",
+            "secure"
+          ]
+        },
+        "prey": {
+          "syn": [
+            "victim",
+            "target"
+          ],
+          "ant": [
+            "predator"
+          ]
+        },
+        "maturity": {
+          "syn": [
+            "adulthood",
+            "fullness"
+          ],
+          "ant": [
+            "youth",
+            "childhood"
+          ]
+        },
+        "buffer": {
+          "syn": [
+            "shield",
+            "cushion"
+          ]
+        },
+        "surge": {
+          "syn": [
+            "rush",
+            "wave"
+          ],
+          "ant": [
+            "drop",
+            "decrease"
+          ]
+        },
+        "erosion": {
+          "syn": [
+            "wearing away",
+            "deterioration"
+          ],
+          "ant": [
+            "buildup",
+            "growth"
+          ]
+        },
+        "safeguard": {
+          "syn": [
+            "protect",
+            "defend"
+          ],
+          "ant": [
+            "endanger",
+            "harm"
+          ]
+        },
+        "shoreline": {
+          "syn": [
+            "coastline",
+            "waterfront"
+          ]
+        },
+        "severe": {
+          "syn": [
+            "serious",
+            "harsh"
+          ],
+          "ant": [
+            "mild",
+            "gentle"
+          ]
+        },
+        "trigger": {
+          "syn": [
+            "cause",
+            "spark"
+          ],
+          "ant": [
+            "prevent",
+            "stop"
+          ]
+        },
+        "bleaching": {
+          "syn": [
+            "whitening",
+            "fading"
+          ],
+          "ant": [
+            "darkening"
+          ]
+        },
+        "abnormally": {
+          "syn": [
+            "unusually",
+            "oddly"
+          ],
+          "ant": [
+            "normally",
+            "typically"
+          ]
+        },
+        "expel": {
+          "syn": [
+            "discharge",
+            "eject"
+          ],
+          "ant": [
+            "absorb",
+            "retain"
+          ]
+        },
+        "persist": {
+          "syn": [
+            "continue",
+            "remain"
+          ],
+          "ant": [
+            "cease",
+            "stop"
+          ]
+        },
+        "starve": {
+          "syn": [
+            "famish",
+            "decline"
+          ],
+          "ant": [
+            "feast",
+            "nourish"
+          ]
+        },
+        "barren": {
+          "syn": [
+            "desolate",
+            "sterile"
+          ],
+          "ant": [
+            "fertile",
+            "productive"
+          ]
+        },
+        "ruin": {
+          "syn": [
+            "destruction",
+            "wreckage"
+          ],
+          "ant": [
+            "restoration",
+            "creation"
+          ]
+        },
+        "flourish": {
+          "syn": [
+            "thrive",
+            "prosper"
+          ],
+          "ant": [
+            "fail",
+            "wither"
+          ]
+        },
+        "conservation": {
+          "syn": [
+            "preservation",
+            "protection"
+          ],
+          "ant": [
+            "destruction",
+            "neglect"
+          ]
+        },
+        "innovative": {
+          "syn": [
+            "creative",
+            "novel"
+          ],
+          "ant": [
+            "outdated",
+            "traditional"
+          ]
+        },
+        "technique": {
+          "syn": [
+            "method",
+            "approach"
+          ]
+        },
+        "habitat": {
+          "syn": [
+            "environment",
+            "home"
+          ]
+        },
+        "collapse": {
+          "syn": [
+            "failure",
+            "downfall"
+          ],
+          "ant": [
+            "rise",
+            "success"
+          ]
+        },
+        "resilient": {
+          "syn": [
+            "tough",
+            "strong"
+          ],
+          "ant": [
+            "fragile",
+            "weak"
+          ]
+        },
+        "transplant": {
+          "syn": [
+            "transfer",
+            "replant"
+          ]
+        },
+        "accelerate": {
+          "syn": [
+            "speed up",
+            "hasten"
+          ],
+          "ant": [
+            "slow down",
+            "delay"
+          ]
+        },
+        "recovery": {
+          "syn": [
+            "healing",
+            "restoration"
+          ],
+          "ant": [
+            "deterioration",
+            "decline"
+          ]
+        },
+        "fragile": {
+          "syn": [
+            "delicate",
+            "weak"
+          ],
+          "ant": [
+            "sturdy",
+            "tough"
+          ]
+        },
+        "urgent": {
+          "syn": [
+            "pressing",
+            "critical"
+          ],
+          "ant": [
+            "unimportant",
+            "trivial"
+          ]
+        },
+        "balance": {
+          "syn": [
+            "equilibrium",
+            "stability"
+          ],
+          "ant": [
+            "imbalance",
+            "instability"
+          ]
+        }
+      },
+      "paragraph_translations": [
+        "Tropikal okyanusların güneşli yüzeyinin derinliklerinde, tamamen mercan polipleri olarak bilinen minik, yumuşak gövdeli hayvanlar tarafından inşa edilmiş canlı bir dünya yatar.",
+        "Sağlıklı bir resifin karmaşık mimarisi, savunmasız yavru balıklar için güvenli kreşler görevi gören sayısız oyuk, girinti ve dallanan yapı içerir.",
+        "Ne yazık ki, modern deniz ekosistemleri, yaygın mercan ağarmasını tetikleyen yükselen okyanus sıcaklıkları, endüstriyel kirlilik ve yıkıcı balıkçılık uygulamalarından kaynaklanan ciddi tehditlerle karşı karşıyadır.",
+        "Dünya çapındaki koruma bilim insanları, bu tehlike altındaki su altı habitatlarını toplam çöküşten kurtarmak için şu anda yenilikçi restorasyon teknikleri geliştiriyorlar."
+      ],
+      "sentence_translations": {
+        "Deep beneath the sunlit surface of tropical oceans lies a vibrant world built entirely by tiny, soft-bodied animals known as coral polyps.": "Tropikal okyanusların güneşli yüzeyinin derinliklerinde, tamamen mercan polipleri olarak bilinen minik, yumuşak gövdeli hayvanlar tarafından inşa edilmiş canlı bir dünya yatar.",
+        "These microscopic creatures extract calcium from seawater to construct hard limestone skeletons around themselves, forming sprawling underwater structures over hundreds of years.": "Bu mikroskobik canlılar, yüzlerce yıl boyunca yayılan su altı yapıları oluşturarak çevrelerinde sert kireç taşı iskeletleri inşa etmek için deniz suyundan kalsiyum çıkarır.",
+        "Far from being mere rocks, these coral reefs function as bustling marine cities, providing essential shelter, breeding grounds, and hunting territory for approximately one quarter of all known ocean life species.": "Basit kayalar olmaktan çok uzakta olan bu mercan resifleri, bilinen tüm okyanus yaşamı türlerinin yaklaşık dörtte biri için temel barınak, üreme alanı ve avlanma bölgesi sağlayarak hareketli deniz şehirleri olarak işlev görür.",
+        "The complex architecture of a healthy reef features countless nooks, crannies, and branching structures that serve as safe nurseries for vulnerable baby fish.": "Sağlıklı bir resifin karmaşık mimarisi, savunmasız yavru balıklar için güvenli kreşler görevi gören sayısız oyuk, girinti ve dallanan yapı içerir.",
+        "Without these protective hiding spots, countless small aquatic creatures would easily fall prey to larger predators before reaching maturity.": "Bu koruyucu saklanma yerleri olmadan, sayısız küçük su canlısı yetişkinliğe ulaşmadan önce daha büyük avcılara kolayca av olurdu.",
+        "Furthermore, this intricate design acts as a natural buffer against powerful ocean waves and tropical storms.": "Dahası, bu karmaşık tasarım güçlü okyanus dalgalarına ve tropikal fırtınalara karşı doğal bir tampon görevi görür.",
+        "By absorbing the tremendous energy of incoming surges, coral barriers significantly reduce coastal erosion and safeguard vulnerable human settlements built near the shorelines.": "Mercan bariyerleri, yaklaşan dalgaların muazzam enerjisini emerek kıyı erozyonunu önemli ölçüde azaltır ve kıyı şeridine yakın inşa edilmiş savunmasız insan yerleşimlerini korur.",
+        "Regrettably, modern marine ecosystems face severe threats from rising ocean temperatures, industrial pollution, and destructive fishing practices that trigger widespread coral bleaching.": "Ne yazık ki, modern deniz ekosistemleri, yaygın mercan ağarmasını tetikleyen yükselen okyanus sıcaklıkları, endüstriyel kirlilik ve yıkıcı balıkçılık uygulamalarından kaynaklanan ciddi tehditlerle karşı karşıyadır.",
+        "When water temperatures remain abnormally high for extended periods, corals expel the colorful microscopic algae living inside their tissues, losing their primary food source and turning completely white.": "Su sıcaklıkları uzun süre anormal derecede yüksek kaldığında, mercanlar dokularının içinde yaşayan renkli mikroskobik algleri dışarı atar, birincil besin kaynaklarını kaybeder ve tamamen beyazlaşır.",
+        "If these harsh conditions persist without interruption, the affected colonies will eventually starve and die, leaving behind barren skeletal ruins where thriving communities once flourished.": "Bu sert koşullar kesintisiz olarak devam ederse, etkilenen koloni grupları sonunda açlıktan ölecek ve bir zamanlar gelişen toplulukların çiçek açtığı yerde verimsiz iskelet kalıntıları bırakacaktır.",
+        "Conservation scientists around the globe are currently developing innovative restoration techniques to rescue these endangered underwater habitats from total collapse.": "Dünya çapındaki koruma bilim insanları, bu tehlike altındaki su altı habitatlarını toplam çöküşten kurtarmak için şu anda yenilikçi restorasyon teknikleri geliştiriyorlar.",
+        "Marine biologists now grow resilient coral fragments in protected underwater nurseries before transplanting them onto damaged reef areas to accelerate natural recovery.": "Deniz biyologları artık doğal iyileşmeyi hızlandırmak için onları hasarlı resif alanlarına nakletmeden önce korumalı su altı kreşlerinde dayanıklı mercan parçaları büyütüyorlar.",
+        "Additionally, local communities are establishing strict marine protected areas to limit harmful human activities and allow fragile populations time to rebuild.": "Ek olarak, yerel topluluklar zararlı insan faaliyetlerini sınırlamak ve kırılgan popülasyonlara yeniden inşa etmeleri için zaman tanımak adına katı deniz koruma alanları kuruyorlar.",
+        "Protecting these vital ocean foundations requires urgent global cooperation, financial investment, and a deeper appreciation for the delicate balance sustaining marine biodiversity.": "Bu hayati okyanus temellerini korumak, acil küresel iş birliği, finansal yatırım ve deniz biyolojik çeşitliliğini destekleyen hassas denge için daha derin bir takdir gerektirir."
+      },
+      "audio_url": "https://line-reader.pages.dev/audio/b1-the-secret-architecture-of-coral-reef-nursery-gr.m4a",
+      "audio_segments": [
+        {
+          "p": 0,
+          "s": 0,
+          "start_ms": 0,
+          "end_ms": 8900
+        },
+        {
+          "p": 0,
+          "s": 1,
+          "start_ms": 8900,
+          "end_ms": 18140
+        },
+        {
+          "p": 0,
+          "s": 2,
+          "start_ms": 18140,
+          "end_ms": 31760
+        },
+        {
+          "p": 1,
+          "s": 3,
+          "start_ms": 31760,
+          "end_ms": 41500
+        },
+        {
+          "p": 1,
+          "s": 4,
+          "start_ms": 41500,
+          "end_ms": 50260
+        },
+        {
+          "p": 1,
+          "s": 5,
+          "start_ms": 50260,
+          "end_ms": 57000
+        },
+        {
+          "p": 1,
+          "s": 6,
+          "start_ms": 57000,
+          "end_ms": 68980
+        },
+        {
+          "p": 2,
+          "s": 7,
+          "start_ms": 68980,
+          "end_ms": 80960
+        },
+        {
+          "p": 2,
+          "s": 8,
+          "start_ms": 80960,
+          "end_ms": 94380
+        },
+        {
+          "p": 2,
+          "s": 9,
+          "start_ms": 94380,
+          "end_ms": 104640
+        },
+        {
+          "p": 3,
+          "s": 10,
+          "start_ms": 104640,
+          "end_ms": 115320
+        },
+        {
+          "p": 3,
+          "s": 11,
+          "start_ms": 115320,
+          "end_ms": 125880
+        },
+        {
+          "p": 3,
+          "s": 12,
+          "start_ms": 125880,
+          "end_ms": 136920
+        },
+        {
+          "p": 3,
+          "s": 13,
+          "start_ms": 136920,
+          "end_ms": 146651
+        }
+      ]
+    },
     {
       "id": "b2-the-resilient-architecture-of-modern-floating-ci",
       "level": "B2",
