@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-11-23T00:22:14.075Z",
+  "updated_at": "2026-11-23T00:23:18.353Z",
   "articles": [
     {
       "id": "c2-the-silent-tyranny-of-unfinished-psychological-t",
@@ -424,7 +424,106 @@
         "One effective strategy involves externalizing our intentions through exhaustive brain dumps, transferring the burden from fragile biological memory to reliable external systems.": "Etkili bir strateji, yükü kırılgan biyolojik hafızadan güvenilir dış sistemlere aktararak niyetlerimizi kapsamlı beyin dökümleri yoluyla dışa vurmayı içerir.",
         "Additionally, embracing the radical art of strategic abandonment—consciously deciding to permanently drop trivial unfulfilled pursuits—can instantly liberate scarce mental resources.": "Ek olarak, stratejik vazgeçme radikal sanatını benimsemek—önemsiz yerine getirilmemiş çabaları kalıcı olarak bırakmaya bilinçli olarak karar vermek—kıt zihinsel kaynakları anında özgürleştirebilir.",
         "By consciously closing these lingering psychological loops, we reclaim our autonomy and restore tranquility to our overburdened minds.": "Bu süregelen psikolojik döngüleri bilinçli olarak kapatarak özerkliğimizi yeniden kazanır ve aşırı yüklenmiş zihinlerimize huzuru geri getiririz."
-      }
+      },
+      "audio_url": "https://line-reader.pages.dev/audio/c2-the-silent-tyranny-of-unfinished-psychological-t.m4a",
+      "audio_segments": [
+        {
+          "p": 0,
+          "s": 0,
+          "start_ms": 0,
+          "end_ms": 5860
+        },
+        {
+          "p": 0,
+          "s": 1,
+          "start_ms": 5860,
+          "end_ms": 10820
+        },
+        {
+          "p": 0,
+          "s": 2,
+          "start_ms": 10820,
+          "end_ms": 19660
+        },
+        {
+          "p": 0,
+          "s": 3,
+          "start_ms": 19660,
+          "end_ms": 31520
+        },
+        {
+          "p": 1,
+          "s": 4,
+          "start_ms": 31520,
+          "end_ms": 39080
+        },
+        {
+          "p": 1,
+          "s": 5,
+          "start_ms": 39080,
+          "end_ms": 47060
+        },
+        {
+          "p": 1,
+          "s": 6,
+          "start_ms": 47060,
+          "end_ms": 56580
+        },
+        {
+          "p": 1,
+          "s": 7,
+          "start_ms": 56580,
+          "end_ms": 68840
+        },
+        {
+          "p": 2,
+          "s": 8,
+          "start_ms": 68840,
+          "end_ms": 78800
+        },
+        {
+          "p": 2,
+          "s": 9,
+          "start_ms": 78800,
+          "end_ms": 86440
+        },
+        {
+          "p": 2,
+          "s": 10,
+          "start_ms": 86440,
+          "end_ms": 93480
+        },
+        {
+          "p": 2,
+          "s": 11,
+          "start_ms": 93480,
+          "end_ms": 101640
+        },
+        {
+          "p": 3,
+          "s": 12,
+          "start_ms": 101640,
+          "end_ms": 110520
+        },
+        {
+          "p": 3,
+          "s": 13,
+          "start_ms": 110520,
+          "end_ms": 121040
+        },
+        {
+          "p": 3,
+          "s": 14,
+          "start_ms": 121040,
+          "end_ms": 130340
+        },
+        {
+          "p": 3,
+          "s": 15,
+          "start_ms": 130340,
+          "end_ms": 138251
+        }
+      ]
     },
     {
       "id": "c1-the-hidden-global-journey-of-industrial-aluminum",
