@@ -351,6 +351,18 @@ class AppUpdateService {
     return result.hasUpdate ? result.remoteInfo : null;
   }
 
+  /// Önceki uygulama içi güncellemeden kalan `linereader_update.apk` dosyasını
+  /// açılışta temizleyerek telefon hafızasında boşuna yer kaplamasını önler.
+  static Future<void> cleanupDownloadedUpdateApk() async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final leftover = File(p.join(tempDir.path, 'linereader_update.apk'));
+      if (await leftover.exists()) {
+        await leftover.delete();
+      }
+    } catch (_) {}
+  }
+
   /// Yeni sürüm APK dosyasını uygulama önbellek dizinine indirir ve canlı ilerlemeyi bildirir.
   Future<File> downloadApk({
     required String apkUrl,

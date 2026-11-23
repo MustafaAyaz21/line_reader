@@ -26,6 +26,7 @@ import '../translation/services/browser_ai_translation_service.dart';
 import '../translation/services/cached_translation_service.dart';
 import '../update/controllers/app_update_controller.dart';
 import '../update/screens/app_update_screen.dart';
+import '../update/services/app_update_service.dart';
 import '../words/controllers/words_controller.dart';
 import '../words/data/word_repository.dart';
 import '../words/models/saved_word.dart';
@@ -74,6 +75,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _ensureInitialized();
     IpaAccentController.shared.load();
     DisplayPreferencesController.shared.load();
+    AppUpdateService.cleanupDownloadedUpdateApk();
     ArticleReadingProgressController.shared.load();
     ProcessTextChannel.ensureInitialized();
     ProcessTextChannel.pendingTextNotifier

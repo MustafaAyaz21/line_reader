@@ -759,6 +759,9 @@ class ArticleAudioController extends ChangeNotifier {
           : (lowerUrl.endsWith('.mp3') ? '.mp3' : '.m4a');
       final cacheFile = File(p.join(cacheDir.path, '$safeId$ext'));
       if (await cacheFile.exists() && await cacheFile.length() > 1024) {
+        try {
+          await cacheFile.setLastModified(DateTime.now());
+        } catch (_) {}
         return cacheFile.path;
       }
 
@@ -772,6 +775,7 @@ class ArticleAudioController extends ChangeNotifier {
               .timeout(const Duration(seconds: 20));
           if (response.statusCode == 200 && response.bodyBytes.length > 1024) {
             await cacheFile.writeAsBytes(response.bodyBytes, flush: true);
+            unawaited(_pruneAudioCache(cacheDir, maxFiles: 8));
             return cacheFile.path;
           }
         } catch (_) {
@@ -782,6 +786,34 @@ class ArticleAudioController extends ChangeNotifier {
       debugPrint('[ArticleAudioController] Yerel ses onbellek hatasi: $error');
     }
     return null;
+  }
+
+  /// Podcast ses önbelleğinin telefon hafızasını şişirmemesi için yalnızca
+  /// en son dinlenen [maxFiles] makalenin ses dosyasını tutar.
+  Future<void> _pruneAudioCache(Directory cacheDir, {int maxFiles = 8}) async {
+    try {
+      final files = <File>[];
+      await for (final entity in cacheDir.list()) {
+        if (entity is File) {
+          files.add(entity);
+        }
+      }
+      if (files.length <= maxFiles) return;
+
+      final withTime = <({File file, DateTime modified})>[];
+      for (final file in files) {
+        try {
+          withTime.add((file: file, modified: await file.lastModified()));
+        } catch (_) {}
+      }
+      withTime.sort((a, b) => b.modified.compareTo(a.modified));
+
+      for (final entry in withTime.skip(maxFiles)) {
+        try {
+          await entry.file.delete();
+        } catch (_) {}
+      }
+    } catch (_) {}
   }
 
   Future<void> _playDeviceTtsAt(int sentenceIndex) async {

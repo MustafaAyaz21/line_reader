@@ -86,12 +86,12 @@ try {
     Write-Utf8NoBom -Path $PubspecPath -Content $updatedPubspec
     Write-Host "Yeni sürüm: v$newVersion (version_code: $newBuildNumber)" -ForegroundColor Green
 
-    # 3) Bağımlılıkları al ve imzalı release APK derle
-    Write-Step "İmzalı release APK derleniyor (flutter build apk --release)..."
+    # 3) Bağımlılıkları al ve hafif 64-bit (arm64-v8a) imzalı release APK derle
+    Write-Step "İmzalı release APK derleniyor (flutter build apk --release --target-platform android-arm64)..."
     & flutter pub get
     if ($LASTEXITCODE -ne 0) { throw "flutter pub get başarısız oldu." }
 
-    & flutter build apk --release
+    & flutter build apk --release --target-platform android-arm64
     if ($LASTEXITCODE -ne 0) { throw "flutter build apk --release başarısız oldu." }
 
     if (-not (Test-Path $ApkPath)) {
