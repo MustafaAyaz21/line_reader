@@ -1114,10 +1114,10 @@
               placeholder="Gemini API Anahtarınız (AIza...)"
             />
             <select id="geminiModelSelect" class="ai-select" title="Gemini Modeli">
-              <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite (Önerilen • En Hızlı)</option>
+              <option value="gemini-flash-latest">gemini-flash-latest (Otomatik Güncel)</option>
+              <option value="gemini-3.8-flash">gemini-3.8-flash (Yeni)</option>
+              <option value="gemini-3-flash-preview">gemini-3-flash-preview</option>
               <option value="gemini-2.5-flash">gemini-2.5-flash</option>
-              <option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite</option>
-              <option value="gemini-2.0-flash">gemini-2.0-flash</option>
             </select>
             <button type="button" class="btn btn-primary btn-sm" id="saveGeminiConfigBtn">
               Anahtarı Kaydet
@@ -1688,7 +1688,10 @@
       if (!article.audio_url || !String(article.audio_url).trim()) {
         missing.push("🎙 Ses yok");
       }
-      if (!article.word_relations || Object.keys(article.word_relations).length === 0) {
+      const hasRelations =
+        parseWordRelationsText(article.word_relations_text || "").count > 0 ||
+        (article.word_relations && Object.keys(article.word_relations).length > 0);
+      if (!hasRelations) {
         missing.push("🔗 Eş/zıt yok");
       }
       if (!(article.description || "").trim()) {

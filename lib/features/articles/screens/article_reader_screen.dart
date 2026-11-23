@@ -463,6 +463,26 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
     await _persistUnderlines(next);
   }
 
+  /// "Altını Çiz" modunda zaten çizili bir kelimeden basılı tutup (ileri veya
+  /// geri) sürükleyerek tüm aralığı veya bir kısmını topluca siler.
+  Future<void> _handleDragEraseCommitted({
+    required int paragraphIndex,
+    required int startOffset,
+    required int endOffset,
+  }) async {
+    if (paragraphIndex < 0 || paragraphIndex >= _paragraphs.length) return;
+    if (endOffset <= startOffset) return;
+    final paragraph = _paragraphs[paragraphIndex];
+    final next = ArticleTextParser.removeWordRangeFromUnderlines(
+      existing: _underlines,
+      paragraphIndex: paragraphIndex,
+      wordStart: startOffset,
+      wordEnd: endOffset,
+      paragraphText: paragraph,
+    );
+    await _persistUnderlines(next);
+  }
+
   /// "Altını Çiz" modu kapalıyken basılı tutma/sürükleme ile seçilen yalnızca
   /// ilgili kelime veya kısa ifade aralığını uygulama içi seçim çubuğuna bağlar
   /// (tüm cümle otomatik seçilmez ve sistem Kopyala/Tümünü Seç menüsü açılmaz).
@@ -1164,6 +1184,12 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                         startOffset: start,
                         endOffset: end,
                       ),
+                      onDragEraseCommitted: (start, end) =>
+                          _handleDragEraseCommitted(
+                        paragraphIndex: i,
+                        startOffset: start,
+                        endOffset: end,
+                      ),
                       onNormalSelectionCommitted: (start, end) =>
                           _handleNormalSelectionCommitted(
                         paragraphIndex: i,
@@ -1661,6 +1687,7 @@ class _ReaderParagraphView extends StatefulWidget {
     required this.isUnderlineMode,
     required this.onSegmentTap,
     required this.onDragMarkCommitted,
+    required this.onDragEraseCommitted,
     required this.onNormalSelectionCommitted,
   });
 
@@ -1679,6 +1706,7 @@ class _ReaderParagraphView extends StatefulWidget {
   final bool isUnderlineMode;
   final void Function(ArticleRenderSegment segment) onSegmentTap;
   final void Function(int startOffset, int endOffset) onDragMarkCommitted;
+  final void Function(int startOffset, int endOffset) onDragEraseCommitted;
   final void Function(int startOffset, int endOffset)
       onNormalSelectionCommitted;
 
@@ -1695,6 +1723,7 @@ class _ReaderParagraphViewState extends State<_ReaderParagraphView> {
   int? _dragAnchorEnd;
   int? _dragRangeStart;
   int? _dragRangeEnd;
+  bool _isDragErasing = false;
 
   void _disposeRecognizers() {
     for (final recognizer in _recognizers) {
@@ -1726,11 +1755,14 @@ class _ReaderParagraphViewState extends State<_ReaderParagraphView> {
     final word = _hitTestWordAtGlobal(details.globalPosition);
     if (word == null) return;
     HapticFeedback.selectionClick();
+    final startsOnUnderline = widget.isUnderlineMode &&
+        widget.underlines.any((u) => u.overlaps(word.start, word.end));
     setState(() {
       _dragAnchorStart = word.start;
       _dragAnchorEnd = word.end;
       _dragRangeStart = word.start;
       _dragRangeEnd = word.end;
+      _isDragErasing = startsOnUnderline;
     });
   }
 
@@ -1755,16 +1787,22 @@ class _ReaderParagraphViewState extends State<_ReaderParagraphView> {
   void _handleLongPressEnd(LongPressEndDetails _) {
     final start = _dragRangeStart;
     final end = _dragRangeEnd;
+    final isErasing = _isDragErasing;
     setState(() {
       _dragAnchorStart = null;
       _dragAnchorEnd = null;
       _dragRangeStart = null;
       _dragRangeEnd = null;
+      _isDragErasing = false;
     });
 
     if (start == null || end == null || end <= start) return;
     if (widget.isUnderlineMode) {
-      widget.onDragMarkCommitted(start, end);
+      if (isErasing) {
+        widget.onDragEraseCommitted(start, end);
+      } else {
+        widget.onDragMarkCommitted(start, end);
+      }
     } else {
       widget.onNormalSelectionCommitted(start, end);
     }
@@ -1777,6 +1815,7 @@ class _ReaderParagraphViewState extends State<_ReaderParagraphView> {
       _dragAnchorEnd = null;
       _dragRangeStart = null;
       _dragRangeEnd = null;
+      _isDragErasing = false;
     });
   }
 
@@ -1863,18 +1902,29 @@ class _ReaderParagraphViewState extends State<_ReaderParagraphView> {
       final isInSpokenSentence = hasSentenceHighlight &&
           segment.start < hlEnd &&
           segment.end > hlStart;
-      final isInLiveDragMark = widget.isUnderlineMode &&
+      final isInLiveDragErase = widget.isUnderlineMode &&
+          _isDragErasing &&
           hasLiveDrag &&
           segment.start < dragEnd &&
           segment.end > dragStart;
-      final isMarked = segment.isUnderlined || isInLiveDragMark;
+      final isInLiveDragMark = widget.isUnderlineMode &&
+          !_isDragErasing &&
+          hasLiveDrag &&
+          segment.start < dragEnd &&
+          segment.end > dragStart;
+      final isMarked =
+          (segment.isUnderlined && !isInLiveDragErase) || isInLiveDragMark;
       final isInNormalSelection = !widget.isUnderlineMode &&
           hasNormalSelection &&
           segment.start < selEnd &&
           segment.end > selStart;
 
       TextStyle style;
-      if (isInNormalSelection) {
+      if (isInLiveDragErase) {
+        style = baseStyle.copyWith(
+          backgroundColor: Theme.of(context).colorScheme.error.withAlpha(58),
+        );
+      } else if (isInNormalSelection) {
         style = (isMarked
                 ? _buildMarkedStyle(
                     baseStyle: baseStyle,

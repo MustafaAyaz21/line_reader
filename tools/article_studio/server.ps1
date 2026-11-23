@@ -436,15 +436,37 @@ Strict requirements:
     }
     $requestBody = $requestObj | ConvertTo-Json -Depth 8 -Compress
 
+    $discoveredFlashModels = @()
+    try {
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
+        $listUrl = "https://generativelanguage.googleapis.com/v1beta/models?key=$([System.Uri]::EscapeDataString($cfg.geminiApiKey))"
+        $listReq = [System.Net.HttpWebRequest]::Create($listUrl)
+        $listReq.Method = "GET"
+        $listReq.Timeout = 10000
+        $listRes = $listReq.GetResponse()
+        $listReader = New-Object System.IO.StreamReader($listRes.GetResponseStream(), [System.Text.Encoding]::UTF8)
+        try { $listText = $listReader.ReadToEnd() } finally { $listReader.Dispose(); $listRes.Close() }
+        $listJson = $listText | ConvertFrom-Json
+        if ($null -ne $listJson.models) {
+            foreach ($m in $listJson.models) {
+                $mName = ([string]$m.name) -replace '^models/', ''
+                $methods = @($m.supportedGenerationMethods)
+                if (($methods -contains "generateContent") -and ($mName -like "*gemini*") -and ($mName -like "*flash*") -and ($mName -notlike "*tts*") -and ($mName -notlike "*image*")) {
+                    $discoveredFlashModels += $mName
+                }
+            }
+        }
+    } catch {}
+
     $modelsToTry = @(
         $cfg.geminiModel,
-        "gemini-2.5-flash-lite",
-        "gemini-flash-lite-latest",
+        "gemini-flash-latest",
+        "gemini-3.8-flash",
+        "gemini-3-flash-preview",
         "gemini-2.5-flash",
-        "gemini-2.0-flash-lite",
-        "gemini-2.0-flash",
-        "gemini-flash-latest"
-    ) | Select-Object -Unique
+        "gemini-2.5-flash-lite",
+        "gemini-flash-lite-latest"
+    ) + $discoveredFlashModels | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
     [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
 
     $lastErrorMsg = "Gemini API yanıt vermedi."
@@ -458,7 +480,7 @@ Strict requirements:
         } else {
             if (-not $hadTransientOverload) { break }
             Start-Sleep -Milliseconds 1800
-            @("gemini-2.5-flash-lite", "gemini-flash-lite-latest", "gemini-2.5-flash") | Select-Object -Unique
+            @("gemini-flash-latest", "gemini-3.8-flash", "gemini-3-flash-preview") + $discoveredFlashModels | Select-Object -Unique
         }
 
         $abortAll = $false
