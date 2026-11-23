@@ -1050,6 +1050,18 @@
           placeholder="Başlık veya açıklama ara..."
         />
         <div class="level-filters" id="levelFilters"></div>
+        <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
+          <select id="sortSelect" class="search-input" style="flex:1;padding:6px 8px;font-size:12px;">
+            <option value="date_desc">📅 Tarih (En yeni)</option>
+            <option value="date_asc">📅 Tarih (En eski)</option>
+            <option value="level_asc">🎯 Seviye (A1→C2)</option>
+            <option value="title_asc">🔤 İsim (A→Z)</option>
+          </select>
+          <label style="display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--text-muted);white-space:nowrap;cursor:pointer;">
+            <input type="checkbox" id="onlyMissingCheck" />
+            Eksikler
+          </label>
+        </div>
       </div>
       <div class="article-list" id="articleList"></div>
     </aside>
@@ -1236,6 +1248,8 @@
       newArticleBtn: document.getElementById("newArticleBtn"),
       searchInput: document.getElementById("searchInput"),
       levelFilters: document.getElementById("levelFilters"),
+      sortSelect: document.getElementById("sortSelect"),
+      onlyMissingCheck: document.getElementById("onlyMissingCheck"),
       articleList: document.getElementById("articleList"),
       editorPane: document.getElementById("editorPane"),
       previewScroll: document.getElementById("previewScroll"),
@@ -1655,18 +1669,73 @@
         .replace(/"/g, "&quot;");
     }
 
+    function formatPublishedDate(iso) {
+      if (!iso) return "Tarih yok";
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return "Tarih yok";
+      return d.toLocaleDateString("tr-TR", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }) + " • " + d.toLocaleTimeString("tr-TR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
+
+    function getArticleMissingTags(article) {
+      const missing = [];
+      if (!article.audio_url || !String(article.audio_url).trim()) {
+        missing.push("🎙 Ses yok");
+      }
+      if (!article.word_relations || Object.keys(article.word_relations).length === 0) {
+        missing.push("🔗 Eş/zıt yok");
+      }
+      if (!(article.description || "").trim()) {
+        missing.push("📝 Açıklama yok");
+      }
+      return missing;
+    }
+
+    const LEVEL_ORDER = { A1: 1, A2: 2, B1: 3, B2: 4, C1: 5, C2: 6 };
+
     function renderArticleList() {
       const q = state.searchQuery.trim().toLowerCase();
+      const sortMode = el.sortSelect ? el.sortSelect.value : "date_desc";
+      const onlyMissing = Boolean(el.onlyMissingCheck && el.onlyMissingCheck.checked);
+
       const filtered = state.articles
         .map((article, index) => ({ article, index }))
         .filter(({ article }) => {
           if (state.filterLevel !== "ALL" && levelMeta(article.level).code !== state.filterLevel) {
             return false;
           }
+          if (onlyMissing && getArticleMissingTags(article).length === 0) {
+            return false;
+          }
           if (!q) return true;
           return (article.title || "").toLowerCase().includes(q) ||
                  (article.description || "").toLowerCase().includes(q);
         });
+
+      filtered.sort((a, b) => {
+        if (sortMode === "date_desc" || sortMode === "date_asc") {
+          const ta = Date.parse(a.article.published_at || "") || 0;
+          const tb = Date.parse(b.article.published_at || "") || 0;
+          if (ta !== tb) return sortMode === "date_desc" ? (tb - ta) : (ta - tb);
+          return b.index - a.index;
+        }
+        if (sortMode === "level_asc") {
+          const la = LEVEL_ORDER[levelMeta(a.article.level).code] || 99;
+          const lb = LEVEL_ORDER[levelMeta(b.article.level).code] || 99;
+          if (la !== lb) return la - lb;
+          return (a.article.title || "").localeCompare(b.article.title || "", "tr");
+        }
+        if (sortMode === "title_asc") {
+          return (a.article.title || "").localeCompare(b.article.title || "", "tr");
+        }
+        return 0;
+      });
 
       if (filtered.length === 0) {
         el.articleList.innerHTML = `
@@ -1684,6 +1753,8 @@
         const isSel = index === state.selectedIndex;
         const isHidden = Boolean(article.is_hidden);
         const isScheduled = !isHidden && isFutureSchedule(article.publish_at);
+        const missingTags = getArticleMissingTags(article);
+        const pubLabel = formatPublishedDate(article.published_at);
         return `
           <div class="article-item ${isSel ? "selected" : ""}" data-index="${index}" style="${isHidden ? "opacity:0.65;border-style:dashed;" : ""}">
             <div class="article-item-head" style="flex-wrap:wrap;gap:4px;">
@@ -1694,6 +1765,8 @@
               <span class="article-item-time">${escapeHtml(article.reading_time || estimateReadingTime(article.content))}</span>
             </div>
             <div class="article-item-title">${escapeHtml(article.title || "(Başlıksız Makale)")}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin:2px 0 4px;">📅 ${escapeHtml(pubLabel)}</div>
+            ${missingTags.length > 0 ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;">${missingTags.map(t => `<span style="font-size:10.5px;font-weight:600;color:#fbbf24;background:rgba(245,158,11,0.14);border:1px solid rgba(245,158,11,0.3);padding:1px 6px;border-radius:999px;">${t}</span>`).join("")}</div>` : ""}
             <div class="article-item-desc">${escapeHtml(article.description || "Kısa açıklama yok")}</div>
             <div class="article-item-actions">
               <button class="mini-btn" data-act="up" data-index="${index}" ${index === 0 ? "disabled" : ""}>↑</button>
@@ -2796,6 +2869,12 @@
       state.searchQuery = el.searchInput.value;
       renderArticleList();
     });
+    if (el.sortSelect) {
+      el.sortSelect.addEventListener("change", () => renderArticleList());
+    }
+    if (el.onlyMissingCheck) {
+      el.onlyMissingCheck.addEventListener("change", () => renderArticleList());
+    }
 
     el.shutdownBtn.addEventListener("click", async () => {
       if (state.dirty && !confirm("Kaydedilmemiş değişiklikler var. Yine de paneli kapatmak istiyor musunuz?")) {

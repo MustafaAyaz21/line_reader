@@ -700,9 +700,16 @@ async function handleDeveloperPanelRequest(request, env, verifiedUser, path, met
         id: a.id,
         level: a.level,
         title: a.title,
+        published_at: a.published_at || null,
         is_hidden: Boolean(a.is_hidden),
         publish_at: a.publish_at || null,
         has_audio: Boolean(a.audio_url && String(a.audio_url).trim().length > 0),
+        has_relations: Boolean(
+          a.word_relations &&
+          typeof a.word_relations === "object" &&
+          Object.keys(a.word_relations).length > 0
+        ),
+        has_description: Boolean(a.description && String(a.description).trim().length > 0),
         audio_url: a.audio_url || null,
       }));
       return jsonResponse({
@@ -825,11 +832,29 @@ async function handleDeveloperPanelRequest(request, env, verifiedUser, path, met
       return jsonResponse({ ok: false, message: "Başlık ve makale metni boş olamaz." }, 400);
     }
     const id = String(rawArticle.id || "").trim() || `${level.toLowerCase()}-${slugifyArticleId(title)}`;
+    const wordCount = content.split(/\s+/).filter(Boolean).length;
+    const readingMin = Math.max(1, Math.round(wordCount / 145));
+    const readingTime = readingMin <= 1 ? "1 - 2 dk" : `${readingMin} - ${readingMin + 1} dk`;
+    const description =
+      String(rawArticle.description || "").trim() || buildFallbackDescription(content);
+    const category =
+      String(rawArticle.category || "").trim() || inferArticleCategory(title, content);
+    const author = String(rawArticle.author || "").trim() || "Line Reader";
+    const publishedAt =
+      String(rawArticle.published_at || "").trim() || new Date().toISOString();
+
     const articleObj = {
       id,
       level,
       title,
+      description,
+      reading_time: String(rawArticle.reading_time || "").trim() || readingTime,
+      reading_time_minutes: Number(rawArticle.reading_time_minutes) || readingMin,
+      language: String(rawArticle.language || "en").trim() || "en",
       content,
+      published_at: publishedAt,
+      category,
+      author,
       word_meanings: rawArticle.word_meanings && typeof rawArticle.word_meanings === "object" ? rawArticle.word_meanings : {},
       sentence_translations: rawArticle.sentence_translations && typeof rawArticle.sentence_translations === "object" ? rawArticle.sentence_translations : {},
       word_relations: rawArticle.word_relations && typeof rawArticle.word_relations === "object" ? rawArticle.word_relations : {},
@@ -972,6 +997,8 @@ async function generateArticleWithGemini(apiKey, level, topic) {
     "Return ONLY one valid JSON object (no markdown fences) with these EXACT keys:",
     "{",
     '  "title": "Engaging English title",',
+    '  "description": "1 concise engaging English summary sentence (15-28 words)",',
+    '  "category": "Single category word (e.g. Science, Psychology, Culture, Technology, History, Nature, Art, Health, Daily Life)",',
     '  "content": "Full English article text with paragraphs separated by \\n\\n",',
     '  "word_meanings": { "lowercase_word": "exact contextual Turkish meaning in this article (for verbs use -mak/-mek)" },',
     '  "sentence_translations": { "Exact English sentence from content": "Natural, fluent Turkish translation" },',
@@ -1052,10 +1079,24 @@ async function generateArticleWithGemini(apiKey, level, topic) {
       lastError = "Başlık veya metin eksik geldi.";
       continue;
     }
+    const description =
+      String(parsed.description || "").trim() || buildFallbackDescription(content);
+    const category =
+      String(parsed.category || "").trim() || inferArticleCategory(title, content);
+    const wordCount = content.split(/\s+/).filter(Boolean).length;
+    const readingMin = Math.max(1, Math.round(wordCount / 145));
+    const readingTime = readingMin <= 1 ? "1 - 2 dk" : `${readingMin} - ${readingMin + 1} dk`;
     return {
       id: `${level.toLowerCase()}-${slugifyArticleId(title)}`,
       level,
       title,
+      description,
+      category,
+      author: "Line Reader",
+      reading_time: readingTime,
+      reading_time_minutes: readingMin,
+      language: "en",
+      published_at: new Date().toISOString(),
       content,
       word_meanings: parsed.word_meanings && typeof parsed.word_meanings === "object" ? parsed.word_meanings : {},
       sentence_translations: parsed.sentence_translations && typeof parsed.sentence_translations === "object" ? parsed.sentence_translations : {},
@@ -1066,6 +1107,29 @@ async function generateArticleWithGemini(apiKey, level, topic) {
   }
 
   throw new Error(lastError);
+}
+
+function buildFallbackDescription(content) {
+  const firstPara = String(content || "").split(/\n\s*\n/)[0] || "";
+  const sentences = firstPara.split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean);
+  if (sentences.length === 0) return firstPara.slice(0, 160).trim();
+  let desc = sentences[0];
+  if (desc.length < 85 && sentences.length > 1) {
+    desc = `${desc} ${sentences[1]}`;
+  }
+  return desc.length > 200 ? `${desc.slice(0, 197).trim()}...` : desc;
+}
+
+function inferArticleCategory(title, content) {
+  const text = `${title} ${content}`.toLowerCase();
+  if (/\b(brain|psycholog|memory|mind|emotion|habit|stress|sleep)\b/.test(text)) return "Psychology";
+  if (/\b(science|space|planet|physics|biology|research|scientist|experiment)\b/.test(text)) return "Science";
+  if (/\b(technology|computer|robot|ai|digital|internet|software|phone)\b/.test(text)) return "Technology";
+  if (/\b(art|paint|music|sculpture|museum|artist|design|film)\b/.test(text)) return "Art";
+  if (/\b(history|ancient|century|empire|war|historical)\b/.test(text)) return "History";
+  if (/\b(nature|ocean|forest|animal|climate|environment|earth|plant)\b/.test(text)) return "Nature";
+  if (/\b(health|food|diet|exercise|medicine|body|sunlight)\b/.test(text)) return "Health";
+  return "Culture";
 }
 
 async function generatePodcastAudioWithGemini(env, articleId, title, content, voiceName) {

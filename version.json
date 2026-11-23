@@ -1,7 +1,7 @@
 {
-    "latest_version":  "0.1.25",
-    "version_code":  26,
+    "latest_version":  "0.1.26",
+    "version_code":  27,
     "min_version_code":  0,
-    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.25/app-release.apk",
+    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.26/app-release.apk",
     "release_notes":  "Uygulama içi iyileştirmeler."
 }

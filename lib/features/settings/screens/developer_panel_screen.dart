@@ -48,6 +48,8 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
   List<DevArticleSummary> _articles = const <DevArticleSummary>[];
   String _selectedLevel = 'B1';
   String _selectedVoice = 'Kore';
+  String _articleSortMode = 'date_desc';
+  bool _onlyMissingArticles = false;
   DevGeneratedArticle? _draftArticle;
   bool _isGeneratingArticle = false;
   bool _isGeneratingAudio = false;
@@ -955,6 +957,51 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
     }
   }
 
+  static const Map<String, int> _levelOrder = <String, int>{
+    'A1': 1,
+    'A2': 2,
+    'B1': 3,
+    'B2': 4,
+    'C1': 5,
+    'C2': 6,
+  };
+
+  List<DevArticleSummary> _filteredSortedArticles() {
+    final list = _onlyMissingArticles
+        ? _articles.where((a) => a.hasMissingFields).toList()
+        : List<DevArticleSummary>.from(_articles);
+
+    list.sort((a, b) {
+      if (_articleSortMode == 'date_desc' || _articleSortMode == 'date_asc') {
+        final ta = a.publishedAt?.millisecondsSinceEpoch ?? 0;
+        final tb = b.publishedAt?.millisecondsSinceEpoch ?? 0;
+        if (ta != tb) {
+          return _articleSortMode == 'date_desc'
+              ? tb.compareTo(ta)
+              : ta.compareTo(tb);
+        }
+        return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+      }
+      if (_articleSortMode == 'level_asc') {
+        final la = _levelOrder[a.level] ?? 99;
+        final lb = _levelOrder[b.level] ?? 99;
+        if (la != lb) return la.compareTo(lb);
+        return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+      }
+      return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+    });
+    return list;
+  }
+
+  String? _formatPublishedDate(DateTime? dt) {
+    if (dt == null) return null;
+    final dd = dt.day.toString().padLeft(2, '0');
+    final mm = dt.month.toString().padLeft(2, '0');
+    final hh = dt.hour.toString().padLeft(2, '0');
+    final min = dt.minute.toString().padLeft(2, '0');
+    return '$dd.$mm.${dt.year} $hh:$min';
+  }
+
   Widget _buildArticlesTab(
     ThemeData theme,
     ColorScheme colorScheme,
@@ -1213,97 +1260,157 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
           ),
         ],
         const SizedBox(height: 16),
-        Text(
-          '${s.t('Yayındaki Makaleler', 'Published Articles')} (${_articles.length})',
-          style: theme.textTheme.labelLarge?.copyWith(
-            color: colorScheme.primary,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 8),
-        if (_articles.isEmpty)
-          Card(
-            margin: EdgeInsets.zero,
-            child: Padding(
-              padding: const EdgeInsets.all(20),
+        Row(
+          children: <Widget>[
+            Expanded(
               child: Text(
-                s.t('Makale bulunamadı.', 'No articles found.'),
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
+                '${s.t('Yayındaki Makaleler', 'Published Articles')} (${_articles.length})',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: colorScheme.primary,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
-          )
-        else
-          ..._articles.reversed.take(30).map((item) {
-            return Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                dense: true,
-                leading: CircleAvatar(
-                  radius: 17,
-                  backgroundColor: item.isHidden
-                      ? colorScheme.surfaceContainerHighest
-                      : colorScheme.secondaryContainer,
-                  child: Text(
-                    item.level,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: item.isHidden
-                          ? colorScheme.onSurfaceVariant
-                          : colorScheme.onSecondaryContainer,
-                    ),
-                  ),
-                ),
-                title: Text(
-                  item.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: item.isHidden
-                        ? colorScheme.onSurfaceVariant
-                        : colorScheme.onSurface,
-                  ),
-                ),
-                subtitle: Text(
-                  '${item.hasAudio ? "🎙 Podcast AI" : "🔊 Cihaz TTS"}${item.isHidden ? " • Gizli" : ""}',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    IconButton(
-                      onPressed: busy
-                          ? null
-                          : () => _handleToggleArticleHidden(item),
-                      icon: Icon(
-                        item.isHidden
-                            ? Icons.visibility_off_outlined
-                            : Icons.visibility_outlined,
-                        size: 19,
-                      ),
-                      tooltip: item.isHidden
-                          ? s.t('Görünür Yap', 'Unhide')
-                          : s.t('Gizle', 'Hide'),
-                    ),
-                    IconButton(
-                      onPressed: busy ? null : () => _handleDeleteArticle(item),
-                      icon: Icon(
-                        Icons.delete_outline_rounded,
-                        size: 19,
-                        color: colorScheme.error,
-                      ),
-                      tooltip: s.delete,
-                    ),
-                  ],
-                ),
+            FilterChip(
+              key: const ValueKey<String>('dev_panel_only_missing_chip'),
+              label: Text(
+                s.t('Sadece Eksikler', 'Missing Only'),
+                style: theme.textTheme.labelSmall,
               ),
+              selected: _onlyMissingArticles,
+              visualDensity: VisualDensity.compact,
+              onSelected: (val) => setState(() => _onlyMissingArticles = val),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: <({String key, String label})>[
+            (key: 'date_desc', label: s.t('Tarih (Yeni)', 'Newest')),
+            (key: 'date_asc', label: s.t('Tarih (Eski)', 'Oldest')),
+            (key: 'level_asc', label: s.t('Seviye (A1–C2)', 'Level')),
+            (key: 'title_asc', label: s.t('İsim (A–Z)', 'Name (A–Z)')),
+          ].map((opt) {
+            return ChoiceChip(
+              key: ValueKey<String>('dev_panel_sort_${opt.key}'),
+              label: Text(opt.label, style: theme.textTheme.labelSmall),
+              selected: _articleSortMode == opt.key,
+              visualDensity: VisualDensity.compact,
+              onSelected: (_) => setState(() => _articleSortMode = opt.key),
             );
-          }),
+          }).toList(growable: false),
+        ),
+        const SizedBox(height: 8),
+        Builder(
+          builder: (context) {
+            final filtered = _filteredSortedArticles();
+            if (filtered.isEmpty) {
+              return Card(
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Text(
+                    s.t('Bu filtreye uygun makale yok.', 'No matching articles.'),
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              );
+            }
+            return Column(
+              children: filtered.take(50).map((item) {
+                final missing = item.missingLabels;
+                final dateLabel = _formatPublishedDate(item.publishedAt);
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    dense: true,
+                    leading: CircleAvatar(
+                      radius: 17,
+                      backgroundColor: item.isHidden
+                          ? colorScheme.surfaceContainerHighest
+                          : colorScheme.secondaryContainer,
+                      child: Text(
+                        item.level,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: item.isHidden
+                              ? colorScheme.onSurfaceVariant
+                              : colorScheme.onSecondaryContainer,
+                        ),
+                      ),
+                    ),
+                    title: Text(
+                      item.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: item.isHidden
+                            ? colorScheme.onSurfaceVariant
+                            : colorScheme.onSurface,
+                      ),
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          '${item.hasAudio ? "🎙 Podcast AI" : "🔊 Cihaz TTS"}${item.isHidden ? " • Gizli" : ""}${dateLabel != null ? " • $dateLabel" : ""}',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        if (missing.isNotEmpty) ...<Widget>[
+                          const SizedBox(height: 3),
+                          Text(
+                            'Eksik: ${missing.join(", ")}',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: colorScheme.error,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        IconButton(
+                          onPressed: busy
+                              ? null
+                              : () => _handleToggleArticleHidden(item),
+                          icon: Icon(
+                            item.isHidden
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                            size: 19,
+                          ),
+                          tooltip: item.isHidden
+                              ? s.t('Görünür Yap', 'Unhide')
+                              : s.t('Gizle', 'Hide'),
+                        ),
+                        IconButton(
+                          onPressed:
+                              busy ? null : () => _handleDeleteArticle(item),
+                          icon: Icon(
+                            Icons.delete_outline_rounded,
+                            size: 19,
+                            color: colorScheme.error,
+                          ),
+                          tooltip: s.delete,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(growable: false),
+            );
+          },
+        ),
       ],
     );
   }

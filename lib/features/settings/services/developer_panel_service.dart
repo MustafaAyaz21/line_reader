@@ -81,6 +81,9 @@ class DevArticleSummary {
     required this.title,
     required this.isHidden,
     required this.hasAudio,
+    this.hasRelations = true,
+    this.hasDescription = true,
+    this.publishedAt,
     this.audioUrl,
   });
 
@@ -89,15 +92,35 @@ class DevArticleSummary {
   final String title;
   final bool isHidden;
   final bool hasAudio;
+  final bool hasRelations;
+  final bool hasDescription;
+  final DateTime? publishedAt;
   final String? audioUrl;
 
+  List<String> get missingLabels => <String>[
+        if (!hasAudio) 'Ses yok',
+        if (!hasRelations) 'Eş/zıt yok',
+        if (!hasDescription) 'Açıklama yok',
+      ];
+
+  bool get hasMissingFields => !hasAudio || !hasRelations || !hasDescription;
+
   factory DevArticleSummary.fromJson(Map<String, dynamic> json) {
+    final rawPublished = json['published_at']?.toString();
     return DevArticleSummary(
       id: (json['id'] ?? '').toString().trim(),
       level: (json['level'] ?? 'B1').toString().trim().toUpperCase(),
       title: (json['title'] ?? '').toString().trim(),
       isHidden: json['is_hidden'] == true,
       hasAudio: json['has_audio'] == true,
+      hasRelations: json.containsKey('has_relations')
+          ? json['has_relations'] == true
+          : true,
+      hasDescription: json.containsKey('has_description')
+          ? json['has_description'] == true
+          : true,
+      publishedAt:
+          rawPublished != null ? DateTime.tryParse(rawPublished)?.toLocal() : null,
       audioUrl: json['audio_url']?.toString(),
     );
   }
@@ -113,6 +136,9 @@ class DevGeneratedArticle {
     required this.wordMeanings,
     required this.sentenceTranslations,
     required this.wordRelations,
+    this.description,
+    this.category,
+    this.author,
     this.audioUrl,
     this.audioVoice,
     this.audioDurationSec,
@@ -127,6 +153,9 @@ class DevGeneratedArticle {
   final Map<String, dynamic> wordMeanings;
   final Map<String, dynamic> sentenceTranslations;
   final Map<String, dynamic> wordRelations;
+  final String? description;
+  final String? category;
+  final String? author;
   final String? audioUrl;
   final String? audioVoice;
   final int? audioDurationSec;
@@ -138,6 +167,9 @@ class DevGeneratedArticle {
   DevGeneratedArticle copyWith({
     String? title,
     String? content,
+    String? description,
+    String? category,
+    String? author,
     String? audioUrl,
     String? audioVoice,
     int? audioDurationSec,
@@ -152,6 +184,9 @@ class DevGeneratedArticle {
       wordMeanings: wordMeanings,
       sentenceTranslations: sentenceTranslations,
       wordRelations: wordRelations,
+      description: description ?? this.description,
+      category: category ?? this.category,
+      author: author ?? this.author,
       audioUrl: audioUrl ?? this.audioUrl,
       audioVoice: audioVoice ?? this.audioVoice,
       audioDurationSec: audioDurationSec ?? this.audioDurationSec,
@@ -165,6 +200,11 @@ class DevGeneratedArticle {
         'level': level,
         'title': title,
         'content': content,
+        if (description != null && description!.trim().isNotEmpty)
+          'description': description,
+        if (category != null && category!.trim().isNotEmpty)
+          'category': category,
+        if (author != null && author!.trim().isNotEmpty) 'author': author,
         'word_meanings': wordMeanings,
         'sentence_translations': sentenceTranslations,
         'word_relations': wordRelations,
@@ -183,6 +223,9 @@ class DevGeneratedArticle {
       level: (json['level'] ?? 'B1').toString().trim().toUpperCase(),
       title: (json['title'] ?? '').toString().trim(),
       content: (json['content'] ?? '').toString().trim(),
+      description: json['description']?.toString(),
+      category: json['category']?.toString(),
+      author: json['author']?.toString(),
       wordMeanings: json['word_meanings'] is Map<String, dynamic>
           ? Map<String, dynamic>.from(
               json['word_meanings'] as Map<String, dynamic>,
