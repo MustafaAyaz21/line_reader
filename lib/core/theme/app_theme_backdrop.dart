@@ -374,10 +374,18 @@ class _AnimatedThemeBackdropHostState extends State<_AnimatedThemeBackdropHost>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   static const Duration _normalCycle = Duration(seconds: 60);
   static const Duration _ecoCycle = Duration(seconds: 90);
+  static const int _normalFrameIntervalMs = 42; // ~24 FPS (sakin, sıfır kasma)
+  static const int _ecoFrameIntervalMs = 68; // ~15 FPS (pil dostu)
 
   late final AnimationController _controller;
+  final ValueNotifier<double> _throttledProgress = ValueNotifier<double>(0.18);
+  int _lastPaintMs = 0;
+
   bool _isAppVisible = true;
   bool _tickerEnabled = true;
+  bool _isRouteTransitioning = false;
+  Animation<double>? _routeAnim;
+  Animation<double>? _secondaryRouteAnim;
 
   @override
   void initState() {
@@ -389,14 +397,57 @@ class _AnimatedThemeBackdropHostState extends State<_AnimatedThemeBackdropHost>
           ? _ecoCycle
           : _normalCycle,
       value: 0.18,
-    );
+    )..addListener(_onTick);
     AppThemeController.shared.addListener(_syncPlayback);
+  }
+
+  void _onTick() {
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final interval = AppThemeController.shared.isEcoAnimation
+        ? _ecoFrameIntervalMs
+        : _normalFrameIntervalMs;
+    if (nowMs - _lastPaintMs >= interval) {
+      _lastPaintMs = nowMs;
+      _throttledProgress.value = _controller.value;
+    }
+  }
+
+  void _attachRouteAnimations(ModalRoute<dynamic>? route) {
+    final nextPrimary = route?.animation;
+    final nextSecondary = route?.secondaryAnimation;
+    if (_routeAnim != nextPrimary) {
+      _routeAnim?.removeStatusListener(_onRouteAnimationStatus);
+      _routeAnim = nextPrimary;
+      _routeAnim?.addStatusListener(_onRouteAnimationStatus);
+    }
+    if (_secondaryRouteAnim != nextSecondary) {
+      _secondaryRouteAnim?.removeStatusListener(_onRouteAnimationStatus);
+      _secondaryRouteAnim = nextSecondary;
+      _secondaryRouteAnim?.addStatusListener(_onRouteAnimationStatus);
+    }
+    _updateTransitionFlag();
+  }
+
+  void _onRouteAnimationStatus(AnimationStatus _) {
+    _updateTransitionFlag();
+    _syncPlayback();
+  }
+
+  void _updateTransitionFlag() {
+    final primaryAnimating = _routeAnim != null &&
+        (_routeAnim!.status == AnimationStatus.forward ||
+            _routeAnim!.status == AnimationStatus.reverse);
+    final secondaryAnimating = _secondaryRouteAnim != null &&
+        (_secondaryRouteAnim!.status == AnimationStatus.forward ||
+            _secondaryRouteAnim!.status == AnimationStatus.reverse);
+    _isRouteTransitioning = primaryAnimating || secondaryAnimating;
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _tickerEnabled = TickerMode.of(context);
+    _attachRouteAnimations(ModalRoute.of(context));
     _syncPlayback();
   }
 
@@ -429,6 +480,7 @@ class _AnimatedThemeBackdropHostState extends State<_AnimatedThemeBackdropHost>
 
     final shouldRun = _isAppVisible &&
         _tickerEnabled &&
+        !_isRouteTransitioning &&
         !AppThemeController.shared.isAnimationPaused;
     if (shouldRun) {
       if (!_controller.isAnimating) {
@@ -443,9 +495,13 @@ class _AnimatedThemeBackdropHostState extends State<_AnimatedThemeBackdropHost>
 
   @override
   void dispose() {
+    _routeAnim?.removeStatusListener(_onRouteAnimationStatus);
+    _secondaryRouteAnim?.removeStatusListener(_onRouteAnimationStatus);
     AppThemeController.shared.removeListener(_syncPlayback);
     WidgetsBinding.instance.removeObserver(this);
+    _controller.removeListener(_onTick);
     _controller.dispose();
+    _throttledProgress.dispose();
     super.dispose();
   }
 
@@ -458,13 +514,13 @@ class _AnimatedThemeBackdropHostState extends State<_AnimatedThemeBackdropHost>
         Positioned.fill(
           child: IgnorePointer(
             child: RepaintBoundary(
-              child: AnimatedBuilder(
-                animation: _controller,
-                builder: (context, _) {
+              child: ValueListenableBuilder<double>(
+                valueListenable: _throttledProgress,
+                builder: (context, progress, _) {
                   return CustomPaint(
                     painter: AnimatedThemePainter(
                       preset: widget.preset,
-                      progress: _controller.value,
+                      progress: progress,
                       isEcoMode: isEco,
                     ),
                   );
@@ -478,12 +534,12 @@ class _AnimatedThemeBackdropHostState extends State<_AnimatedThemeBackdropHost>
           Positioned.fill(
             child: IgnorePointer(
               child: RepaintBoundary(
-                child: AnimatedBuilder(
-                  animation: _controller,
-                  builder: (context, _) {
+                child: ValueListenableBuilder<double>(
+                  valueListenable: _throttledProgress,
+                  builder: (context, progress, _) {
                     return CustomPaint(
                       painter: SakuraForegroundCanopyPainter(
-                        progress: _controller.value,
+                        progress: progress,
                         isEcoMode: isEco,
                       ),
                     );

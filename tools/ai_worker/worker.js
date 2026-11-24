@@ -120,13 +120,15 @@ async function handleWordExamples(request, env, url) {
     return jsonResponse({ ok: false, error: "invalid_word" }, 400);
   }
 
+  const cacheKey = `v2:${word}`;
+
   // 1) Önce Cloudflare D1 önbelleğine bak (maliyetsiz ve <100ms).
   if (env && env.DB) {
     try {
       await ensureSchema(env.DB);
       const cached = await env.DB
         .prepare("SELECT examples_json FROM word_examples_cache WHERE word = ? LIMIT 1")
-        .bind(word)
+        .bind(cacheKey)
         .first();
       if (cached && cached.examples_json) {
         const parsed = JSON.parse(cached.examples_json);
@@ -147,17 +149,17 @@ async function handleWordExamples(request, env, url) {
   }
 
   const systemPrompt = [
-    "You are an expert English-Turkish dictionary editor.",
+    "You are an expert English-Turkish dictionary editor for everyday language learners.",
     "Write EXACTLY 3 natural, meaningful, real-life English example sentences for the given English word or expression, with fluent Turkish translations.",
     "Strict rules:",
-    "1. Every English sentence MUST be a complete, natural sentence between 10 and 18 words long (never shorter than 8 words, never longer than 22 words).",
-    "2. Every sentence MUST naturally use the target word or expression in a clear, realistic context (daily life, work, travel, technology, news, or conversation).",
-    "3. Use 3 distinct, varied contexts. Never write dictionary definitions, bare phrases, or robotic templates like 'We talked about X in class today'.",
-    "4. Provide a natural, idiomatic Turkish translation for each sentence.",
+    "1. ALWAYS use the #1 MOST COMMON everyday meaning of the target word in ALL 3 sentences (for example: 'home' MUST mean house/residence/ev, 'run' MUST mean move fast/koşmak). NEVER use rare, technical, idiomatic, or obscure secondary meanings (such as 'home in on', 'home market', or 'home country' when 'home' simply means ev).",
+    "2. Every English sentence MUST be a complete, natural sentence between 10 and 18 words long (never shorter than 8 words, never longer than 22 words).",
+    "3. Use 3 different everyday life situations (family, friends, daily routine, travel, work) while keeping the SAME #1 most common meaning of the word. Never write dictionary definitions, bare phrases, or robotic templates.",
+    "4. Provide a natural, accurate Turkish translation for each sentence matching that #1 everyday meaning.",
     '5. Respond ONLY with valid JSON: {"examples":[{"english":"...","turkish":"..."},{"english":"...","turkish":"..."},{"english":"...","turkish":"..."}]}',
   ].join("\n");
 
-  const userPrompt = `Target word or expression: "${word}"\nReturn ONLY the JSON object.`;
+  const userPrompt = `Target word or expression: "${word}"\nUse ONLY its #1 most common everyday meaning in all 3 sentences.\nReturn ONLY the JSON object.`;
 
   try {
     const aiResult = await env.AI.run(MODEL_ID, {
@@ -165,7 +167,7 @@ async function handleWordExamples(request, env, url) {
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      temperature: 0.35,
+      temperature: 0.25,
       max_tokens: 420,
     });
 
@@ -187,7 +189,7 @@ async function handleWordExamples(request, env, url) {
               examples_json = excluded.examples_json,
               updated_at = excluded.updated_at
           `)
-          .bind(word, JSON.stringify(validExamples), new Date().toISOString())
+          .bind(cacheKey, JSON.stringify(validExamples), new Date().toISOString())
           .run();
       } catch (_) {}
     }

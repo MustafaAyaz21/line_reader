@@ -29,9 +29,23 @@ class ArticleReadingProgressController extends ChangeNotifier {
   final Map<String, ArticleReadingProgress> _itemsById =
       <String, ArticleReadingProgress>{};
   String? _lastArticleId;
+  String? _dismissedArticleId;
   bool _hasLoaded = false;
 
   bool get hasLoaded => _hasLoaded;
+
+  bool isContinueReadingDismissed(String articleId) {
+    final trimmed = articleId.trim();
+    return trimmed.isNotEmpty && _dismissedArticleId == trimmed;
+  }
+
+  Future<void> dismissContinueReading(String articleId) async {
+    final trimmed = articleId.trim();
+    if (trimmed.isEmpty || _dismissedArticleId == trimmed) return;
+    _dismissedArticleId = trimmed;
+    notifyListeners();
+    await _persistState();
+  }
 
   ArticleReadingProgress? get lastProgress {
     final id = _lastArticleId;
@@ -94,6 +108,13 @@ class ArticleReadingProgressController extends ChangeNotifier {
           _itemsById.containsKey(storedLastId)) {
         _lastArticleId = storedLastId;
       }
+      final storedDismissed =
+          (decoded['dismissedArticleId'] as String?)?.trim();
+      if (_dismissedArticleId == null &&
+          storedDismissed != null &&
+          storedDismissed.isNotEmpty) {
+        _dismissedArticleId = storedDismissed;
+      }
       notifyListeners();
     } catch (_) {
       // Test ortamı veya ilk açılışta yerel kayıt okunamazsa sessizce devam et.
@@ -124,12 +145,14 @@ class ArticleReadingProgressController extends ChangeNotifier {
     );
 
     final shouldNotify = _lastArticleId != id ||
+        _dismissedArticleId != null ||
         existing == null ||
         existing.progressPercent != updated.progressPercent ||
         existing.articleTitle != updated.articleTitle;
 
     _itemsById[id] = updated;
     _lastArticleId = id;
+    _dismissedArticleId = null;
     _pruneOverflow();
 
     if (shouldNotify) {
@@ -159,6 +182,7 @@ class ArticleReadingProgressController extends ChangeNotifier {
     try {
       final payload = <String, Object?>{
         'lastArticleId': _lastArticleId,
+        'dismissedArticleId': _dismissedArticleId,
         'items': <String, Object?>{
           for (final entry in _itemsById.entries)
             entry.key: entry.value.toJson(),
@@ -172,6 +196,7 @@ class ArticleReadingProgressController extends ChangeNotifier {
   void resetForTesting() {
     _itemsById.clear();
     _lastArticleId = null;
+    _dismissedArticleId = null;
     _hasLoaded = false;
     notifyListeners();
   }

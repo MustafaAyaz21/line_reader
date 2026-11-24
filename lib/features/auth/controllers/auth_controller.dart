@@ -200,16 +200,26 @@ class AuthController extends ChangeNotifier {
   }
 
   /// Sunucudan (`/me`) kullanıcının güncel yetkisini çeker ve yerel önbelleği günceller.
-  Future<void> refreshEntitlement() async {
+  Future<void> refreshEntitlement({bool forceTokenRefresh = false}) async {
     if (!isAuthenticated || _isSyncingEntitlement) return;
     _isSyncingEntitlement = true;
     _safeNotify();
 
     try {
-      final token = await getIdToken();
+      var token = await getIdToken(forceRefresh: forceTokenRefresh);
       if (token == null || token.trim().isEmpty) return;
 
-      final remote = await _entitlementClient.fetchEntitlement(token);
+      var remote = await _entitlementClient.fetchEntitlement(token);
+      if (remote == null && !forceTokenRefresh) {
+        // Eski/süresi dolmuş Firebase token ihtimaline karşı zorla yenileyip tekrar dene
+        final freshToken = await getIdToken(forceRefresh: true);
+        if (freshToken != null &&
+            freshToken.trim().isNotEmpty &&
+            freshToken != token) {
+          token = freshToken;
+          remote = await _entitlementClient.fetchEntitlement(token);
+        }
+      }
       if (remote == null) return;
 
       _isUnlimited = remote.isUnlimited;
@@ -518,9 +528,9 @@ class AuthController extends ChangeNotifier {
 
   /// Yalnızca kayıtlı kullanıcılar için tarayıcı AI Worker doğrulama token'ı döner;
   /// misafir kullanıcılar için her zaman `null` döner.
-  Future<String?> getIdToken() async {
+  Future<String?> getIdToken({bool forceRefresh = false}) async {
     if (!isAuthenticated) return null;
-    return _backend.getIdToken();
+    return _backend.getIdToken(forceRefresh: forceRefresh);
   }
 
   Future<void> signOut() async {

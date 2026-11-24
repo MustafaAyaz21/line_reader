@@ -111,7 +111,14 @@ class CloudflareEntitlementService implements EntitlementClient {
     final token = idToken.trim();
     if (!_hasEndpoint || token.isEmpty) return null;
 
-    for (final base in _orderedBaseUrls()) {
+    final urls = _orderedBaseUrls();
+    for (var i = 0; i < urls.length; i++) {
+      final base = urls[i];
+      // İlk denemede mobil operatör workers.dev'i düşürüyorsa 12 sn beklemeyip
+      // 3.5 sn içinde pages.dev/api yedeğine geç.
+      final timeout = i == 0 && urls.length > 1
+          ? const Duration(milliseconds: 3500)
+          : ApiConfig.requestTimeout;
       try {
         final uri = Uri.parse('$base/me');
         final response = await _httpClient
@@ -123,7 +130,7 @@ class CloudflareEntitlementService implements EntitlementClient {
                 'User-Agent': 'LineReaderApp',
               },
             )
-            .timeout(ApiConfig.requestTimeout);
+            .timeout(timeout);
 
         if (response.statusCode != 200) continue;
 

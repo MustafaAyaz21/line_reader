@@ -174,6 +174,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.tap(
+      find.byKey(const ValueKey<String>('settings_theme_cat_static')),
+    );
+    await tester.pumpAndSettle();
+
     final electricCoralTile = find.byKey(
       const ValueKey<String>('settings_theme_electric_coral'),
     );
@@ -389,13 +394,23 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Ayarlar > Görünüm / Temalar alt sayfasını aç
+      // Ayarlar > Görünüm ve Temalar alt sayfasını aç
       await tester.tap(
         find.byKey(const ValueKey<String>('settings_cat_appearance')),
       );
       await tester.pumpAndSettle();
 
+      // Hareketsiz Temalar ve Hareketli Temalar ayrı kategori kartları olarak görünür
       expect(find.text('Hareketsiz Temalar'), findsOneWidget);
+      expect(find.text('Hareketli Temalar'), findsOneWidget);
+      // Yetkisiz / misafir kullanıcıda Özel Temalar kategorisi tamamen gizli olmalı
+      expect(find.text('Özel Temalar'), findsNothing);
+
+      // Hareketli Temalar alt sayfasına gir
+      await tester.tap(
+        find.byKey(const ValueKey<String>('settings_theme_cat_animated')),
+      );
+      await tester.pumpAndSettle();
 
       final pauseSwitch = find.byKey(
         const ValueKey<String>('settings_theme_pause_animation_switch'),
@@ -406,8 +421,6 @@ void main() {
         scrollable: find.byType(Scrollable).first,
       );
       await tester.pumpAndSettle();
-
-      expect(find.text('Hareketli Temalar'), findsOneWidget);
 
       // 4 yeni hareketli tema başlık & kısa açıklamaları
       expect(find.text('Ametist Galaksi'), findsOneWidget);
@@ -446,8 +459,7 @@ void main() {
       await tester.pump();
       expect(AppThemeController.shared.isAnimationPaused, isTrue);
 
-      // Yetkisiz / misafir kullanıcıda Özel Temalar ve Sakura Bahçesi tamamen gizli olmalı
-      expect(find.text('Özel Temalar'), findsNothing);
+      // Yetkisiz kullanıcıda Sakura Bahçesi görünmez
       expect(find.text('Sakura Bahçesi'), findsNothing);
 
       apiKeyController.dispose();

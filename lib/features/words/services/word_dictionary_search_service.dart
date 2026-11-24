@@ -143,6 +143,23 @@ Respond ONLY with valid JSON:
         RegExp(r'^[a-zA-Z]+$').hasMatch(normalizedWord);
     WordLexiconInfo? lexiconInfo;
 
+    // Eş/zıt anlamlı + IPA ve örnek cümle aramalarını bekletmeden hemen paralel başlat.
+    final Future<WordLexiconInfo?> lexiconFuture = isSingleWord
+        ? _lexiconService.lookup(normalizedWord).catchError((_) => null)
+        : Future<WordLexiconInfo?>.value(null);
+    final Future<List<WordExampleSentence>> workerExamplesFuture =
+        collectedExamples.length < _targetExamplesCount
+            ? _fetchWorkerExamples(normalizedWord)
+            : Future<List<WordExampleSentence>>.value(
+                const <WordExampleSentence>[],
+              );
+    final Future<List<WordExampleSentence>> tatoebaExamplesFuture =
+        collectedExamples.length < _targetExamplesCount
+            ? _fetchTatoebaExamples(normalizedWord)
+            : Future<List<WordExampleSentence>>.value(
+                const <WordExampleSentence>[],
+              );
+
     // 2) Anlam sayısı < 10 veya örnek < 3 ise ücretsiz çoklu kaynaklardan tamamla.
     if (collectedMeanings.length < _targetMinMeanings ||
         collectedExamples.length < _targetExamplesCount) {
@@ -222,13 +239,12 @@ Respond ONLY with valid JSON:
           }
         }
 
-        // Örnek cümleleri topla (öncelik: 1) Worker AI + D1 önbellek,
-        // 2) Tatoeba insan çevirili korpus, 3) Sözlüklerden 8-22 kelimelik tam cümleler).
+        // Örnek cümleleri topla (zaten paralel başlatıldı!).
         if (collectedExamples.length < _targetExamplesCount) {
           final richResults = await Future.wait<List<WordExampleSentence>>(
             <Future<List<WordExampleSentence>>>[
-              _fetchWorkerExamples(normalizedWord),
-              _fetchTatoebaExamples(normalizedWord),
+              workerExamplesFuture,
+              tatoebaExamplesFuture,
             ],
           );
 
@@ -387,7 +403,7 @@ Respond ONLY with valid JSON:
 
     if (isSingleWord) {
       try {
-        lexiconInfo = await _lexiconService.lookup(normalizedWord);
+        lexiconInfo = await lexiconFuture;
       } catch (_) {}
     }
 
@@ -955,43 +971,51 @@ Respond ONLY with valid JSON:
 
   /// Cloudflare Worker AI + D1 önbellek üzerinden hedef kelime/ifade için
   /// 3 adet 8–22 kelimelik doğal İngilizce–Türkçe örnek cümle getirir.
+  /// Mobil veride `workers.dev` yavaşlarsa otomatik `pages.dev/api/examples` yedeğine geçer.
   Future<List<WordExampleSentence>> _fetchWorkerExamples(String word) async {
-    try {
-      final uri = Uri.parse(ApiConfig.wordExamplesWorkerUrl);
-      final response = await _httpClient
-          .post(
-            uri,
-            headers: const <String, String>{
-              'Content-Type': 'application/json; charset=utf-8',
-              'Accept': 'application/json',
-            },
-            body: jsonEncode(<String, Object?>{'word': word}),
-          )
-          .timeout(const Duration(seconds: 7));
+    final endpoints = <String>[
+      ApiConfig.wordExamplesWorkerUrl,
+      '${ApiConfig.browserAiFallbackEndpoint}/examples',
+    ];
+    for (var i = 0; i < endpoints.length; i++) {
+      final timeout =
+          i == 0 ? const Duration(milliseconds: 3000) : const Duration(seconds: 4);
+      try {
+        final uri = Uri.parse(endpoints[i]);
+        final response = await _httpClient
+            .post(
+              uri,
+              headers: const <String, String>{
+                'Content-Type': 'application/json; charset=utf-8',
+                'Accept': 'application/json',
+              },
+              body: jsonEncode(<String, Object?>{'word': word}),
+            )
+            .timeout(timeout);
 
-      if (response.statusCode != 200) return const <WordExampleSentence>[];
-      final decoded = jsonDecode(response.body);
-      if (decoded is! Map<String, dynamic>) return const <WordExampleSentence>[];
-      final rawList = decoded['examples'];
-      if (rawList is! List<dynamic>) return const <WordExampleSentence>[];
+        if (response.statusCode != 200) continue;
+        final decoded = jsonDecode(response.body);
+        if (decoded is! Map<String, dynamic>) continue;
+        final rawList = decoded['examples'];
+        if (rawList is! List<dynamic>) continue;
 
-      final results = <WordExampleSentence>[];
-      for (final item in rawList) {
-        if (item is! Map<String, dynamic>) continue;
-        final en = _cleanSentence((item['english'] ?? '').toString());
-        final tr = (item['turkish'] ?? '').toString().trim();
-        if (en.isEmpty) continue;
-        results.add(
-          WordExampleSentence(
-            english: en,
-            turkish: tr.isNotEmpty ? tr : null,
-          ),
-        );
-      }
-      return results;
-    } catch (_) {
-      return const <WordExampleSentence>[];
+        final results = <WordExampleSentence>[];
+        for (final item in rawList) {
+          if (item is! Map<String, dynamic>) continue;
+          final en = _cleanSentence((item['english'] ?? '').toString());
+          final tr = (item['turkish'] ?? '').toString().trim();
+          if (en.isEmpty) continue;
+          results.add(
+            WordExampleSentence(
+              english: en,
+              turkish: tr.isNotEmpty ? tr : null,
+            ),
+          );
+        }
+        if (results.isNotEmpty) return results;
+      } catch (_) {}
     }
+    return const <WordExampleSentence>[];
   }
 
   /// Tatoeba açık korpusundan insan çevirili İngilizce–Türkçe örnek cümleler çeker.
@@ -1014,7 +1038,7 @@ Respond ONLY with valid JSON:
           'Accept': 'application/json',
           'User-Agent': 'LineReader/1.0',
         },
-      ).timeout(const Duration(seconds: 6));
+      ).timeout(const Duration(milliseconds: 3500));
 
       if (response.statusCode != 200) return const <WordExampleSentence>[];
       final decoded = jsonDecode(response.body);

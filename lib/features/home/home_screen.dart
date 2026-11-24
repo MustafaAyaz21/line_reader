@@ -93,6 +93,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _checkForAppUpdateSilently();
+      if (_authController?.isAuthenticated == true) {
+        _authController!.refreshEntitlement();
+      }
       _refreshArticlesSilently();
       _authController?.refreshEntitlement();
       _wordsController?.loadLists();

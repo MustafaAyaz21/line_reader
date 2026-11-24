@@ -68,6 +68,7 @@ class _LineReaderAppState extends State<LineReaderApp> {
               classicBrightness: Brightness.dark,
             ),
             themeMode: preset.themeMode,
+            themeAnimationDuration: Duration.zero,
             home: const SplashScreen(),
           );
         },

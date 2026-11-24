@@ -226,7 +226,11 @@ class MainMenuScreen extends StatelessWidget {
                   listenable: Listenable.merge(listenables),
                   builder: (context, _) {
                     final lastProgress = progressController.lastProgress;
-                    if (lastProgress == null || lastProgress.isCompleted) {
+                    if (lastProgress == null ||
+                        lastProgress.isCompleted ||
+                        progressController.isContinueReadingDismissed(
+                          lastProgress.articleId,
+                        )) {
                       return const SizedBox.shrink();
                     }
                     final article = _findVisibleArticleById(
@@ -245,6 +249,8 @@ class MainMenuScreen extends StatelessWidget {
                           article,
                           progressController,
                         ),
+                        onDismiss: () => progressController
+                            .dismissContinueReading(lastProgress.articleId),
                       ),
                     );
                   },
@@ -345,11 +351,13 @@ class _ContinueReadingCard extends StatelessWidget {
     required this.article,
     required this.progress,
     required this.onTap,
+    required this.onDismiss,
   });
 
   final Article article;
   final ArticleReadingProgress progress;
   final VoidCallback onTap;
+  final VoidCallback onDismiss;
 
   @override
   Widget build(BuildContext context) {
@@ -425,6 +433,25 @@ class _ContinueReadingCard extends StatelessWidget {
                       ),
                     ),
                   ],
+                  const SizedBox(width: 4),
+                  SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: IconButton(
+                      key: const ValueKey<String>(
+                        'main_menu_continue_reading_dismiss_btn',
+                      ),
+                      padding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                      tooltip: s.t('Kapat', 'Dismiss'),
+                      onPressed: onDismiss,
+                      icon: Icon(
+                        Icons.close_rounded,
+                        size: 16,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 10),

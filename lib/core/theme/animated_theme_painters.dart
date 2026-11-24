@@ -133,12 +133,18 @@ class AnimatedThemePainter extends CustomPainter {
         width: spec.rx * 2 * breathe,
         height: spec.ry * 2 * breathe,
       );
+      // GPU dostu yumuşak dış hare (MaskFilter.blur kullanmadan)
       final ringPaint = Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = spec.stroke
-        ..color = spec.color.withAlpha((spec.alpha * 255).round())
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, isPreview ? 3 : 8);
+        ..color = spec.color.withAlpha((spec.alpha * 165).round());
       canvas.drawOval(oval, ringPaint);
+
+      final midPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = spec.stroke * 0.45
+        ..color = spec.color.withAlpha((spec.alpha * 225).round());
+      canvas.drawOval(oval, midPaint);
 
       final crispPaint = Paint()
         ..style = PaintingStyle.stroke

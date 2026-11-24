@@ -231,7 +231,7 @@ class _FakeAuthBackend implements AuthBackend {
   }
 
   @override
-  Future<String?> getIdToken() async =>
+  Future<String?> getIdToken({bool forceRefresh = false}) async =>
       _current == null ? null : 'fake-jwt-token';
 
   @override

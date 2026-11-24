@@ -118,7 +118,7 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
     final trimmed = value.trim();
     if (trimmed.length < 2) return;
 
-    _debounceTimer = Timer(const Duration(milliseconds: 700), () {
+    _debounceTimer = Timer(const Duration(milliseconds: 450), () {
       if (!mounted) return;
       if (_searchController.text.trim() == trimmed &&
           _detail?.word != _normalizeKey(trimmed)) {
@@ -247,6 +247,28 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
       }
 
       final lexicon = detail.lexiconInfo;
+      // Yeni aranan kelimede eş/zıt anlamlılar otomatik seçili gelmez;
+      // kullanıcı yalnızca eklemek istediklerine tıklayarak tikler.
+      // Daha önce kaydedilmiş bir kelime düzenleniyorsa mevcut seçimler korunur.
+      final preselectedSynonyms = <String>{};
+      final preselectedAntonyms = <String>{};
+      if (matched != null) {
+        final savedSynKeys =
+            matched.synonyms.map(_normalizeKey).toSet();
+        final savedAntKeys =
+            matched.antonyms.map(_normalizeKey).toSet();
+        for (final s in lexicon?.synonyms ?? const <String>[]) {
+          if (savedSynKeys.contains(_normalizeKey(s))) {
+            preselectedSynonyms.add(s);
+          }
+        }
+        for (final a in lexicon?.antonyms ?? const <String>[]) {
+          if (savedAntKeys.contains(_normalizeKey(a))) {
+            preselectedAntonyms.add(a);
+          }
+        }
+      }
+
       setState(() {
         _detail = WordSearchDetail(
           word: detail.word,
@@ -260,10 +282,10 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
           ..addAll(preselected);
         _selectedSynonyms
           ..clear()
-          ..addAll(lexicon?.synonyms ?? const <String>[]);
+          ..addAll(preselectedSynonyms);
         _selectedAntonyms
           ..clear()
-          ..addAll(lexicon?.antonyms ?? const <String>[]);
+          ..addAll(preselectedAntonyms);
         _isLoading = false;
       });
     } on TranslationException catch (error) {
@@ -1175,53 +1197,13 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
               Expanded(
                 child: ListView.separated(
                   padding: const EdgeInsets.symmetric(vertical: 4),
-                  itemCount: detail.meanings.length +
-                      ((detail.lexiconInfo != null &&
-                              detail.lexiconInfo!.hasRelations)
-                          ? 1
-                          : 0),
+                  itemCount: detail.meanings.length,
                   separatorBuilder: (context, index) => Divider(
                     height: 1,
                     indent: 52,
                     color: colorScheme.outlineVariant.withAlpha(140),
                   ),
                   itemBuilder: (context, index) {
-                    if (index >= detail.meanings.length) {
-                      final info = detail.lexiconInfo!;
-                      return Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-                        child: WordRelationsSection(
-                          synonyms: info.synonyms,
-                          antonyms: info.antonyms,
-                          selectedSynonyms: _selectedSynonyms,
-                          selectedAntonyms: _selectedAntonyms,
-                          onToggleSynonym: (term) {
-                            setState(() {
-                              if (!_selectedSynonyms.remove(term)) {
-                                _selectedSynonyms.add(term);
-                              }
-                            });
-                          },
-                          onToggleAntonym: (term) {
-                            setState(() {
-                              if (!_selectedAntonyms.remove(term)) {
-                                _selectedAntonyms.add(term);
-                              }
-                            });
-                          },
-                          onToggleAll: (selectAll) {
-                            setState(() {
-                              _selectedSynonyms.clear();
-                              _selectedAntonyms.clear();
-                              if (selectAll) {
-                                _selectedSynonyms.addAll(info.synonyms);
-                                _selectedAntonyms.addAll(info.antonyms);
-                              }
-                            });
-                          },
-                        ),
-                      );
-                    }
                     final entry = detail.meanings[index];
                     final isChecked = _selectedIndices.contains(index);
 
@@ -1310,129 +1292,179 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
           thickness: 2,
           color: colorScheme.outlineVariant,
         ),
-        // ALT BÖLÜM: 3 Kısa Örnek Cümle
-        Expanded(
-          flex: 4,
-          child: Container(
-            color: colorScheme.surfaceContainerLowest,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.format_quote_rounded,
-                        size: 18,
-                        color: colorScheme.primary,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Örnek Cümleler',
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: colorScheme.onSurface,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 2, 16, 84),
-                    itemCount: detail.examples.length,
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: 8),
-                    itemBuilder: (context, index) {
-                      final example = detail.examples[index];
-                      return Container(
-                        padding: const EdgeInsets.fromLTRB(12, 9, 8, 9),
-                        decoration: BoxDecoration(
-                          color: colorScheme.surface,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: colorScheme.outlineVariant.withAlpha(160),
-                          ),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              width: 20,
-                              height: 20,
-                              alignment: Alignment.center,
-                              margin: const EdgeInsets.only(top: 1),
-                              decoration: BoxDecoration(
-                                color: colorScheme.secondaryContainer,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Text(
-                                '${index + 1}',
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  color: colorScheme.onSecondaryContainer,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _HighlightedSentenceText(
-                                    sentence: example.english,
-                                    highlightWord: detail.word,
-                                    baseStyle:
-                                        theme.textTheme.bodyMedium?.copyWith(
-                                      color: colorScheme.onSurface,
-                                      height: 1.35,
-                                    ),
-                                    highlightColor: colorScheme.primary,
-                                  ),
-                                  if (example.turkish != null &&
-                                      example.turkish!.isNotEmpty) ...[
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      example.turkish!,
-                                      style:
-                                          theme.textTheme.bodySmall?.copyWith(
-                                        color: colorScheme.onSurfaceVariant,
-                                        height: 1.3,
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                            if (widget.ttsService != null)
-                              IconButton(
-                                onPressed: () => _handleSpeak(
-                                  example.english,
-                                  TtsSpeakingTarget.sentence,
-                                ),
-                                icon: Icon(
-                                  Icons.volume_up_outlined,
-                                  size: 18,
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                                tooltip: 'Cümleyi Dinle',
-                                visualDensity: VisualDensity.compact,
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(
-                                  minWidth: 30,
-                                  minHeight: 30,
-                                ),
-                              ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
+        // ORTA BÖLÜM: Eş & Zıt Anlamlılar (kaydırmadan doğrudan erişilebilir, tıklayarak tiklenir)
+        if (detail.lexiconInfo != null && detail.lexiconInfo!.hasRelations) ...[
+          Container(
+            color: colorScheme.surfaceContainerLow,
+            constraints: const BoxConstraints(maxHeight: 132),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: WordRelationsSection(
+                synonyms: detail.lexiconInfo!.synonyms,
+                antonyms: detail.lexiconInfo!.antonyms,
+                selectedSynonyms: _selectedSynonyms,
+                selectedAntonyms: _selectedAntonyms,
+                onToggleSynonym: (term) {
+                  setState(() {
+                    if (!_selectedSynonyms.remove(term)) {
+                      _selectedSynonyms.add(term);
+                    }
+                  });
+                },
+                onToggleAntonym: (term) {
+                  setState(() {
+                    if (!_selectedAntonyms.remove(term)) {
+                      _selectedAntonyms.add(term);
+                    }
+                  });
+                },
+                onToggleAll: (selectAll) {
+                  setState(() {
+                    _selectedSynonyms.clear();
+                    _selectedAntonyms.clear();
+                    if (selectAll) {
+                      _selectedSynonyms.addAll(detail.lexiconInfo!.synonyms);
+                      _selectedAntonyms.addAll(detail.lexiconInfo!.antonyms);
+                    }
+                  });
+                },
+              ),
             ),
+          ),
+          Divider(
+            height: 1,
+            color: colorScheme.outlineVariant,
+          ),
+        ],
+        // ALT BÖLÜM: Tek Örnek Cümle Görünümü (aşağı kaydırınca diğer cümleler görünür)
+        Container(
+          color: colorScheme.surfaceContainerLowest,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.format_quote_rounded,
+                      size: 17,
+                      color: colorScheme.primary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Örnek Cümleler',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                    const Spacer(),
+                    if (detail.examples.length > 1)
+                      Text(
+                        '${detail.examples.length} cümle • kaydır',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              SizedBox(
+                height: 112,
+                child: ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 2, 76, 16),
+                  itemCount: detail.examples.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final example = detail.examples[index];
+                    return Container(
+                      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: colorScheme.outlineVariant.withAlpha(160),
+                        ),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 20,
+                            height: 20,
+                            alignment: Alignment.center,
+                            margin: const EdgeInsets.only(top: 1),
+                            decoration: BoxDecoration(
+                              color: colorScheme.secondaryContainer,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              '${index + 1}',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: colorScheme.onSecondaryContainer,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _HighlightedSentenceText(
+                                  sentence: example.english,
+                                  highlightWord: detail.word,
+                                  baseStyle:
+                                      theme.textTheme.bodyMedium?.copyWith(
+                                    color: colorScheme.onSurface,
+                                    height: 1.32,
+                                  ),
+                                  highlightColor: colorScheme.primary,
+                                ),
+                                if (example.turkish != null &&
+                                    example.turkish!.isNotEmpty) ...[
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    example.turkish!,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                      height: 1.28,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          if (widget.ttsService != null)
+                            IconButton(
+                              onPressed: () => _handleSpeak(
+                                example.english,
+                                TtsSpeakingTarget.sentence,
+                              ),
+                              icon: Icon(
+                                Icons.volume_up_outlined,
+                                size: 18,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                              tooltip: 'Cümleyi Dinle',
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 30,
+                                minHeight: 30,
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         ),
       ],

@@ -41,7 +41,7 @@ abstract class AuthBackend {
   Future<AppAuthUser?> reloadCurrentUser() async => currentUser;
 
   /// Kayıtlı kullanıcı için kısa ömürlü imzalı Firebase ID Token döndürür.
-  Future<String?> getIdToken();
+  Future<String?> getIdToken({bool forceRefresh = false});
 
   Future<void> signOut();
 }
@@ -367,12 +367,12 @@ class FirebaseAuthBackend implements AuthBackend {
   }
 
   @override
-  Future<String?> getIdToken() async {
+  Future<String?> getIdToken({bool forceRefresh = false}) async {
     if (!_isConfigured) return null;
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return null;
-      return await user.getIdToken();
+      return await user.getIdToken(forceRefresh);
     } catch (error) {
       debugPrint('[FirebaseAuthBackend] ID token alma hatasi: $error');
       return null;

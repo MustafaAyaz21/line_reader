@@ -233,11 +233,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     context: context,
                     titleBuilder: (ls) =>
                         ls.t('Profil ve Hesap', 'Profile & Account'),
-                    bodyBuilder: (ctx, th, cs, ls) => ListView(
-                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
-                      children: <Widget>[
-                        _buildAccountCard(ctx, th, cs, ls),
-                      ],
+                    bodyBuilder: (ctx, th, cs, ls) => RefreshIndicator(
+                      onRefresh: () async {
+                        if (widget.authController.isAuthenticated) {
+                          await widget.authController
+                              .refreshEntitlement(forceTokenRefresh: true);
+                        }
+                      },
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
+                        children: <Widget>[
+                          _buildAccountCard(ctx, th, cs, ls),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -626,212 +635,235 @@ class _SettingsScreenState extends State<SettingsScreen> {
     AppStrings s,
   ) {
     final activePreset = AppThemeController.shared.preset;
-    final isAnimationPaused = AppThemeController.shared.isAnimationPaused;
-    final isEcoAnimation = AppThemeController.shared.isEcoAnimation;
     final canSeeSpecialThemes = widget.authController.hasSpecialThemes;
+    final activeTitle = activePreset.titleForLocale(isEnglish: s.isEn);
 
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Row(
-              children: <Widget>[
-                Icon(
-                  Icons.palette_outlined,
-                  size: 20,
-                  color: colorScheme.primary,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    s.t('Renk Teması ve Atmosfer', 'Color Theme & Atmosphere'),
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              s.t(
+    final staticSubtitle = !activePreset.isAnimatedTheme &&
+            !activePreset.isSpecialTheme
+        ? '${s.t('Seçili', 'Active')}: $activeTitle'
+        : s.t('Varsayılan ve 4 hareketsiz renk teması', 'Classic & 4 static color themes');
+
+    final animatedSubtitle = activePreset.isAnimatedTheme &&
+            !activePreset.isSpecialTheme
+        ? '${s.t('Seçili', 'Active')}: $activeTitle'
+        : s.t('4 sakin hareketli vektör tema', '4 calm animated vector themes');
+
+    final specialSubtitle = activePreset.isSpecialTheme
+        ? '${s.t('Seçili', 'Active')}: $activeTitle'
+        : s.t('Size özel tanımlı temalar', 'Exclusive themes unlocked for you');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        _SettingsCategoryCard(
+          key: const ValueKey<String>('settings_theme_cat_static'),
+          icon: Icons.layers_outlined,
+          iconBg: colorScheme.primaryContainer,
+          iconColor: colorScheme.onPrimaryContainer,
+          title: s.t('Hareketsiz Temalar', 'Static Themes'),
+          subtitle: staticSubtitle,
+          onTap: () => _openSubPage(
+            context: context,
+            titleBuilder: (ls) => ls.t('Hareketsiz Temalar', 'Static Themes'),
+            bodyBuilder: (ctx, th, cs, ls) => _buildThemeCategoryPage(
+              presets: AppThemePreset.staticPresets,
+              description: ls.t(
                 'Ana menü, kartlar, kelime listeleri, tarayıcı çevresi ve makale okuma alanına anında uygulanır.',
                 'Applies instantly to Home, cards, word lists, browser chrome, and article reading areas.',
               ),
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-                height: 1.35,
-              ),
+              showAnimationControls: false,
+              theme: th,
+              colorScheme: cs,
+              s: ls,
             ),
-            const SizedBox(height: 16),
-            // 1. Alt Kategori: Hareketsiz Temalar
-            _buildThemeSubcategoryHeader(
-              theme: theme,
-              colorScheme: colorScheme,
-              icon: Icons.layers_outlined,
-              title: s.t('Hareketsiz Temalar', 'Static Themes'),
-            ),
-            const SizedBox(height: 10),
-            _buildThemePresetGrid(
-              presets: AppThemePreset.staticPresets,
-              activePreset: activePreset,
-              theme: theme,
-              colorScheme: colorScheme,
-              s: s,
-            ),
-            const SizedBox(height: 18),
-            Divider(height: 1, color: colorScheme.outlineVariant),
-            const SizedBox(height: 16),
-            // 2. Alt Kategori: Hareketli Temalar
-            _buildThemeSubcategoryHeader(
-              theme: theme,
-              colorScheme: colorScheme,
-              icon: Icons.auto_awesome_rounded,
-              title: s.t('Hareketli Temalar', 'Animated Themes'),
-            ),
-            const SizedBox(height: 10),
-            _buildThemePresetGrid(
-              presets: AppThemePreset.animatedPresets,
-              activePreset: activePreset,
-              theme: theme,
-              colorScheme: colorScheme,
-              s: s,
-            ),
-            const SizedBox(height: 12),
-            Material(
-              color: colorScheme.surfaceContainerHighest.withAlpha(135),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-                side: BorderSide(color: colorScheme.outlineVariant),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: SwitchListTile(
-                key: const ValueKey<String>(
-                  'settings_theme_pause_animation_switch',
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 2,
-                ),
-                dense: true,
-                secondary: Icon(
-                  isAnimationPaused
-                      ? Icons.pause_circle_outline_rounded
-                      : Icons.motion_photos_on_rounded,
-                  size: 20,
-                  color: colorScheme.primary,
-                ),
-                title: Text(
-                  s.t('Animasyonu Duraklat', 'Pause Animation'),
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                subtitle: Text(
-                  s.t(
-                    'Arka plan animasyonunu sabitler (uygulama küçültülünce otomatik durur).',
-                    'Freezes background motion (auto-pauses when minimized).',
-                  ),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    fontSize: 11.5,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                value: isAnimationPaused,
-                onChanged: (value) =>
-                    AppThemeController.shared.setAnimationPaused(value),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Material(
-              color: colorScheme.surfaceContainerHighest.withAlpha(135),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-                side: BorderSide(color: colorScheme.outlineVariant),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: SwitchListTile(
-                key: const ValueKey<String>(
-                  'settings_theme_eco_animation_switch',
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 2,
-                ),
-                dense: true,
-                secondary: Icon(
-                  Icons.battery_saver_rounded,
-                  size: 20,
-                  color: colorScheme.primary,
-                ),
-                title: Text(
-                  s.t('Pil Dostu Animasyon', 'Battery-Saver Motion'),
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                subtitle: Text(
-                  s.t(
-                    'Daha az yaprak ve daha sakin hızla sıfır kasma sağlar.',
-                    'Fewer particles and gentler speed for zero lag.',
-                  ),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    fontSize: 11.5,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                value: isEcoAnimation,
-                onChanged: isAnimationPaused
-                    ? null
-                    : (value) =>
-                        AppThemeController.shared.setEcoAnimation(value),
-              ),
-            ),
-            if (canSeeSpecialThemes &&
-                AppThemePreset.specialPresets.isNotEmpty) ...<Widget>[
-              const SizedBox(height: 18),
-              Divider(height: 1, color: colorScheme.outlineVariant),
-              const SizedBox(height: 16),
-              // 3. Alt Kategori: Özel Temalar (yalnızca yetkili & geliştirici hesaplarda görünür)
-              _buildThemeSubcategoryHeader(
-                theme: theme,
-                colorScheme: colorScheme,
-                icon: Icons.workspace_premium_rounded,
-                title: s.t('Özel Temalar', 'Special Themes'),
-              ),
-              const SizedBox(height: 10),
-              _buildThemePresetGrid(
-                presets: AppThemePreset.specialPresets,
-                activePreset: activePreset,
-                theme: theme,
-                colorScheme: colorScheme,
-                s: s,
-              ),
-            ],
-          ],
+          ),
         ),
-      ),
+        const SizedBox(height: 10),
+        _SettingsCategoryCard(
+          key: const ValueKey<String>('settings_theme_cat_animated'),
+          icon: Icons.auto_awesome_rounded,
+          iconBg: colorScheme.secondaryContainer,
+          iconColor: colorScheme.onSecondaryContainer,
+          title: s.t('Hareketli Temalar', 'Animated Themes'),
+          subtitle: animatedSubtitle,
+          onTap: () => _openSubPage(
+            context: context,
+            titleBuilder: (ls) => ls.t('Hareketli Temalar', 'Animated Themes'),
+            bodyBuilder: (ctx, th, cs, ls) => _buildThemeCategoryPage(
+              presets: AppThemePreset.animatedPresets,
+              description: ls.t(
+                'Göz yormayan, sakin vektör animasyonlu temalar. Uygulama küçültülünce otomatik duraklayıp pil tasarrufu sağlar.',
+                'Calm, eye-friendly vector animated themes. Auto-pauses when minimized to save battery.',
+              ),
+              showAnimationControls: true,
+              theme: th,
+              colorScheme: cs,
+              s: ls,
+            ),
+          ),
+        ),
+        if (canSeeSpecialThemes &&
+            AppThemePreset.specialPresets.isNotEmpty) ...<Widget>[
+          const SizedBox(height: 10),
+          _SettingsCategoryCard(
+            key: const ValueKey<String>('settings_theme_cat_special'),
+            icon: Icons.workspace_premium_rounded,
+            iconBg: colorScheme.tertiaryContainer,
+            iconColor: colorScheme.onTertiaryContainer,
+            title: s.t('Özel Temalar', 'Special Themes'),
+            subtitle: specialSubtitle,
+            onTap: () => _openSubPage(
+              context: context,
+              titleBuilder: (ls) => ls.t('Özel Temalar', 'Special Themes'),
+              bodyBuilder: (ctx, th, cs, ls) => _buildThemeCategoryPage(
+                presets: AppThemePreset.specialPresets,
+                description: ls.t(
+                  'Hesabınıza özel tanımlanmış koleksiyon temaları.',
+                  'Exclusive collection themes unlocked for your account.',
+                ),
+                showAnimationControls: true,
+                theme: th,
+                colorScheme: cs,
+                s: ls,
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 
-  Widget _buildThemeSubcategoryHeader({
+  Widget _buildThemeCategoryPage({
+    required List<AppThemePreset> presets,
+    required String description,
+    required bool showAnimationControls,
     required ThemeData theme,
     required ColorScheme colorScheme,
-    required IconData icon,
-    required String title,
+    required AppStrings s,
   }) {
-    return Row(
+    final activePreset = AppThemeController.shared.preset;
+    final isAnimationPaused = AppThemeController.shared.isAnimationPaused;
+    final isEcoAnimation = AppThemeController.shared.isEcoAnimation;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
       children: <Widget>[
-        Icon(icon, size: 16, color: colorScheme.primary),
-        const SizedBox(width: 7),
-        Text(
-          title,
-          style: theme.textTheme.labelLarge?.copyWith(
-            fontWeight: FontWeight.w700,
-            color: colorScheme.onSurface,
+        Card(
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Text(
+                  description,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _buildThemePresetGrid(
+                  presets: presets,
+                  activePreset: activePreset,
+                  theme: theme,
+                  colorScheme: colorScheme,
+                  s: s,
+                ),
+                if (showAnimationControls) ...<Widget>[
+                  const SizedBox(height: 14),
+                  Material(
+                    color: colorScheme.surfaceContainerHighest.withAlpha(135),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      side: BorderSide(color: colorScheme.outlineVariant),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: SwitchListTile(
+                      key: const ValueKey<String>(
+                        'settings_theme_pause_animation_switch',
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 2,
+                      ),
+                      dense: true,
+                      secondary: Icon(
+                        isAnimationPaused
+                            ? Icons.pause_circle_outline_rounded
+                            : Icons.motion_photos_on_rounded,
+                        size: 20,
+                        color: colorScheme.primary,
+                      ),
+                      title: Text(
+                        s.t('Animasyonu Duraklat', 'Pause Animation'),
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      subtitle: Text(
+                        s.t(
+                          'Arka plan animasyonunu sabitler (uygulama küçültülünce otomatik durur).',
+                          'Freezes background motion (auto-pauses when minimized).',
+                        ),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontSize: 11.5,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      value: isAnimationPaused,
+                      onChanged: (value) =>
+                          AppThemeController.shared.setAnimationPaused(value),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Material(
+                    color: colorScheme.surfaceContainerHighest.withAlpha(135),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      side: BorderSide(color: colorScheme.outlineVariant),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: SwitchListTile(
+                      key: const ValueKey<String>(
+                        'settings_theme_eco_animation_switch',
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 2,
+                      ),
+                      dense: true,
+                      secondary: Icon(
+                        Icons.battery_saver_rounded,
+                        size: 20,
+                        color: colorScheme.primary,
+                      ),
+                      title: Text(
+                        s.t('Pil Dostu Animasyon', 'Battery-Saver Motion'),
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      subtitle: Text(
+                        s.t(
+                          'Daha az yaprak ve daha sakin hızla sıfır kasma sağlar.',
+                          'Fewer particles and gentler speed for zero lag.',
+                        ),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontSize: 11.5,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      value: isEcoAnimation,
+                      onChanged: isAnimationPaused
+                          ? null
+                          : (value) =>
+                              AppThemeController.shared.setEcoAnimation(value),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ],
