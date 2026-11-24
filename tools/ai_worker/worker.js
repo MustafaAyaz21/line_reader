@@ -1804,12 +1804,14 @@ async function handleAdminRequest(request, env, path, method) {
 
     const body = await safeReadJson(request);
 
-    // Geçmiş Firebase Auth dışa aktarımından (JSON/CSV) toplu kullanıcı içe aktarma
+    // Geçmiş & canlı Firebase Auth senkronizasyonu (prune_missing: true ise Firebase'de silinenleri D1'den temizler)
     if (method === "POST" && body?.action === "import_users" && Array.isArray(body?.users)) {
+      const activeEmails = new Set();
       let imported = 0;
       for (const item of body.users) {
         const em = String(item?.email || "").trim().toLowerCase();
         if (!em || !em.includes("@")) continue;
+        activeEmails.add(em);
         await upsertRegisteredUser(env.DB, {
           email: em,
           uid: item?.uid || item?.localId || "",
@@ -1818,10 +1820,34 @@ async function handleAdminRequest(request, env, path, method) {
         });
         imported += 1;
       }
+
+      let pruned = 0;
+      if (body?.prune_missing === true) {
+        const existingReg = await env.DB
+          .prepare("SELECT email FROM registered_users")
+          .all();
+        for (const row of (existingReg.results || [])) {
+          const em = String(row.email || "").trim().toLowerCase();
+          if (em && !activeEmails.has(em)) {
+            await env.DB
+              .prepare("DELETE FROM registered_users WHERE LOWER(email) = ?")
+              .bind(em)
+              .run();
+            await env.DB
+              .prepare("DELETE FROM user_entitlements WHERE LOWER(email) = ? AND LOWER(source) != 'admin'")
+              .bind(em)
+              .run();
+            pruned += 1;
+          }
+        }
+      }
+
+      const prunedNote = pruned > 0 ? ` (${pruned} silinmiş hesap temizlendi)` : "";
       return jsonResponse({
         ok: true,
         imported,
-        message: `${imported} Firebase kullanıcısı panele aktarıldı.`,
+        pruned,
+        message: `${imported} Firebase kullanıcısı eşitlendi${prunedNote}.`,
       });
     }
 
@@ -1887,6 +1913,22 @@ async function handleAdminRequest(request, env, path, method) {
     }
 
     if (method === "DELETE") {
+      if (body?.delete_account === true) {
+        await env.DB
+          .prepare("DELETE FROM registered_users WHERE LOWER(email) = ?")
+          .bind(email)
+          .run();
+        await env.DB
+          .prepare("DELETE FROM user_entitlements WHERE LOWER(email) = ?")
+          .bind(email)
+          .run();
+        return jsonResponse({
+          ok: true,
+          deleted: true,
+          message: `${email} kullanıcısı sistemden tamamen kaldırıldı.`,
+        });
+      }
+
       const existing = await env.DB
         .prepare("SELECT has_special_themes FROM user_entitlements WHERE LOWER(email) = ? LIMIT 1")
         .bind(email)

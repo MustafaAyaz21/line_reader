@@ -21,7 +21,7 @@ function ConvertTo-Base64Url([byte[]]$Bytes) {
     return [Convert]::ToBase64String($Bytes).TrimEnd("=").Replace("+", "-").Replace("/", "_")
 }
 
-function Invoke-FirebaseAuthSync {
+function Get-FirebaseAdminToken {
     if (-not (Test-Path $FirebaseServiceAccountPath)) {
         return @{ ok = $false; message = "Önce Firebase Service Account JSON dosyasını bağlayın." }
     }
@@ -36,7 +36,6 @@ function Invoke-FirebaseAuthSync {
         return @{ ok = $false; message = "Geçersiz Firebase Service Account JSON dosyası." }
     }
 
-    # PKCS#8 PEM -> raw DER bytes -> Windows native CngKey + RSACng (Node.js gerektirmez!)
     $pemBody = $privateKeyPem `
         -replace "-----BEGIN PRIVATE KEY-----", "" `
         -replace "-----END PRIVATE KEY-----", "" `
@@ -82,7 +81,35 @@ function Invoke-FirebaseAuthSync {
         return @{ ok = $false; message = "Google OAuth erişim jetonu alınamadı." }
     }
 
-    $accessToken = [string]$tokenRes.access_token
+    return @{
+        ok          = $true
+        projectId   = $projectId
+        accessToken = [string]$tokenRes.access_token
+    }
+}
+
+function Invoke-FirebaseDeleteUser([string]$Uid) {
+    if ([string]::IsNullOrWhiteSpace($Uid)) {
+        return @{ ok = $false; skipped = $true; message = "UID yok, yalnızca panelden silindi." }
+    }
+    $auth = Get-FirebaseAdminToken
+    if (-not $auth.ok) {
+        return $auth
+    }
+    $uri = "https://identitytoolkit.googleapis.com/v1/projects/$([Uri]::EscapeDataString($auth.projectId))/accounts:delete"
+    $payload = (@{ localId = $Uid.Trim() } | ConvertTo-Json -Compress)
+    Invoke-RestMethod -Method Post -Uri $uri -Headers @{ Authorization = "Bearer $($auth.accessToken)" } -ContentType "application/json; charset=utf-8" -Body $payload -TimeoutSec 20 | Out-Null
+    return @{ ok = $true }
+}
+
+function Invoke-FirebaseAuthSync {
+    $auth = Get-FirebaseAdminToken
+    if (-not $auth.ok) {
+        return $auth
+    }
+
+    $projectId = $auth.projectId
+    $accessToken = $auth.accessToken
     $authHeaders = @{ Authorization = "Bearer $accessToken" }
     $allUsers = New-Object System.Collections.ArrayList
     $nextPageToken = ""
@@ -1513,12 +1540,43 @@ try {
                         $errMsg = if ($syncObj.message) { $syncObj.message } else { "Firebase senkronizasyonu başarısız." }
                         Send-JsonObject -Response $res -StatusCode 500 -Payload @{ ok = $false; message = $errMsg }
                     } else {
-                        $importPayload = (@{ action = "import_users"; users = $syncObj.users } | ConvertTo-Json -Depth 6 -Compress)
+                        $importPayload = (@{ action = "import_users"; prune_missing = $true; users = $syncObj.users } | ConvertTo-Json -Depth 6 -Compress)
                         $fwd = Forward-WorkerAdminRequest -RemotePath "/admin/users" -HttpMethod "POST" -BodyText $importPayload
                         Send-Response -Response $res -StatusCode $fwd.StatusCode -Body $fwd.Body -ContentType "application/json; charset=utf-8"
                     }
                 } catch {
                     Send-JsonObject -Response $res -StatusCode 500 -Payload @{ ok = $false; message = "Firebase senkron hatası: $($_.Exception.Message)" }
+                }
+            }
+            elseif ($method -eq "DELETE" -and $path -eq "/api/admin/firebase-user") {
+                try {
+                    $body = Read-RequestBody $req
+                    $parsed = $body | ConvertFrom-Json
+                    $email = ([string]$parsed.email).Trim().ToLowerInvariant()
+                    $uid = ([string]$parsed.uid).Trim()
+                    if ([string]::IsNullOrWhiteSpace($email)) {
+                        Send-JsonObject -Response $res -StatusCode 400 -Payload @{ ok = $false; message = "E-posta belirtilmedi." }
+                    } else {
+                        $fbDeleted = $false
+                        if (-not [string]::IsNullOrWhiteSpace($uid) -and (Test-Path $FirebaseServiceAccountPath)) {
+                            try {
+                                $fbRes = Invoke-FirebaseDeleteUser $uid
+                                $fbDeleted = ($fbRes.ok -eq $true)
+                            } catch {
+                                # Firebase'de zaten silinmişse D1'den silmeye devam et
+                            }
+                        }
+                        $delPayload = (@{ email = $email; delete_account = $true } | ConvertTo-Json -Compress)
+                        $fwd = Forward-WorkerAdminRequest -RemotePath "/admin/users" -HttpMethod "DELETE" -BodyText $delPayload
+                        if ($fwd.StatusCode -eq 200) {
+                            $note = if ($fbDeleted) { " (Firebase + Panel)" } else { " (Panel)" }
+                            Send-JsonObject -Response $res -StatusCode 200 -Payload @{ ok = $true; message = "$email kullanıcısı tamamen kaldırıldı$note." }
+                        } else {
+                            Send-Response -Response $res -StatusCode $fwd.StatusCode -Body $fwd.Body -ContentType "application/json; charset=utf-8"
+                        }
+                    }
+                } catch {
+                    Send-JsonObject -Response $res -StatusCode 500 -Payload @{ ok = $false; message = "Kullanıcı silme hatası: $($_.Exception.Message)" }
                 }
             }
             elseif ($method -eq "POST" -and $path -eq "/api/admin/config") {

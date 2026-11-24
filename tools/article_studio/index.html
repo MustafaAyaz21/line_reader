@@ -3151,6 +3151,7 @@
                 ${isAdmin ? "⭐ Premium Yap" : "🛠 Geliştirici Yap"}
               </button>
               ${isUnlimited ? `<button class="mini-btn del" data-revoke-email="${escapeHtml(u.email)}">Yetkiyi Kaldır</button>` : ""}
+              ${!isAdmin ? `<button class="mini-btn del" data-delete-email="${escapeHtml(u.email)}" data-delete-uid="${escapeHtml(u.uid || "")}">🗑 Sil</button>` : ""}
             </div>
           </div>
         `;
@@ -3201,6 +3202,22 @@
           });
           const d = await r.json();
           showToast(d.message || "Yetki kaldırıldı.", r.ok ? "success" : "error");
+          await loadAdminUsers();
+        });
+      });
+
+      accessEl.usersList.querySelectorAll("button[data-delete-email]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const email = btn.dataset.deleteEmail;
+          const uid = btn.dataset.deleteUid || "";
+          if (!confirm(`${email} kullanıcısını hem Firebase'den hem panelden tamamen silmek istiyor musunuz?`)) return;
+          const r = await fetch("/api/admin/firebase-user", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, uid })
+          });
+          const d = await r.json();
+          showToast(d.message || "Kullanıcı silindi.", r.ok ? "success" : "error");
           await loadAdminUsers();
         });
       });
