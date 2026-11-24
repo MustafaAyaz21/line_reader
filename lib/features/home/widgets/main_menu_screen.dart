@@ -12,6 +12,7 @@ import '../../articles/models/article.dart';
 import '../../articles/models/article_reading_progress.dart';
 import '../../articles/screens/article_reader_screen.dart';
 import '../../auth/controllers/auth_controller.dart';
+import '../../auth/screens/auth_screen.dart';
 import '../../browser/browser_screen.dart';
 import '../../settings/screens/how_to_use_screen.dart';
 import '../../settings/widgets/api_key_dialog.dart';
@@ -164,6 +165,31 @@ class MainMenuScreen extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
+                if (authController != null)
+                  ListenableBuilder(
+                    listenable: authController!,
+                    builder: (context, _) {
+                      if (authController!.isAuthenticated ||
+                          authController!.isLoading) {
+                        return const SizedBox.shrink();
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 14),
+                        child: _GuestSignInBanner(
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute<bool>(
+                                builder: (_) => AuthScreen(
+                                  controller: authController!,
+                                  canPop: true,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      );
+                    },
+                  ),
                 IntrinsicHeight(
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -225,6 +251,88 @@ class MainMenuScreen extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GuestSignInBanner extends StatelessWidget {
+  const _GuestSignInBanner({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Material(
+      key: const ValueKey<String>('main_menu_guest_signin_banner'),
+      color: colorScheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(18),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: colorScheme.primary.withAlpha(90)),
+          ),
+          child: Row(
+            children: <Widget>[
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.rocket_launch_rounded,
+                  size: 20,
+                  color: colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      s.t(
+                        'Ücretsiz giriş yap, limitini 2 katına çıkar',
+                        'Sign in free to double your daily limit',
+                      ),
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      s.t(
+                        'Hemen giriş yap veya kaydol — günlük 80 kelime çeviri hakkı kazan.',
+                        'Sign in or sign up now — unlock 80 daily translations.',
+                      ),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        height: 1.25,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 14,
+                color: colorScheme.primary,
+              ),
+            ],
           ),
         ),
       ),

@@ -1193,14 +1193,29 @@
         <!-- Sağ: Manuel Kullanıcı Yetki Yönetimi -->
         <div class="admin-card">
           <div>
-            <h3>Kullanıcı Yetkileri (Premium Üye / Geliştirici)</h3>
-            <p class="admin-sub">Kod paylaşmadan istediğiniz e-postaya <b>Premium Üye</b> veya <b>Geliştirici</b> rolü verin; mevcut kullanıcıları tek tıkla <b>Geliştirici</b> yapın ya da yetkisini kaldırın.</p>
+            <h3>Tüm Kullanıcılar & Yetkiler (Firebase Senkron)</h3>
+            <p class="admin-sub">Uygulamaya giriş yapan tüm Firebase kullanıcıları otomatik listelenir. Tek tıkla <b>Premium Üye</b>, <b>Özel Tema</b> veya <b>Geliştirici</b> yetkisi verip kaldırabilirsiniz.</p>
           </div>
 
           <div class="admin-form-row">
             <input type="email" id="grantUserEmailInput" class="admin-input" style="flex:1;min-width:200px;" placeholder="kullanici@gmail.com" />
             <button class="btn btn-primary" id="grantUserBtn">⭐ Premium Üye Ver</button>
+            <button class="btn" id="grantSpecialThemesBtn" style="background:rgba(244,114,182,0.18);border:1px solid rgba(244,114,182,0.45);color:#fbcfe8;">✨ Özel Tema Ver</button>
             <button class="btn btn-ai" id="grantAdminBtn">🛠 Geliştirici Yap</button>
+          </div>
+
+          <div class="admin-form-row" style="margin-top:8px;">
+            <input type="search" id="adminUserSearchInput" class="admin-input" style="flex:1;min-width:160px;" placeholder="🔍 E-posta veya isim ara..." />
+            <select id="adminUserFilterSelect" class="admin-input" style="width:auto;min-width:130px;">
+              <option value="all">Tümü</option>
+              <option value="admin">🛠 Geliştirici</option>
+              <option value="premium">⭐ Premium</option>
+              <option value="special">✨ Özel Tema</option>
+              <option value="standard">Standart Üye</option>
+            </select>
+            <button class="btn" id="connectFirebaseSaBtn" title="Firebase Console > Project Settings > Service Accounts > Generate new private key JSON">🔑 Firebase Bağla</button>
+            <button class="btn btn-primary" id="syncFirebaseNowBtn" style="display:none;" title="Firebase Authentication'daki tüm kullanıcıları anında çek ve eşitle">🔄 Firebase Eşitle</button>
+            <input type="file" id="firebaseSaFileInput" accept=".json" style="display:none;" />
           </div>
 
           <div class="admin-table" id="adminUsersList">
@@ -3060,6 +3075,137 @@
       }
     }
 
+    let cachedAdminUsers = [];
+
+    function renderAdminUsersList() {
+      const q = (document.getElementById("adminUserSearchInput")?.value || "").trim().toLowerCase();
+      const filter = document.getElementById("adminUserFilterSelect")?.value || "all";
+
+      const filtered = cachedAdminUsers.filter(u => {
+        const isUnlimited = Number(u.is_unlimited) === 1;
+        const isAdmin = isUnlimited && String(u.source || "").toLowerCase() === "admin";
+        const hasSpecial = Number(u.has_special_themes) === 1 || isAdmin;
+        if (filter === "admin" && !isAdmin) return false;
+        if (filter === "premium" && (!isUnlimited || isAdmin)) return false;
+        if (filter === "special" && !hasSpecial) return false;
+        if (filter === "standard" && isUnlimited) return false;
+        if (q) {
+          const hay = `${u.email || ""} ${u.display_name || ""} ${u.code_used || ""}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        accessEl.usersList.innerHTML = `<div class="empty-list">${cachedAdminUsers.length === 0 ? "Henüz kayıtlı kullanıcı yok." : "Filtreye uygun kullanıcı bulunamadı."}</div>`;
+        return;
+      }
+
+      accessEl.usersList.innerHTML = filtered.map(u => {
+        const isUnlimited = Number(u.is_unlimited) === 1;
+        const isAdmin = isUnlimited && String(u.source || "").toLowerCase() === "admin";
+        const hasSpecialThemes = Number(u.has_special_themes) === 1 || isAdmin;
+        const rolePill = isAdmin
+          ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:rgba(99,102,241,0.22);color:#c7d2fe;border:1px solid rgba(129,140,248,0.45);">🛠 Geliştirici</span>`
+          : isUnlimited
+            ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:rgba(34,197,94,0.16);color:#86efac;border:1px solid rgba(74,222,128,0.35);">⭐ Premium Üye</span>`
+            : `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:rgba(148,163,184,0.16);color:#cbd5e1;border:1px solid rgba(148,163,184,0.35);">Standart Üye</span>`;
+        const specialPill = hasSpecialThemes
+          ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:rgba(244,114,182,0.18);color:#fbcfe8;border:1px solid rgba(244,114,182,0.42);">✨ Özel Tema</span>`
+          : "";
+        const rawProv = String(u.auth_provider || "").toLowerCase();
+        const providerPill = rawProv === "google+password"
+          ? `<span style="font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:999px;background:rgba(59,130,246,0.16);color:#bfdbfe;border:1px solid rgba(96,165,250,0.35);">G Google + ✉ E-posta</span>`
+          : rawProv.includes("google")
+            ? `<span style="font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:999px;background:rgba(59,130,246,0.16);color:#bfdbfe;border:1px solid rgba(96,165,250,0.35);">G Google</span>`
+            : rawProv.includes("password") || rawProv.includes("email")
+              ? `<span style="font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:999px;background:rgba(245,158,11,0.15);color:#fde68a;border:1px solid rgba(251,191,36,0.35);">✉ E-posta</span>`
+              : "";
+        const namePrefix = u.display_name ? `${u.display_name} • ` : "";
+        const subLabel = isAdmin
+          ? `${namePrefix}Geliştirici • Tüm özel temalar açık`
+          : isUnlimited
+            ? `${namePrefix}${u.code_used ? `Kod: ${u.code_used}` : "Manuel Premium Üye"}`
+            : `${namePrefix}${hasSpecialThemes ? "Standart Üye • Özel Temalar açık" : "Firebase Kayıtlı Üye"}`;
+        return `
+          <div class="admin-row">
+            <div style="min-width:170px;">
+              <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
+                <span style="font-size:13.5px;font-weight:700;">${escapeHtml(u.email)}</span>
+                ${rolePill}
+                ${providerPill}
+                ${specialPill}
+              </div>
+              <div style="font-size:11.5px;color:var(--text-muted);margin-top:2px;">${escapeHtml(subLabel)}</div>
+            </div>
+            <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;">
+              ${isAdmin ? "" : `
+                <button class="mini-btn" data-special-email="${escapeHtml(u.email)}" data-next-special="${hasSpecialThemes ? "0" : "1"}">
+                  ${hasSpecialThemes ? "✨ Özel Temayı Kapat" : "✨ Özel Tema Aç"}
+                </button>
+              `}
+              ${!isUnlimited ? `
+                <button class="mini-btn" data-role-email="${escapeHtml(u.email)}" data-next-role="premium">⭐ Premium Ver</button>
+              ` : ""}
+              <button class="mini-btn" data-role-email="${escapeHtml(u.email)}" data-next-role="${isAdmin ? "premium" : "admin"}">
+                ${isAdmin ? "⭐ Premium Yap" : "🛠 Geliştirici Yap"}
+              </button>
+              ${isUnlimited ? `<button class="mini-btn del" data-revoke-email="${escapeHtml(u.email)}">Yetkiyi Kaldır</button>` : ""}
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      accessEl.usersList.querySelectorAll("button[data-special-email]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const email = btn.dataset.specialEmail;
+          const enabled = btn.dataset.nextSpecial === "1";
+          const r = await fetch("/api/admin/users", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, action: "set_special_themes", has_special_themes: enabled })
+          });
+          const d = await r.json();
+          showToast(d.message || "Özel tema yetkisi güncellendi.", r.ok ? "success" : "error");
+          await loadAdminUsers();
+        });
+      });
+
+      accessEl.usersList.querySelectorAll("button[data-role-email]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const email = btn.dataset.roleEmail;
+          const nextRole = btn.dataset.nextRole;
+          const r = await fetch("/api/admin/users", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, role: nextRole })
+          });
+          const d = await r.json();
+          if (r.ok && nextRole === "admin" && d.role !== "admin") {
+            showToast("Cloudflare Worker eski sürümde! tools/ai_worker/worker.js dosyasını Cloudflare'da Deploy edin.", "error");
+          } else {
+            showToast(d.message || "Rol güncellendi.", r.ok ? "success" : "error");
+          }
+          await loadAdminUsers();
+        });
+      });
+
+      accessEl.usersList.querySelectorAll("button[data-revoke-email]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const email = btn.dataset.revokeEmail;
+          if (!confirm(`${email} hesabının sınırsız yetkisini kaldırmak istiyor musunuz?`)) return;
+          const r = await fetch("/api/admin/users", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email })
+          });
+          const d = await r.json();
+          showToast(d.message || "Yetki kaldırıldı.", r.ok ? "success" : "error");
+          await loadAdminUsers();
+        });
+      });
+    }
+
     async function loadAdminUsers() {
       try {
         const res = await fetch("/api/admin/users");
@@ -3068,75 +3214,78 @@
           accessEl.usersList.innerHTML = `<div class="empty-list">${escapeHtml(data.message || data.error || "Kullanıcılar alınamadı.")}</div>`;
           return;
         }
-        const users = data.users || [];
-        if (users.length === 0) {
-          accessEl.usersList.innerHTML = `<div class="empty-list">Henüz sınırsız yetkili kullanıcı yok.</div>`;
-          return;
-        }
-        accessEl.usersList.innerHTML = users.map(u => {
-          const isAdmin = String(u.source || "").toLowerCase() === "admin";
-          const rolePill = isAdmin
-            ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:rgba(99,102,241,0.22);color:#c7d2fe;border:1px solid rgba(129,140,248,0.45);">🛠 Geliştirici</span>`
-            : `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:rgba(34,197,94,0.16);color:#86efac;border:1px solid rgba(74,222,128,0.35);">⭐ Premium Üye</span>`;
-          const subLabel = isAdmin
-            ? "Ayarlar'da 'Geliştirici' görünür"
-            : (u.code_used ? `Kod: ${u.code_used}` : "Manuel Premium Üye");
-          return `
-            <div class="admin-row">
-              <div style="min-width:170px;">
-                <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
-                  <span style="font-size:13.5px;font-weight:700;">${escapeHtml(u.email)}</span>
-                  ${rolePill}
-                </div>
-                <div style="font-size:11.5px;color:var(--text-muted);margin-top:2px;">${escapeHtml(subLabel)}</div>
-              </div>
-              <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;">
-                <button class="mini-btn" data-role-email="${escapeHtml(u.email)}" data-next-role="${isAdmin ? "premium" : "admin"}">
-                  ${isAdmin ? "⭐ Premium Yap" : "🛠 Geliştirici Yap"}
-                </button>
-                <button class="mini-btn del" data-revoke-email="${escapeHtml(u.email)}">Yetkiyi Kaldır</button>
-              </div>
-            </div>
-          `;
-        }).join("");
-
-        accessEl.usersList.querySelectorAll("button[data-role-email]").forEach(btn => {
-          btn.addEventListener("click", async () => {
-            const email = btn.dataset.roleEmail;
-            const nextRole = btn.dataset.nextRole;
-            const r = await fetch("/api/admin/users", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ email, role: nextRole })
-            });
-            const d = await r.json();
-            if (r.ok && nextRole === "admin" && d.role !== "admin") {
-              showToast("Cloudflare Worker eski sürümde! tools/ai_worker/worker.js dosyasını Cloudflare'da Deploy edin.", "error");
-            } else {
-              showToast(d.message || "Rol güncellendi.", r.ok ? "success" : "error");
-            }
-            await loadAdminUsers();
-          });
-        });
-
-        accessEl.usersList.querySelectorAll("button[data-revoke-email]").forEach(btn => {
-          btn.addEventListener("click", async () => {
-            const email = btn.dataset.revokeEmail;
-            if (!confirm(`${email} hesabının sınırsız yetkisini kaldırmak istiyor musunuz?`)) return;
-            const r = await fetch("/api/admin/users", {
-              method: "DELETE",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ email })
-            });
-            const d = await r.json();
-            showToast(d.message || "Yetki kaldırıldı.", r.ok ? "success" : "error");
-            await loadAdminUsers();
-          });
-        });
+        cachedAdminUsers = data.users || [];
+        renderAdminUsersList();
       } catch (err) {
         accessEl.usersList.innerHTML = `<div class="empty-list">Bağlantı hatası: ${escapeHtml(err.message)}</div>`;
       }
     }
+
+    document.getElementById("adminUserSearchInput")?.addEventListener("input", renderAdminUsersList);
+    document.getElementById("adminUserFilterSelect")?.addEventListener("change", renderAdminUsersList);
+
+    async function refreshFirebaseSyncButtonState() {
+      try {
+        const res = await fetch("/api/admin/config");
+        const cfg = await res.json();
+        const connectBtn = document.getElementById("connectFirebaseSaBtn");
+        const syncBtn = document.getElementById("syncFirebaseNowBtn");
+        if (cfg.hasFirebaseServiceAccount) {
+          if (connectBtn) connectBtn.textContent = "🔑 Firebase (Bağlı)";
+          if (syncBtn) syncBtn.style.display = "inline-flex";
+        }
+      } catch (_) {}
+    }
+
+    async function runFirebaseSync(silent = false) {
+      const syncBtn = document.getElementById("syncFirebaseNowBtn");
+      if (syncBtn) {
+        syncBtn.disabled = true;
+        syncBtn.textContent = "⏳ Eşitleniyor...";
+      }
+      try {
+        const res = await fetch("/api/admin/firebase-sync", { method: "POST" });
+        const d = await res.json();
+        if (!silent || !res.ok) {
+          showToast(d.message || d.error || "Firebase eşitlendi.", res.ok ? "success" : "error");
+        }
+        if (res.ok) await loadAdminUsers();
+      } catch (err) {
+        if (!silent) showToast(`Firebase eşitleme hatası: ${err.message}`, "error");
+      } finally {
+        if (syncBtn) {
+          syncBtn.disabled = false;
+          syncBtn.textContent = "🔄 Firebase Eşitle";
+        }
+      }
+    }
+
+    document.getElementById("connectFirebaseSaBtn")?.addEventListener("click", () => {
+      document.getElementById("firebaseSaFileInput")?.click();
+    });
+    document.getElementById("syncFirebaseNowBtn")?.addEventListener("click", () => runFirebaseSync(false));
+    document.getElementById("firebaseSaFileInput")?.addEventListener("change", async (ev) => {
+      const file = ev.target.files?.[0];
+      ev.target.value = "";
+      if (!file) return;
+      try {
+        const raw = await file.text();
+        const res = await fetch("/api/admin/firebase-config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: raw
+        });
+        const d = await res.json();
+        showToast(d.message || "Firebase bağlandı.", res.ok ? "success" : "error");
+        if (res.ok) {
+          await refreshFirebaseSyncButtonState();
+          await runFirebaseSync(false);
+        }
+      } catch (err) {
+        showToast(`Bağlantı hatası: ${err.message}`, "error");
+      }
+    });
+    refreshFirebaseSyncButtonState();
 
     accessEl.saveConfigBtn.addEventListener("click", async () => {
       try {
@@ -3222,6 +3371,28 @@
 
     accessEl.grantUserBtn.addEventListener("click", () => grantUserWithRole("premium"));
     accessEl.grantAdminBtn.addEventListener("click", () => grantUserWithRole("admin"));
+    document.getElementById("grantSpecialThemesBtn").addEventListener("click", async () => {
+      const email = accessEl.grantEmailInput.value.trim().toLowerCase();
+      if (!email || !email.includes("@")) {
+        showToast("Geçerli bir e-posta adresi yazın.", "error");
+        return;
+      }
+      try {
+        const res = await fetch("/api/admin/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, action: "set_special_themes", has_special_themes: true })
+        });
+        const data = await res.json();
+        showToast(data.message || data.error || "İşlem tamamlandı.", res.ok ? "success" : "error");
+        if (res.ok) {
+          accessEl.grantEmailInput.value = "";
+          await loadAdminUsers();
+        }
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    });
 
     loadInitial();
     loadAiConfig();

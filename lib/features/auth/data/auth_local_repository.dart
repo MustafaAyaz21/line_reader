@@ -14,13 +14,18 @@ abstract class AuthLocalStore {
     required int usedCount,
   });
 
-  Future<({bool isUnlimited, String? codeUsed, String? role})>
-      loadCachedEntitlement();
+  Future<({
+    bool isUnlimited,
+    String? codeUsed,
+    String? role,
+    bool hasSpecialThemes,
+  })> loadCachedEntitlement();
 
   Future<void> saveCachedEntitlement({
     required bool isUnlimited,
     String? codeUsed,
     String? role,
+    bool hasSpecialThemes = false,
   });
 }
 
@@ -35,6 +40,8 @@ class AuthLocalRepository implements AuthLocalStore {
   static const String _entitlementUnlimitedKey = 'auth_entitlement_unlimited';
   static const String _entitlementCodeKey = 'auth_entitlement_code';
   static const String _entitlementRoleKey = 'auth_entitlement_role';
+  static const String _entitlementSpecialThemesKey =
+      'auth_entitlement_special_themes';
 
   final SettingsRepository _settingsRepository;
 
@@ -74,16 +81,23 @@ class AuthLocalRepository implements AuthLocalStore {
   }
 
   @override
-  Future<({bool isUnlimited, String? codeUsed, String? role})>
-      loadCachedEntitlement() async {
+  Future<({
+    bool isUnlimited,
+    String? codeUsed,
+    String? role,
+    bool hasSpecialThemes,
+  })> loadCachedEntitlement() async {
     final rawUnlimited =
         await _settingsRepository.getString(_entitlementUnlimitedKey);
     final codeUsed = await _settingsRepository.getString(_entitlementCodeKey);
     final role = await _settingsRepository.getString(_entitlementRoleKey);
+    final rawSpecial =
+        await _settingsRepository.getString(_entitlementSpecialThemesKey);
     return (
       isUnlimited: rawUnlimited == 'true',
       codeUsed: codeUsed,
       role: role,
+      hasSpecialThemes: rawSpecial == 'true',
     );
   }
 
@@ -92,10 +106,15 @@ class AuthLocalRepository implements AuthLocalStore {
     required bool isUnlimited,
     String? codeUsed,
     String? role,
+    bool hasSpecialThemes = false,
   }) async {
     await _settingsRepository.saveString(
       _entitlementUnlimitedKey,
       isUnlimited ? 'true' : 'false',
+    );
+    await _settingsRepository.saveString(
+      _entitlementSpecialThemesKey,
+      hasSpecialThemes ? 'true' : 'false',
     );
     if (isUnlimited && codeUsed != null && codeUsed.trim().isNotEmpty) {
       await _settingsRepository.saveString(

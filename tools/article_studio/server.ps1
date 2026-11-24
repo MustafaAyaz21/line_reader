@@ -15,6 +15,130 @@ $ContentAudioDir = Join-Path $ContentDir "audio"
 $RootAudioDir = Join-Path $ProjectRoot "audio"
 $IndexHtmlPath = Join-Path $StudioDir "index.html"
 $AdminConfigPath = Join-Path $StudioDir "admin_config.local.json"
+$FirebaseServiceAccountPath = Join-Path $StudioDir "firebase_service_account.local.json"
+
+function ConvertTo-Base64Url([byte[]]$Bytes) {
+    return [Convert]::ToBase64String($Bytes).TrimEnd("=").Replace("+", "-").Replace("/", "_")
+}
+
+function Invoke-FirebaseAuthSync {
+    if (-not (Test-Path $FirebaseServiceAccountPath)) {
+        return @{ ok = $false; message = "Önce Firebase Service Account JSON dosyasını bağlayın." }
+    }
+
+    $rawSa = [System.IO.File]::ReadAllText($FirebaseServiceAccountPath, [System.Text.Encoding]::UTF8)
+    $sa = $rawSa | ConvertFrom-Json
+    $projectId = ([string]$sa.project_id).Trim()
+    $clientEmail = ([string]$sa.client_email).Trim()
+    $privateKeyPem = ([string]$sa.private_key).Trim()
+
+    if ([string]::IsNullOrWhiteSpace($projectId) -or [string]::IsNullOrWhiteSpace($clientEmail) -or [string]::IsNullOrWhiteSpace($privateKeyPem)) {
+        return @{ ok = $false; message = "Geçersiz Firebase Service Account JSON dosyası." }
+    }
+
+    # PKCS#8 PEM -> raw DER bytes -> Windows native CngKey + RSACng (Node.js gerektirmez!)
+    $pemBody = $privateKeyPem `
+        -replace "-----BEGIN PRIVATE KEY-----", "" `
+        -replace "-----END PRIVATE KEY-----", "" `
+        -replace "\s+", ""
+    $pkcs8Bytes = [Convert]::FromBase64String($pemBody)
+
+    $now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    $headerJson = '{"alg":"RS256","typ":"JWT"}'
+    $claimObj = @{
+        iss   = $clientEmail
+        scope = "https://www.googleapis.com/auth/identitytoolkit"
+        aud   = "https://oauth2.googleapis.com/token"
+        iat   = $now
+        exp   = $now + 3600
+    }
+    $claimJson = ($claimObj | ConvertTo-Json -Compress)
+
+    $headerB64 = ConvertTo-Base64Url ([System.Text.Encoding]::UTF8.GetBytes($headerJson))
+    $claimB64 = ConvertTo-Base64Url ([System.Text.Encoding]::UTF8.GetBytes($claimJson))
+    $signingInput = "$headerB64.$claimB64"
+    $signingBytes = [System.Text.Encoding]::UTF8.GetBytes($signingInput)
+
+    $cngKey = [System.Security.Cryptography.CngKey]::Import(
+        $pkcs8Bytes,
+        [System.Security.Cryptography.CngKeyBlobFormat]::Pkcs8PrivateBlob
+    )
+    $rsa = [System.Security.Cryptography.RSACng]::new($cngKey)
+    try {
+        $sigBytes = $rsa.SignData(
+            $signingBytes,
+            [System.Security.Cryptography.HashAlgorithmName]::SHA256,
+            [System.Security.Cryptography.RSASignaturePadding]::Pkcs1
+        )
+    } finally {
+        $rsa.Dispose()
+        $cngKey.Dispose()
+    }
+
+    $assertion = "$signingInput.$(ConvertTo-Base64Url $sigBytes)"
+    $tokenBody = "grant_type=$([Uri]::EscapeDataString('urn:ietf:params:oauth:grant-type:jwt-bearer'))&assertion=$([Uri]::EscapeDataString($assertion))"
+    $tokenRes = Invoke-RestMethod -Method Post -Uri "https://oauth2.googleapis.com/token" -ContentType "application/x-www-form-urlencoded" -Body $tokenBody -TimeoutSec 20
+    if (-not $tokenRes -or [string]::IsNullOrWhiteSpace([string]$tokenRes.access_token)) {
+        return @{ ok = $false; message = "Google OAuth erişim jetonu alınamadı." }
+    }
+
+    $accessToken = [string]$tokenRes.access_token
+    $authHeaders = @{ Authorization = "Bearer $accessToken" }
+    $allUsers = New-Object System.Collections.ArrayList
+    $nextPageToken = ""
+
+    for ($page = 0; $page -lt 40; $page++) {
+        $uri = "https://identitytoolkit.googleapis.com/v1/projects/$([Uri]::EscapeDataString($projectId))/accounts:batchGet?maxResults=500"
+        if (-not [string]::IsNullOrWhiteSpace($nextPageToken)) {
+            $uri += "&nextPageToken=$([Uri]::EscapeDataString($nextPageToken))"
+        }
+        $listRes = Invoke-RestMethod -Method Get -Uri $uri -Headers $authHeaders -TimeoutSec 25
+        if ($listRes -and $listRes.users) {
+            foreach ($u in $listRes.users) {
+                $em = ([string]$u.email).Trim().ToLowerInvariant()
+                if ([string]::IsNullOrWhiteSpace($em) -or -not $em.Contains("@")) { continue }
+
+                $providers = @()
+                if ($u.providerUserInfo) {
+                    foreach ($p in $u.providerUserInfo) {
+                        if ($p.providerId) { $providers += ([string]$p.providerId).ToLowerInvariant() }
+                    }
+                }
+                $hasGoogle = $providers -contains "google.com"
+                $hasPassword = ($providers -contains "password") -or (-not [string]::IsNullOrWhiteSpace([string]$u.passwordHash))
+                $authProv = if ($hasGoogle -and $hasPassword) {
+                    "google+password"
+                } elseif ($hasGoogle) {
+                    "google"
+                } elseif ($hasPassword) {
+                    "password"
+                } elseif ($providers.Count -gt 0) {
+                    $providers[0]
+                } else {
+                    ""
+                }
+
+                [void]$allUsers.Add(@{
+                    email        = $em
+                    uid          = ([string]$u.localId).Trim()
+                    displayName  = ([string]$u.displayName).Trim()
+                    authProvider = $authProv
+                })
+            }
+        }
+        if ($listRes -and $listRes.nextPageToken) {
+            $nextPageToken = [string]$listRes.nextPageToken
+        } else {
+            break
+        }
+    }
+
+    return @{
+        ok    = $true
+        count = $allUsers.Count
+        users = $allUsers.ToArray()
+    }
+}
 $DefaultWorkerUrl = "https://linereader-ai.xreasayaz21.workers.dev"
 
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
@@ -1362,9 +1486,39 @@ try {
             elseif ($method -eq "GET" -and $path -eq "/api/admin/config") {
                 $cfg = Get-AdminConfig
                 Send-JsonObject -Response $res -StatusCode 200 -Payload @{
-                    ok        = $true
-                    workerUrl = $cfg.workerUrl
-                    hasSecret = -not [string]::IsNullOrWhiteSpace($cfg.adminSecret)
+                    ok                        = $true
+                    workerUrl                 = $cfg.workerUrl
+                    hasSecret                 = -not [string]::IsNullOrWhiteSpace($cfg.adminSecret)
+                    hasFirebaseServiceAccount = Test-Path $FirebaseServiceAccountPath
+                }
+            }
+            elseif ($method -eq "POST" -and $path -eq "/api/admin/firebase-config") {
+                $body = Read-RequestBody $req
+                try {
+                    $parsedSa = $body | ConvertFrom-Json
+                    if ([string]::IsNullOrWhiteSpace($parsedSa.project_id) -or [string]::IsNullOrWhiteSpace($parsedSa.client_email) -or [string]::IsNullOrWhiteSpace($parsedSa.private_key)) {
+                        Send-JsonObject -Response $res -StatusCode 400 -Payload @{ ok = $false; message = "Geçersiz Firebase Service Account JSON dosyası." }
+                    } else {
+                        [System.IO.File]::WriteAllText($FirebaseServiceAccountPath, $body, [System.Text.UTF8Encoding]::new($false))
+                        Send-JsonObject -Response $res -StatusCode 200 -Payload @{ ok = $true; projectId = $parsedSa.project_id; message = "Firebase Service Account bağlandı ($($parsedSa.project_id))." }
+                    }
+                } catch {
+                    Send-JsonObject -Response $res -StatusCode 400 -Payload @{ ok = $false; message = "JSON okunamadı: $($_.Exception.Message)" }
+                }
+            }
+            elseif ($method -eq "POST" -and $path -eq "/api/admin/firebase-sync") {
+                try {
+                    $syncObj = Invoke-FirebaseAuthSync
+                    if (-not $syncObj.ok) {
+                        $errMsg = if ($syncObj.message) { $syncObj.message } else { "Firebase senkronizasyonu başarısız." }
+                        Send-JsonObject -Response $res -StatusCode 500 -Payload @{ ok = $false; message = $errMsg }
+                    } else {
+                        $importPayload = (@{ action = "import_users"; users = $syncObj.users } | ConvertTo-Json -Depth 6 -Compress)
+                        $fwd = Forward-WorkerAdminRequest -RemotePath "/admin/users" -HttpMethod "POST" -BodyText $importPayload
+                        Send-Response -Response $res -StatusCode $fwd.StatusCode -Body $fwd.Body -ContentType "application/json; charset=utf-8"
+                    }
+                } catch {
+                    Send-JsonObject -Response $res -StatusCode 500 -Payload @{ ok = $false; message = "Firebase senkron hatası: $($_.Exception.Message)" }
                 }
             }
             elseif ($method -eq "POST" -and $path -eq "/api/admin/config") {

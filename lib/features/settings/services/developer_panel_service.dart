@@ -9,21 +9,52 @@ class DevEntitlementUser {
   const DevEntitlementUser({
     required this.email,
     required this.source,
+    this.isUnlimited = true,
+    this.hasSpecialThemes = false,
+    this.displayName,
+    this.authProvider,
     this.codeUsed,
     this.grantedAt,
   });
 
   final String email;
   final String source;
+  final bool isUnlimited;
+  final bool hasSpecialThemes;
+  final String? displayName;
+  final String? authProvider;
   final String? codeUsed;
   final String? grantedAt;
 
-  bool get isDeveloper => source.trim().toLowerCase() == 'admin';
+  bool get isDeveloper =>
+      isUnlimited && source.trim().toLowerCase() == 'admin';
+
+  bool get effectiveSpecialThemes => hasSpecialThemes || isDeveloper;
+
+  String? get authProviderLabel {
+    final p = (authProvider ?? '').trim().toLowerCase();
+    if (p.isEmpty) return null;
+    if (p == 'google+password') return 'Google + E-posta';
+    if (p.contains('google')) return 'Google';
+    if (p.contains('password') || p.contains('email')) return 'E-posta';
+    return authProvider;
+  }
 
   factory DevEntitlementUser.fromJson(Map<String, dynamic> json) {
+    final rawUnlimited = json['is_unlimited'];
+    final isUnlimited = rawUnlimited == null
+        ? true
+        : (rawUnlimited == true || rawUnlimited == 1 || rawUnlimited == '1');
+    final rawSpecial = json['has_special_themes'];
+    final hasSpecial =
+        rawSpecial == true || rawSpecial == 1 || rawSpecial == '1';
     return DevEntitlementUser(
       email: (json['email'] ?? '').toString().trim(),
       source: (json['source'] ?? 'manual').toString().trim(),
+      isUnlimited: isUnlimited,
+      hasSpecialThemes: hasSpecial,
+      displayName: json['display_name']?.toString().trim(),
+      authProvider: json['auth_provider']?.toString().trim(),
       codeUsed: json['code_used']?.toString(),
       grantedAt: json['granted_at']?.toString(),
     );
@@ -386,6 +417,33 @@ class DeveloperPanelService {
       message: data['message']?.toString() ??
           (res.statusCode == 200
               ? 'Premium yetkisi verildi.'
+              : 'İşlem başarısız (HTTP ${res.statusCode}).'),
+    );
+  }
+
+  Future<DevActionResult> setSpecialThemes(
+    String idToken,
+    String email, {
+    required bool enabled,
+  }) async {
+    final res = await _request(
+      'POST',
+      '/dev/users',
+      idToken: idToken,
+      jsonBody: <String, Object?>{
+        'email': email.trim(),
+        'action': 'set_special_themes',
+        'has_special_themes': enabled,
+      },
+    );
+    final data = _decodeJsonMap(res.body);
+    return DevActionResult(
+      ok: res.statusCode == 200 && data['ok'] == true,
+      message: data['message']?.toString() ??
+          (res.statusCode == 200
+              ? (enabled
+                  ? 'Özel temalar yetkisi verildi.'
+                  : 'Özel temalar yetkisi kaldırıldı.')
               : 'İşlem başarısız (HTTP ${res.statusCode}).'),
     );
   }

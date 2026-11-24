@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'animated_theme_painters.dart';
 import 'app_theme.dart';
+import 'app_theme_controller.dart';
 import 'app_theme_preset.dart';
 
 /// Seçili gradyan temasını harici görsel dosyası kullanmadan, her ekran
@@ -29,6 +31,12 @@ class AppThemeMeshPainter extends CustomPainter {
         return;
       case AppThemePreset.electricCoral:
         _paintElectricCoral(canvas, rect);
+        return;
+      case AppThemePreset.amethystGalaxy:
+      case AppThemePreset.oceanDepths:
+      case AppThemePreset.warmLatteBokeh:
+      case AppThemePreset.sageSunlight:
+      case AppThemePreset.sakuraGarden:
         return;
     }
   }
@@ -291,22 +299,37 @@ class AppThemeMeshPainter extends CustomPainter {
   }
 }
 
-/// Herhangi bir ekranı seçili kod-tabanlı gradyan teması üzerine yerleştirir.
-/// Varsayılan (Klasik) temada hiçbir ekstra katman çizmez.
+/// Herhangi bir ekranı seçili kod-tabanlı hareketsiz veya hareketli tema üzerine
+/// yerleştirir. Varsayılan (Klasik) temada hiçbir ekstra katman çizmez.
 class AppThemeBackdrop extends StatelessWidget {
   const AppThemeBackdrop({
     super.key,
     required this.child,
     this.presetOverride,
+    this.showForegroundOverlay = false,
   });
 
   final Widget child;
   final AppThemePreset? presetOverride;
 
+  /// Sakura Bahçesi gibi ön plan bulutsu yaprak örtüşmesi olan temalarda
+  /// Ana Menü kartlarının üst köşelerine tıklamayı engellemeyen ön plan
+  /// katmanını çizer.
+  final bool showForegroundOverlay;
+
   @override
   Widget build(BuildContext context) {
     final visuals = AppThemeVisuals.of(context);
     final preset = presetOverride ?? visuals.preset;
+
+    if (preset.isAnimatedTheme) {
+      return _AnimatedThemeBackdropHost(
+        preset: preset,
+        showForegroundOverlay:
+            showForegroundOverlay && preset == AppThemePreset.sakuraGarden,
+        child: child,
+      );
+    }
 
     return Stack(
       fit: StackFit.expand,
@@ -322,6 +345,153 @@ class AppThemeBackdrop extends StatelessWidget {
             ),
           ),
         child,
+      ],
+    );
+  }
+}
+
+/// Hareketli arka plan temalarını tek bir sakin `AnimationController` ile çizer.
+/// Pencere küçültüldüğünde / arka plana alındığında veya kullanıcı "Animasyonu
+/// Duraklat" anahtarını açtığında otomatik olarak duraklayıp CPU tüketimini
+/// sıfıra indirir; "Pil Dostu Animasyon" modunda daha hafif döngü kullanır.
+class _AnimatedThemeBackdropHost extends StatefulWidget {
+  const _AnimatedThemeBackdropHost({
+    required this.preset,
+    required this.showForegroundOverlay,
+    required this.child,
+  });
+
+  final AppThemePreset preset;
+  final bool showForegroundOverlay;
+  final Widget child;
+
+  @override
+  State<_AnimatedThemeBackdropHost> createState() =>
+      _AnimatedThemeBackdropHostState();
+}
+
+class _AnimatedThemeBackdropHostState extends State<_AnimatedThemeBackdropHost>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  static const Duration _normalCycle = Duration(seconds: 60);
+  static const Duration _ecoCycle = Duration(seconds: 90);
+
+  late final AnimationController _controller;
+  bool _isAppVisible = true;
+  bool _tickerEnabled = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _controller = AnimationController(
+      vsync: this,
+      duration: AppThemeController.shared.isEcoAnimation
+          ? _ecoCycle
+          : _normalCycle,
+      value: 0.18,
+    );
+    AppThemeController.shared.addListener(_syncPlayback);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _tickerEnabled = TickerMode.of(context);
+    _syncPlayback();
+  }
+
+  @override
+  void didUpdateWidget(covariant _AnimatedThemeBackdropHost oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncPlayback();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final visible = state == AppLifecycleState.resumed;
+    if (_isAppVisible != visible) {
+      _isAppVisible = visible;
+      _syncPlayback();
+    }
+  }
+
+  void _syncPlayback() {
+    if (!mounted) return;
+    final desiredDuration = AppThemeController.shared.isEcoAnimation
+        ? _ecoCycle
+        : _normalCycle;
+    if (_controller.duration != desiredDuration) {
+      _controller.duration = desiredDuration;
+      if (_controller.isAnimating) {
+        _controller.repeat();
+      }
+    }
+
+    final shouldRun = _isAppVisible &&
+        _tickerEnabled &&
+        !AppThemeController.shared.isAnimationPaused;
+    if (shouldRun) {
+      if (!_controller.isAnimating) {
+        _controller.repeat();
+      }
+    } else {
+      if (_controller.isAnimating) {
+        _controller.stop(canceled: false);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    AppThemeController.shared.removeListener(_syncPlayback);
+    WidgetsBinding.instance.removeObserver(this);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isEco = AppThemeController.shared.isEcoAnimation;
+    return Stack(
+      fit: StackFit.expand,
+      children: <Widget>[
+        Positioned.fill(
+          child: IgnorePointer(
+            child: RepaintBoundary(
+              child: AnimatedBuilder(
+                animation: _controller,
+                builder: (context, _) {
+                  return CustomPaint(
+                    painter: AnimatedThemePainter(
+                      preset: widget.preset,
+                      progress: _controller.value,
+                      isEcoMode: isEco,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+        widget.child,
+        if (widget.showForegroundOverlay)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: RepaintBoundary(
+                child: AnimatedBuilder(
+                  animation: _controller,
+                  builder: (context, _) {
+                    return CustomPaint(
+                      painter: SakuraForegroundCanopyPainter(
+                        progress: _controller.value,
+                        isEcoMode: isEco,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -352,26 +522,35 @@ class AppThemePreviewSwatch extends StatelessWidget {
       child: SizedBox(
         width: width,
         height: height,
-        child: preset.isGradientTheme
+        child: preset.isAnimatedTheme
             ? CustomPaint(
-                painter: AppThemeMeshPainter(preset),
-                child: child ?? const SizedBox.expand(),
-              )
-            : DecoratedBox(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: <Color>[
-                      Color(0xFFF6F8FC),
-                      Color(0xFFDCE7F7),
-                      Color(0xFF2B6CB0),
-                    ],
-                    stops: <double>[0.0, 0.55, 1.0],
-                  ),
+                painter: AnimatedThemePainter(
+                  preset: preset,
+                  progress: 0.22,
+                  isPreview: true,
                 ),
                 child: child ?? const SizedBox.expand(),
-              ),
+              )
+            : preset.isGradientTheme
+                ? CustomPaint(
+                    painter: AppThemeMeshPainter(preset),
+                    child: child ?? const SizedBox.expand(),
+                  )
+                : DecoratedBox(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: <Color>[
+                          Color(0xFFF6F8FC),
+                          Color(0xFFDCE7F7),
+                          Color(0xFF2B6CB0),
+                        ],
+                        stops: <double>[0.0, 0.55, 1.0],
+                      ),
+                    ),
+                    child: child ?? const SizedBox.expand(),
+                  ),
       ),
     );
   }

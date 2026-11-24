@@ -413,6 +413,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             }
           },
           child: AppThemeBackdrop(
+            showForegroundOverlay:
+                _selectedIndex == _mainMenuTabIndex && !_isBrowserOpen,
             child: Scaffold(
               backgroundColor: visuals.hasBackdrop ? Colors.transparent : null,
               body: IndexedStack(

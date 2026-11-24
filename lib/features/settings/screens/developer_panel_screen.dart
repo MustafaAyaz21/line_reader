@@ -198,6 +198,48 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
     }
   }
 
+  Future<void> _handleGrantSpecialThemesFromInput() async {
+    final email = _emailController.text.trim().toLowerCase();
+    if (!email.contains('@') || email.length < 5) {
+      _showSnack(
+        context.l10n.t(
+          'Geçerli bir Gmail / e-posta adresi girin.',
+          'Enter a valid email address.',
+        ),
+        isError: true,
+      );
+      return;
+    }
+    await _handleSetSpecialThemes(email, enabled: true, clearInput: true);
+  }
+
+  Future<void> _handleSetSpecialThemes(
+    String email, {
+    required bool enabled,
+    bool clearInput = false,
+  }) async {
+    final token = await _requireToken();
+    if (token == null) return;
+
+    setState(() => _isSubmitting = true);
+    try {
+      final result = await _service.setSpecialThemes(
+        token,
+        email,
+        enabled: enabled,
+      );
+      _showSnack(result.message, isError: !result.ok);
+      if (result.ok) {
+        if (clearInput) _emailController.clear();
+        await _loadAll();
+      }
+    } catch (e) {
+      _showSnack(e.toString(), isError: true);
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
   Future<void> _handleRevokePremium(DevEntitlementUser user) async {
     final s = context.l10n;
     final confirmed = await showDialog<bool>(
@@ -482,11 +524,35 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
                   ),
                 ),
                 const SizedBox(height: 10),
-                FilledButton.icon(
-                  key: const ValueKey<String>('dev_panel_grant_premium_btn'),
-                  onPressed: _isSubmitting ? null : _handleGrantPremium,
-                  icon: const Icon(Icons.workspace_premium_rounded, size: 18),
-                  label: Text(s.t('Premium Üye Ver', 'Grant Premium')),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: FilledButton.icon(
+                        key: const ValueKey<String>(
+                          'dev_panel_grant_premium_btn',
+                        ),
+                        onPressed: _isSubmitting ? null : _handleGrantPremium,
+                        icon: const Icon(
+                          Icons.workspace_premium_rounded,
+                          size: 18,
+                        ),
+                        label: Text(s.t('Premium Ver', 'Grant Premium')),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: FilledButton.tonalIcon(
+                        key: const ValueKey<String>(
+                          'dev_panel_grant_special_themes_btn',
+                        ),
+                        onPressed: _isSubmitting
+                            ? null
+                            : _handleGrantSpecialThemesFromInput,
+                        icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+                        label: Text(s.t('Özel Tema Ver', 'Special Themes')),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -541,11 +607,27 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
                   ),
                 ),
                 subtitle: Text(
-                  user.isDeveloper
-                      ? s.t('Geliştirici (PC korumalı)', 'Developer (PC protected)')
-                      : (user.codeUsed != null && user.codeUsed!.isNotEmpty
-                          ? '${s.t('Premium Üye', 'Premium Member')} • ${user.codeUsed}'
-                          : s.t('Premium Üye', 'Premium Member')),
+                  () {
+                    final parts = <String>[];
+                    if (user.isDeveloper) {
+                      parts.add(s.t('Geliştirici', 'Developer'));
+                    } else if (user.isUnlimited) {
+                      parts.add(
+                        user.codeUsed != null && user.codeUsed!.isNotEmpty
+                            ? '${s.t('Premium Üye', 'Premium Member')} (${user.codeUsed})'
+                            : s.t('Premium Üye', 'Premium Member'),
+                      );
+                    } else {
+                      parts.add(s.t('Standart Üye', 'Standard Member'));
+                    }
+                    if (user.authProviderLabel != null) {
+                      parts.add(user.authProviderLabel!);
+                    }
+                    if (user.hasSpecialThemes && !user.isDeveloper) {
+                      parts.add('✨ ${s.t('Özel Tema', 'Special Themes')}');
+                    }
+                    return parts.join(' • ');
+                  }(),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),
@@ -556,15 +638,78 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
                         size: 18,
                         color: colorScheme.onSurfaceVariant,
                       )
-                    : IconButton(
-                        onPressed: _isSubmitting
-                            ? null
-                            : () => _handleRevokePremium(user),
-                        icon: Icon(
-                          Icons.delete_outline_rounded,
-                          color: colorScheme.error,
-                        ),
-                        tooltip: s.t('Yetkiyi Kaldır', 'Revoke'),
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          IconButton(
+                            onPressed: _isSubmitting
+                                ? null
+                                : () => _handleSetSpecialThemes(
+                                      user.email,
+                                      enabled: !user.hasSpecialThemes,
+                                    ),
+                            icon: Icon(
+                              user.hasSpecialThemes
+                                  ? Icons.auto_awesome_rounded
+                                  : Icons.auto_awesome_outlined,
+                              color: user.hasSpecialThemes
+                                  ? colorScheme.primary
+                                  : colorScheme.onSurfaceVariant,
+                            ),
+                            tooltip: user.hasSpecialThemes
+                                ? s.t('Özel Temayı Kapat', 'Disable Special Themes')
+                                : s.t('Özel Tema Aç', 'Enable Special Themes'),
+                          ),
+                          if (user.isUnlimited)
+                            IconButton(
+                              onPressed: _isSubmitting
+                                  ? null
+                                  : () => _handleRevokePremium(user),
+                              icon: Icon(
+                                Icons.delete_outline_rounded,
+                                color: colorScheme.error,
+                              ),
+                              tooltip: s.t(
+                                'Premium Yetkisini Kaldır',
+                                'Revoke Premium',
+                              ),
+                            )
+                          else
+                            IconButton(
+                              onPressed: _isSubmitting
+                                  ? null
+                                  : () async {
+                                      final token = await _requireToken();
+                                      if (token == null) return;
+                                      setState(() => _isSubmitting = true);
+                                      try {
+                                        final res = await _service.grantPremium(
+                                          token,
+                                          user.email,
+                                        );
+                                        _showSnack(
+                                          res.message,
+                                          isError: !res.ok,
+                                        );
+                                        if (res.ok) await _loadAll();
+                                      } catch (e) {
+                                        _showSnack(
+                                          e.toString(),
+                                          isError: true,
+                                        );
+                                      } finally {
+                                        if (mounted) {
+                                          setState(() => _isSubmitting = false);
+                                        }
+                                      }
+                                    },
+                              icon: Icon(
+                                Icons.workspace_premium_outlined,
+                                color: colorScheme.primary,
+                              ),
+                              tooltip: s.t('Premium Üye Ver', 'Grant Premium'),
+                            ),
+                        ],
                       ),
               ),
             );

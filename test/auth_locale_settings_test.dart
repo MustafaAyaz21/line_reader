@@ -40,6 +40,7 @@ class _InMemoryAuthLocalStore implements AuthLocalStore {
   String quotaDate = '';
   int quotaUsed = 0;
   bool cachedUnlimited = false;
+  bool cachedSpecialThemes = false;
   String? cachedCodeUsed;
   String? cachedRole;
 
@@ -66,12 +67,17 @@ class _InMemoryAuthLocalStore implements AuthLocalStore {
   }
 
   @override
-  Future<({bool isUnlimited, String? codeUsed, String? role})>
-      loadCachedEntitlement() async {
+  Future<({
+    bool isUnlimited,
+    String? codeUsed,
+    String? role,
+    bool hasSpecialThemes,
+  })> loadCachedEntitlement() async {
     return (
       isUnlimited: cachedUnlimited,
       codeUsed: cachedCodeUsed,
       role: cachedRole,
+      hasSpecialThemes: cachedSpecialThemes,
     );
   }
 
@@ -80,8 +86,10 @@ class _InMemoryAuthLocalStore implements AuthLocalStore {
     required bool isUnlimited,
     String? codeUsed,
     String? role,
+    bool hasSpecialThemes = false,
   }) async {
     cachedUnlimited = isUnlimited;
+    cachedSpecialThemes = hasSpecialThemes;
     cachedCodeUsed = isUnlimited ? codeUsed : null;
     cachedRole = isUnlimited ? role : null;
   }

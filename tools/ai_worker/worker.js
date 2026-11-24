@@ -262,7 +262,8 @@ async function ensureSchema(db) {
         is_unlimited INTEGER NOT NULL DEFAULT 1,
         source TEXT NOT NULL DEFAULT 'manual',
         code_used TEXT,
-        granted_at TEXT NOT NULL
+        granted_at TEXT NOT NULL,
+        has_special_themes INTEGER NOT NULL DEFAULT 0
       )
     `),
     db.prepare(`
@@ -290,7 +291,29 @@ async function ensureSchema(db) {
         updated_at TEXT NOT NULL
       )
     `),
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS registered_users (
+        email TEXT PRIMARY KEY,
+        uid TEXT,
+        display_name TEXT,
+        auth_provider TEXT,
+        first_seen_at TEXT NOT NULL,
+        last_seen_at TEXT NOT NULL
+      )
+    `),
   ]);
+
+  // Mevcut canlı D1 tabloları için güvenli sütun geçişleri (zaten varsa sessizce geçer)
+  try {
+    await db
+      .prepare("ALTER TABLE user_entitlements ADD COLUMN has_special_themes INTEGER NOT NULL DEFAULT 0")
+      .run();
+  } catch (_) {}
+  try {
+    await db
+      .prepare("ALTER TABLE registered_users ADD COLUMN auth_provider TEXT")
+      .run();
+  } catch (_) {}
 }
 
 async function handleGetArticlesFeed(request, env) {
@@ -332,7 +355,9 @@ async function handleGetArticlesFeed(request, env) {
 }
 
 async function getUserEntitlement(db, user) {
-  if (!db) return { isUnlimited: false, source: null, codeUsed: null };
+  if (!db) {
+    return { isUnlimited: false, source: null, codeUsed: null, hasSpecialThemes: false };
+  }
   await ensureSchema(db);
 
   const email = (user.email || "").trim().toLowerCase();
@@ -341,19 +366,19 @@ async function getUserEntitlement(db, user) {
   let row = null;
   if (email) {
     row = await db
-      .prepare("SELECT email, uid, is_unlimited, source, code_used FROM user_entitlements WHERE LOWER(email) = ? LIMIT 1")
+      .prepare("SELECT email, uid, is_unlimited, source, code_used, has_special_themes FROM user_entitlements WHERE LOWER(email) = ? LIMIT 1")
       .bind(email)
       .first();
   }
   if (!row && uid) {
     row = await db
-      .prepare("SELECT email, uid, is_unlimited, source, code_used FROM user_entitlements WHERE uid = ? LIMIT 1")
+      .prepare("SELECT email, uid, is_unlimited, source, code_used, has_special_themes FROM user_entitlements WHERE uid = ? LIMIT 1")
       .bind(uid)
       .first();
   }
 
-  if (!row || Number(row.is_unlimited) !== 1) {
-    return { isUnlimited: false, source: null, codeUsed: null };
+  if (!row) {
+    return { isUnlimited: false, source: null, codeUsed: null, hasSpecialThemes: false };
   }
 
   // E-posta ile önceden yetki verilmişse ilk girişte UID alanını tamamla.
@@ -366,16 +391,122 @@ async function getUserEntitlement(db, user) {
     } catch (_) {}
   }
 
+  const isUnlimited = Number(row.is_unlimited) === 1;
+  const isAdmin = isUnlimited && String(row.source || "").toLowerCase() === "admin";
+  const hasSpecialThemes = Number(row.has_special_themes) === 1 || isAdmin;
+
   return {
-    isUnlimited: true,
-    source: row.source || "manual",
-    codeUsed: row.code_used || null,
+    isUnlimited,
+    source: isUnlimited ? (row.source || "manual") : null,
+    codeUsed: isUnlimited ? (row.code_used || null) : null,
+    hasSpecialThemes,
   };
+}
+
+function normalizeAuthProvider(raw) {
+  const v = String(raw || "").trim().toLowerCase();
+  if (!v) return null;
+  if (v.includes("google") && (v.includes("password") || v.includes("email"))) {
+    return "google+password";
+  }
+  if (v.includes("google")) return "google";
+  if (v.includes("password") || v.includes("email")) return "password";
+  return v;
+}
+
+async function upsertRegisteredUser(db, user) {
+  if (!db || !user) return;
+  const email = String(user.email || "").trim().toLowerCase();
+  if (!email || !email.includes("@")) return;
+  const uid = String(user.uid || "").trim() || null;
+  const displayName = String(user.displayName || "").trim() || null;
+  const authProvider = normalizeAuthProvider(user.authProvider || user.auth_provider || user.provider);
+  const now = new Date().toISOString();
+  try {
+    await db
+      .prepare(`
+        INSERT INTO registered_users (email, uid, display_name, auth_provider, first_seen_at, last_seen_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(email) DO UPDATE SET
+          uid = COALESCE(NULLIF(excluded.uid, ''), registered_users.uid),
+          display_name = COALESCE(NULLIF(excluded.display_name, ''), registered_users.display_name),
+          auth_provider = COALESCE(NULLIF(excluded.auth_provider, ''), registered_users.auth_provider),
+          last_seen_at = excluded.last_seen_at
+      `)
+      .bind(email, uid, displayName, authProvider, now, now)
+      .run();
+  } catch (_) {}
+}
+
+async function listAllUsersWithEntitlements(db) {
+  await ensureSchema(db);
+  const [regRes, entRes] = await Promise.all([
+    db.prepare("SELECT email, uid, display_name, auth_provider, first_seen_at, last_seen_at FROM registered_users").all(),
+    db.prepare("SELECT email, uid, is_unlimited, source, code_used, granted_at, has_special_themes FROM user_entitlements").all(),
+  ]);
+
+  const map = new Map();
+  for (const r of (regRes.results || [])) {
+    const email = String(r.email || "").trim().toLowerCase();
+    if (!email) continue;
+    map.set(email, {
+      email,
+      uid: r.uid || null,
+      display_name: r.display_name || null,
+      auth_provider: r.auth_provider || null,
+      first_seen_at: r.first_seen_at || null,
+      last_seen_at: r.last_seen_at || null,
+      is_unlimited: 0,
+      source: "standard",
+      code_used: null,
+      granted_at: null,
+      has_special_themes: 0,
+    });
+  }
+
+  for (const e of (entRes.results || [])) {
+    const email = String(e.email || "").trim().toLowerCase();
+    if (!email) continue;
+    const prev = map.get(email) || {
+      email,
+      uid: e.uid || null,
+      display_name: null,
+      auth_provider: null,
+      first_seen_at: e.granted_at || null,
+      last_seen_at: e.granted_at || null,
+    };
+    map.set(email, {
+      ...prev,
+      uid: prev.uid || e.uid || null,
+      is_unlimited: Number(e.is_unlimited) === 1 ? 1 : 0,
+      source: e.source || "manual",
+      code_used: e.code_used || null,
+      granted_at: e.granted_at || null,
+      has_special_themes: Number(e.has_special_themes) === 1 ? 1 : 0,
+    });
+  }
+
+  const rankOf = (u) => {
+    const isUnl = Number(u.is_unlimited) === 1;
+    if (isUnl && String(u.source || "").toLowerCase() === "admin") return 0;
+    if (isUnl) return 1;
+    if (Number(u.has_special_themes) === 1) return 2;
+    return 3;
+  };
+
+  return Array.from(map.values()).sort((a, b) => {
+    const rd = rankOf(a) - rankOf(b);
+    if (rd !== 0) return rd;
+    const ta = String(a.last_seen_at || a.granted_at || "");
+    const tb = String(b.last_seen_at || b.granted_at || "");
+    return tb.localeCompare(ta);
+  });
 }
 
 async function handleGetMe(env, user) {
   try {
     const ent = await getUserEntitlement(env.DB, user);
+    await upsertRegisteredUser(env.DB, user);
     const role = ent.isUnlimited
       ? (String(ent.source || "").toLowerCase() === "admin" ? "admin" : "premium")
       : "standard";
@@ -387,6 +518,7 @@ async function handleGetMe(env, user) {
       source: ent.source,
       role,
       code_used: ent.codeUsed,
+      has_special_themes: ent.hasSpecialThemes,
     });
   } catch (err) {
     return jsonResponse({ error: "db_error", message: String(err?.message || err) }, 500);
@@ -574,13 +706,11 @@ async function handleDeveloperPanelRequest(request, env, verifiedUser, path, met
 
   const callerEmail = String(verifiedUser.email || verifiedUser.uid || "dev").trim().toLowerCase();
 
-  // 1) Premium kullanıcı yönetimi (Geliştirici rolleri yalnızca PC panelinden değiştirilebilir)
+  // 1) Tüm kayıtlı kullanıcılar + Premium & Özel Tema yönetimi
   if (path === "/dev/users") {
     if (method === "GET") {
-      const res = await env.DB
-        .prepare("SELECT email, uid, is_unlimited, source, code_used, granted_at FROM user_entitlements ORDER BY granted_at DESC")
-        .all();
-      return jsonResponse({ ok: true, users: res.results || [] });
+      const users = await listAllUsersWithEntitlements(env.DB);
+      return jsonResponse({ ok: true, users });
     }
 
     const body = await safeReadJson(request);
@@ -590,9 +720,42 @@ async function handleDeveloperPanelRequest(request, env, verifiedUser, path, met
     }
 
     const existing = await env.DB
-      .prepare("SELECT email, source FROM user_entitlements WHERE LOWER(email) = ? LIMIT 1")
+      .prepare("SELECT email, is_unlimited, source, has_special_themes FROM user_entitlements WHERE LOWER(email) = ? LIMIT 1")
       .bind(email)
       .first();
+
+    // Bağımsız Özel Tema bayrağı güncelleme (Premium/Üye durumunu bozmaz)
+    if (method === "POST" && (body?.action === "set_special_themes" || typeof body?.has_special_themes === "boolean")) {
+      const enabled = body?.has_special_themes === true || body?.enabled === true;
+      const flag = enabled ? 1 : 0;
+      if (enabled) {
+        await env.DB
+          .prepare(`
+            INSERT INTO user_entitlements (email, uid, is_unlimited, source, code_used, granted_at, has_special_themes)
+            VALUES (?, NULL, 0, 'special_themes', NULL, ?, 1)
+            ON CONFLICT(email) DO UPDATE SET
+              has_special_themes = 1
+          `)
+          .bind(email, new Date().toISOString())
+          .run();
+      } else {
+        await env.DB
+          .prepare("UPDATE user_entitlements SET has_special_themes = 0 WHERE LOWER(email) = ?")
+          .bind(email)
+          .run();
+        await env.DB
+          .prepare("DELETE FROM user_entitlements WHERE LOWER(email) = ? AND is_unlimited = 0 AND has_special_themes = 0")
+          .bind(email)
+          .run();
+      }
+      return jsonResponse({
+        ok: true,
+        has_special_themes: flag === 1,
+        message: enabled
+          ? `${email} hesabına Özel Temalar yetkisi verildi.`
+          : `${email} hesabının Özel Temalar yetkisi kaldırıldı.`,
+      });
+    }
 
     if (existing && String(existing.source || "").toLowerCase() === "admin") {
       return jsonResponse({
@@ -605,8 +768,8 @@ async function handleDeveloperPanelRequest(request, env, verifiedUser, path, met
     if (method === "POST") {
       await env.DB
         .prepare(`
-          INSERT INTO user_entitlements (email, uid, is_unlimited, source, code_used, granted_at)
-          VALUES (?, NULL, 1, 'manual', ?, ?)
+          INSERT INTO user_entitlements (email, uid, is_unlimited, source, code_used, granted_at, has_special_themes)
+          VALUES (?, NULL, 1, 'manual', ?, ?, 0)
           ON CONFLICT(email) DO UPDATE SET
             is_unlimited = 1,
             source = 'manual',
@@ -623,10 +786,17 @@ async function handleDeveloperPanelRequest(request, env, verifiedUser, path, met
     }
 
     if (method === "DELETE") {
-      await env.DB
-        .prepare("DELETE FROM user_entitlements WHERE LOWER(email) = ? AND LOWER(source) != 'admin'")
-        .bind(email)
-        .run();
+      if (existing && Number(existing.has_special_themes) === 1) {
+        await env.DB
+          .prepare("UPDATE user_entitlements SET is_unlimited = 0, source = 'special_themes', code_used = NULL WHERE LOWER(email) = ? AND LOWER(source) != 'admin'")
+          .bind(email)
+          .run();
+      } else {
+        await env.DB
+          .prepare("DELETE FROM user_entitlements WHERE LOWER(email) = ? AND LOWER(source) != 'admin'")
+          .bind(email)
+          .run();
+      }
       return jsonResponse({
         ok: true,
         message: `${email} hesabının Premium yetkisi kaldırıldı.`,
@@ -1623,30 +1793,82 @@ async function handleAdminRequest(request, env, path, method) {
     }
   }
 
-  // Kullanıcı yetki yönetimi
+  // Kullanıcı yetki yönetimi (tüm Firebase kayıtlı kullanıcılar + yetkiler)
   if (path === "/admin/users") {
     if (method === "GET") {
-      const res = await env.DB
-        .prepare("SELECT email, uid, is_unlimited, source, code_used, granted_at FROM user_entitlements ORDER BY granted_at DESC")
-        .all();
-      return jsonResponse({ ok: true, users: res.results || [] });
+      const users = await listAllUsersWithEntitlements(env.DB);
+      return jsonResponse({ ok: true, users });
     }
 
     const body = await safeReadJson(request);
+
+    // Geçmiş Firebase Auth dışa aktarımından (JSON/CSV) toplu kullanıcı içe aktarma
+    if (method === "POST" && body?.action === "import_users" && Array.isArray(body?.users)) {
+      let imported = 0;
+      for (const item of body.users) {
+        const em = String(item?.email || "").trim().toLowerCase();
+        if (!em || !em.includes("@")) continue;
+        await upsertRegisteredUser(env.DB, {
+          email: em,
+          uid: item?.uid || item?.localId || "",
+          displayName: item?.displayName || item?.display_name || "",
+          authProvider: item?.authProvider || item?.auth_provider || item?.provider || "",
+        });
+        imported += 1;
+      }
+      return jsonResponse({
+        ok: true,
+        imported,
+        message: `${imported} Firebase kullanıcısı panele aktarıldı.`,
+      });
+    }
+
     const email = String(body?.email || "").trim().toLowerCase();
     if (!email || !email.includes("@")) {
       return jsonResponse({ ok: false, message: "Geçerli bir e-posta adresi girin." }, 400);
     }
 
     if (method === "POST" || method === "PATCH") {
+      // Bağımsız Özel Tema bayrağı güncelleme (Premium/Geliştirici rolünü bozmaz)
+      if (body?.action === "set_special_themes" || typeof body?.has_special_themes === "boolean") {
+        const enabled = body?.has_special_themes === true || body?.enabled === true;
+        if (enabled) {
+          await env.DB
+            .prepare(`
+              INSERT INTO user_entitlements (email, uid, is_unlimited, source, code_used, granted_at, has_special_themes)
+              VALUES (?, NULL, 0, 'special_themes', NULL, ?, 1)
+              ON CONFLICT(email) DO UPDATE SET
+                has_special_themes = 1
+            `)
+            .bind(email, new Date().toISOString())
+            .run();
+        } else {
+          await env.DB
+            .prepare("UPDATE user_entitlements SET has_special_themes = 0 WHERE LOWER(email) = ?")
+            .bind(email)
+            .run();
+          await env.DB
+            .prepare("DELETE FROM user_entitlements WHERE LOWER(email) = ? AND is_unlimited = 0 AND has_special_themes = 0")
+            .bind(email)
+            .run();
+        }
+        return jsonResponse({
+          ok: true,
+          has_special_themes: enabled,
+          message: enabled
+            ? `${email} hesabına Özel Temalar yetkisi verildi.`
+            : `${email} hesabının Özel Temalar yetkisi kaldırıldı.`,
+        });
+      }
+
       const requestedRole = String(body?.role || "").trim().toLowerCase();
       const isDeveloper = requestedRole === "admin" || requestedRole === "developer";
       const targetSource = isDeveloper ? "admin" : "manual";
       const roleLabel = isDeveloper ? "Geliştirici" : "Premium Üye";
       await env.DB
         .prepare(`
-          INSERT INTO user_entitlements (email, uid, is_unlimited, source, code_used, granted_at)
-          VALUES (?, NULL, 1, ?, NULL, ?)
+          INSERT INTO user_entitlements (email, uid, is_unlimited, source, code_used, granted_at, has_special_themes)
+          VALUES (?, NULL, 1, ?, NULL, ?, 0)
           ON CONFLICT(email) DO UPDATE SET
             is_unlimited = 1,
             source = excluded.source,
@@ -1663,10 +1885,21 @@ async function handleAdminRequest(request, env, path, method) {
     }
 
     if (method === "DELETE") {
-      await env.DB
-        .prepare("DELETE FROM user_entitlements WHERE LOWER(email) = ?")
+      const existing = await env.DB
+        .prepare("SELECT has_special_themes FROM user_entitlements WHERE LOWER(email) = ? LIMIT 1")
         .bind(email)
-        .run();
+        .first();
+      if (existing && Number(existing.has_special_themes) === 1 && body?.revoke_all !== true) {
+        await env.DB
+          .prepare("UPDATE user_entitlements SET is_unlimited = 0, source = 'special_themes', code_used = NULL WHERE LOWER(email) = ?")
+          .bind(email)
+          .run();
+      } else {
+        await env.DB
+          .prepare("DELETE FROM user_entitlements WHERE LOWER(email) = ?")
+          .bind(email)
+          .run();
+      }
       return jsonResponse({ ok: true, message: `${email} hesabının yetkisi kaldırıldı.` });
     }
   }
@@ -1852,7 +2085,12 @@ async function verifyFirebaseIdToken(token) {
     );
 
     if (!isValid) return null;
-    return { uid: payload.sub, email: payload.email || "" };
+    return {
+    uid: payload.sub,
+    email: payload.email || "",
+    displayName: payload.name || "",
+    authProvider: normalizeAuthProvider(payload.firebase?.sign_in_provider || ""),
+  };
   } catch (_) {
     return null;
   }

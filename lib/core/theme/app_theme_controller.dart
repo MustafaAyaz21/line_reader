@@ -14,15 +14,21 @@ class AppThemeController extends ChangeNotifier {
         _preset = initialPreset;
 
   static const String _settingsKey = 'app_theme_preset';
+  static const String _animationPausedKey = 'app_theme_animation_paused';
+  static const String _ecoAnimationKey = 'app_theme_eco_animation';
 
   /// Tüm ekranların ve Ayarlar'ın anında senkronize olması için paylaşılan örnek.
   static final AppThemeController shared = AppThemeController();
 
   final SettingsRepository? _repository;
   AppThemePreset _preset;
+  bool _isAnimationPaused = false;
+  bool _isEcoAnimation = false;
   bool _hasLoaded = false;
 
   AppThemePreset get preset => _preset;
+  bool get isAnimationPaused => _isAnimationPaused;
+  bool get isEcoAnimation => _isEcoAnimation;
   bool get hasLoaded => _hasLoaded;
 
   SettingsRepository _resolveRepository() {
@@ -33,10 +39,27 @@ class AppThemeController extends ChangeNotifier {
     if (_hasLoaded && !force) return;
     _hasLoaded = true;
     try {
-      final raw = await _resolveRepository().getString(_settingsKey);
+      final repo = _resolveRepository();
+      final raw = await repo.getString(_settingsKey);
       final parsed = AppThemePreset.fromStorageKey(raw);
+      final rawPaused = await repo.getString(_animationPausedKey);
+      final parsedPaused = rawPaused == '1' || rawPaused == 'true';
+      final rawEco = await repo.getString(_ecoAnimationKey);
+      final parsedEco = rawEco == '1' || rawEco == 'true';
+      var changed = false;
       if (parsed != _preset) {
         _preset = parsed;
+        changed = true;
+      }
+      if (parsedPaused != _isAnimationPaused) {
+        _isAnimationPaused = parsedPaused;
+        changed = true;
+      }
+      if (parsedEco != _isEcoAnimation) {
+        _isEcoAnimation = parsedEco;
+        changed = true;
+      }
+      if (changed) {
         notifyListeners();
       }
     } catch (_) {
@@ -52,17 +75,45 @@ class AppThemeController extends ChangeNotifier {
     try {
       final repo = _resolveRepository();
       await repo.saveString(_settingsKey, next.storageKey);
-      // Tema değiştirildiğinde (Sistem Varsayılanı veya özel gradyan tema)
-      // makale okuma alanı da otomatik olarak seçilen temaya / telefonun
-      // koyu-açık moduna uyumlu hale gelir (kullanıcı Aa'dan yine
-      // Beyaz/Kağıt/Koyu seçebilir).
       await repo.saveString('article_reader_tone', 'theme');
     } catch (_) {}
+  }
+
+  Future<void> setAnimationPaused(bool paused) async {
+    if (_isAnimationPaused == paused) return;
+    _isAnimationPaused = paused;
+    _hasLoaded = true;
+    notifyListeners();
+    try {
+      final repo = _resolveRepository();
+      await repo.saveString(_animationPausedKey, paused ? '1' : '0');
+    } catch (_) {}
+  }
+
+  Future<void> setEcoAnimation(bool eco) async {
+    if (_isEcoAnimation == eco) return;
+    _isEcoAnimation = eco;
+    _hasLoaded = true;
+    notifyListeners();
+    try {
+      final repo = _resolveRepository();
+      await repo.saveString(_ecoAnimationKey, eco ? '1' : '0');
+    } catch (_) {}
+  }
+
+  /// Özel tema yetkisi geri alındığında veya oturum kapatıldığında, aktif tema
+  /// özel bir temaysa güvenli şekilde Varsayılan (Classic) temaya geri döner.
+  void enforceSpecialThemeAccess({required bool hasSpecialThemes}) {
+    if (!hasSpecialThemes && _preset.isSpecialTheme) {
+      setPreset(AppThemePreset.classic);
+    }
   }
 
   @visibleForTesting
   void resetForTesting() {
     _preset = AppThemePreset.classic;
+    _isAnimationPaused = false;
+    _isEcoAnimation = false;
     _hasLoaded = false;
     notifyListeners();
   }

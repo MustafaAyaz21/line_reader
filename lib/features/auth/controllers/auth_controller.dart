@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/settings/settings_repository.dart';
+import '../../../core/theme/app_theme_controller.dart';
 import '../data/auth_local_repository.dart';
 import '../models/auth_user.dart';
 import '../services/auth_service.dart';
@@ -45,6 +46,7 @@ class AuthController extends ChangeNotifier {
   bool _isBusy = false;
   bool _isSyncingEntitlement = false;
   bool _isUnlimited = false;
+  bool _hasSpecialThemes = false;
   String? _entitlementCodeUsed;
   String? _entitlementRole;
   String _quotaDateKey = '';
@@ -73,6 +75,18 @@ class AuthController extends ChangeNotifier {
   /// Ayarlar'da "Premium Üye" yerine "Yetkili" olarak gösterilir.
   bool get isAuthorizedStaff =>
       isUnlimited && _entitlementRole?.trim().toLowerCase() == 'admin';
+
+  /// Kullanıcının gizli "Özel Temalar" bölümüne erişim hakkı.
+  /// Geliştirici (admin) hesaplar her zaman tüm özel temaları görür.
+  /// Misafir veya çıkış yapmış oturumlarda her zaman `false` döner.
+  bool get hasSpecialThemes =>
+      isAuthenticated && (_hasSpecialThemes || isAuthorizedStaff);
+
+  void _enforceSpecialThemeFallback() {
+    AppThemeController.shared.enforceSpecialThemeAccess(
+      hasSpecialThemes: hasSpecialThemes,
+    );
+  }
 
   /// Aktif oturum için günlük çeviri limiti (Misafir: 40, Kayıtlı standart: 80).
   int get dailyTranslationLimit =>
@@ -139,18 +153,21 @@ class AuthController extends ChangeNotifier {
         _user = current;
         _status = AuthSessionStatus.authenticated;
         _isUnlimited = cachedEnt.isUnlimited;
+        _hasSpecialThemes = cachedEnt.hasSpecialThemes;
         _entitlementCodeUsed = cachedEnt.codeUsed;
         _entitlementRole = cachedEnt.role;
       } else {
         final guestEnabled = await _localStore.isGuestModeEnabled();
         _user = null;
         _isUnlimited = false;
+        _hasSpecialThemes = false;
         _entitlementCodeUsed = null;
         _entitlementRole = null;
         _status = guestEnabled
             ? AuthSessionStatus.guest
             : AuthSessionStatus.unauthenticated;
       }
+      _enforceSpecialThemeFallback();
 
       await _authSub?.cancel();
       _authSub = _backend.authStateChanges.listen((nextUser) {
@@ -162,9 +179,11 @@ class AuthController extends ChangeNotifier {
         } else if (_status == AuthSessionStatus.authenticated) {
           _user = null;
           _isUnlimited = false;
+          _hasSpecialThemes = false;
           _entitlementCodeUsed = null;
           _entitlementRole = null;
           _status = AuthSessionStatus.unauthenticated;
+          _enforceSpecialThemeFallback();
           _safeNotify();
         }
       });
@@ -194,6 +213,7 @@ class AuthController extends ChangeNotifier {
       if (remote == null) return;
 
       _isUnlimited = remote.isUnlimited;
+      _hasSpecialThemes = remote.effectiveSpecialThemes;
       _entitlementCodeUsed = remote.codeUsed;
       _entitlementRole = remote.isAuthorizedStaff
           ? 'admin'
@@ -202,7 +222,9 @@ class AuthController extends ChangeNotifier {
         isUnlimited: _isUnlimited,
         codeUsed: _entitlementCodeUsed,
         role: _entitlementRole,
+        hasSpecialThemes: _hasSpecialThemes,
       );
+      _enforceSpecialThemeFallback();
     } catch (error) {
       debugPrint('[AuthController] Yetki yenileme hatasi: $error');
     } finally {
@@ -252,6 +274,7 @@ class AuthController extends ChangeNotifier {
           isUnlimited: true,
           codeUsed: _entitlementCodeUsed,
           role: _entitlementRole,
+          hasSpecialThemes: _hasSpecialThemes,
         );
       }
       return result;
@@ -441,23 +464,43 @@ class AuthController extends ChangeNotifier {
   }
 
   Future<void> _syncEntitlementAfterSignIn() async {
-    try {
-      final token = await _backend.getIdToken();
-      if (token == null || token.trim().isEmpty) return;
-      final remote = await _entitlementClient.fetchEntitlement(token);
-      if (remote != null) {
-        _isUnlimited = remote.isUnlimited;
-        _entitlementCodeUsed = remote.codeUsed;
-        _entitlementRole = remote.isAuthorizedStaff
-            ? 'admin'
-            : (remote.isUnlimited ? 'premium' : null);
-        await _localStore.saveCachedEntitlement(
-          isUnlimited: _isUnlimited,
-          codeUsed: _entitlementCodeUsed,
-          role: _entitlementRole,
-        );
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        final token = await _backend.getIdToken();
+        if (token == null || token.trim().isEmpty) {
+          if (attempt == 0) {
+            await Future<void>.delayed(const Duration(milliseconds: 800));
+            continue;
+          }
+          return;
+        }
+        final remote = await _entitlementClient.fetchEntitlement(token);
+        if (remote != null) {
+          _isUnlimited = remote.isUnlimited;
+          _hasSpecialThemes = remote.effectiveSpecialThemes;
+          _entitlementCodeUsed = remote.codeUsed;
+          _entitlementRole = remote.isAuthorizedStaff
+              ? 'admin'
+              : (remote.isUnlimited ? 'premium' : null);
+          await _localStore.saveCachedEntitlement(
+            isUnlimited: _isUnlimited,
+            codeUsed: _entitlementCodeUsed,
+            role: _entitlementRole,
+            hasSpecialThemes: _hasSpecialThemes,
+          );
+          _enforceSpecialThemeFallback();
+          _safeNotify();
+          return;
+        }
+        if (attempt == 0) {
+          await Future<void>.delayed(const Duration(milliseconds: 1200));
+        }
+      } catch (_) {
+        if (attempt == 0) {
+          await Future<void>.delayed(const Duration(milliseconds: 1200));
+        }
       }
-    } catch (_) {}
+    }
   }
 
   Future<AuthActionResult> sendPasswordResetEmail(String email) async {
@@ -488,13 +531,18 @@ class AuthController extends ChangeNotifier {
     try {
       await _backend.signOut();
       await _localStore.setGuestModeEnabled(true);
-      await _localStore.saveCachedEntitlement(isUnlimited: false);
+      await _localStore.saveCachedEntitlement(
+        isUnlimited: false,
+        hasSpecialThemes: false,
+      );
       _user = null;
       _isUnlimited = false;
+      _hasSpecialThemes = false;
       _entitlementCodeUsed = null;
       _entitlementRole = null;
       _sessionLookupCount = 0;
       _status = AuthSessionStatus.guest;
+      _enforceSpecialThemeFallback();
     } finally {
       _isBusy = false;
       _safeNotify();

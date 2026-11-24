@@ -48,6 +48,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (widget.authController.isAuthenticated) {
       widget.authController.refreshEntitlement();
     }
+    if (widget.authController.isAuthenticated) {
+      widget.authController.refreshEntitlement();
+    }
   }
 
   @override
@@ -623,6 +626,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     AppStrings s,
   ) {
     final activePreset = AppThemeController.shared.preset;
+    final isAnimationPaused = AppThemeController.shared.isAnimationPaused;
+    final isEcoAnimation = AppThemeController.shared.isEcoAnimation;
+    final canSeeSpecialThemes = widget.authController.hasSpecialThemes;
 
     return Card(
       margin: EdgeInsets.zero,
@@ -660,176 +666,338 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 height: 1.35,
               ),
             ),
-            const SizedBox(height: 14),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                const spacing = 10.0;
-                final itemWidth = (constraints.maxWidth - spacing) / 2;
-                return Wrap(
-                  spacing: spacing,
-                  runSpacing: spacing,
-                  children: AppThemePreset.values.map((preset) {
-                    final isSelected = activePreset == preset;
-                    final title = preset.titleForLocale(isEnglish: s.isEn);
-                    final subtitle =
-                        preset.subtitleForLocale(isEnglish: s.isEn);
-                    final isFullWidth = preset == AppThemePreset.classic;
-
-                    return SizedBox(
-                      width: isFullWidth ? constraints.maxWidth : itemWidth,
-                      child: Material(
-                        color: isSelected
-                            ? colorScheme.primaryContainer.withAlpha(185)
-                            : colorScheme.surfaceContainerHighest.withAlpha(155),
-                        borderRadius: BorderRadius.circular(14),
-                        clipBehavior: Clip.antiAlias,
-                        child: InkWell(
-                          key: ValueKey<String>(
-                            'settings_theme_${preset.storageKey}',
-                          ),
-                          onTap: () =>
-                              AppThemeController.shared.setPreset(preset),
-                          child: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: isSelected
-                                    ? colorScheme.primary
-                                    : colorScheme.outlineVariant,
-                                width: isSelected ? 2 : 1,
-                              ),
-                            ),
-                            child: isFullWidth
-                                ? Row(
-                                    children: <Widget>[
-                                      AppThemePreviewSwatch(
-                                        preset: preset,
-                                        width: 56,
-                                        height: 40,
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: <Widget>[
-                                            Text(
-                                              title,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: theme.textTheme.labelLarge
-                                                  ?.copyWith(
-                                                fontWeight: FontWeight.w700,
-                                                color: isSelected
-                                                    ? colorScheme
-                                                        .onPrimaryContainer
-                                                    : colorScheme.onSurface,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              subtitle,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: theme.textTheme.bodySmall
-                                                  ?.copyWith(
-                                                fontSize: 11.5,
-                                                color: isSelected
-                                                    ? colorScheme
-                                                        .onPrimaryContainer
-                                                        .withAlpha(205)
-                                                    : colorScheme
-                                                        .onSurfaceVariant,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      if (isSelected)
-                                        Icon(
-                                          Icons.check_circle_rounded,
-                                          size: 20,
-                                          color: colorScheme.primary,
-                                        ),
-                                    ],
-                                  )
-                                : Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: <Widget>[
-                                      Stack(
-                                        children: <Widget>[
-                                          AppThemePreviewSwatch(
-                                            preset: preset,
-                                            width: double.infinity,
-                                            height: 58,
-                                            borderRadius:
-                                                BorderRadius.circular(10),
-                                          ),
-                                          if (isSelected)
-                                            Positioned(
-                                              top: 6,
-                                              right: 6,
-                                              child: Container(
-                                                padding:
-                                                    const EdgeInsets.all(2),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.black
-                                                      .withAlpha(140),
-                                                  shape: BoxShape.circle,
-                                                ),
-                                                child: const Icon(
-                                                  Icons.check_rounded,
-                                                  size: 14,
-                                                  color: Colors.white,
-                                                ),
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        title,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: theme.textTheme.labelLarge
-                                            ?.copyWith(
-                                          fontWeight: FontWeight.w700,
-                                          color: isSelected
-                                              ? colorScheme.onPrimaryContainer
-                                              : colorScheme.onSurface,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        subtitle,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: theme.textTheme.bodySmall
-                                            ?.copyWith(
-                                          fontSize: 11,
-                                          height: 1.25,
-                                          color: isSelected
-                                              ? colorScheme.onPrimaryContainer
-                                                  .withAlpha(205)
-                                              : colorScheme.onSurfaceVariant,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(growable: false),
-                );
-              },
+            const SizedBox(height: 16),
+            // 1. Alt Kategori: Hareketsiz Temalar
+            _buildThemeSubcategoryHeader(
+              theme: theme,
+              colorScheme: colorScheme,
+              icon: Icons.layers_outlined,
+              title: s.t('Hareketsiz Temalar', 'Static Themes'),
             ),
+            const SizedBox(height: 10),
+            _buildThemePresetGrid(
+              presets: AppThemePreset.staticPresets,
+              activePreset: activePreset,
+              theme: theme,
+              colorScheme: colorScheme,
+              s: s,
+            ),
+            const SizedBox(height: 18),
+            Divider(height: 1, color: colorScheme.outlineVariant),
+            const SizedBox(height: 16),
+            // 2. Alt Kategori: Hareketli Temalar
+            _buildThemeSubcategoryHeader(
+              theme: theme,
+              colorScheme: colorScheme,
+              icon: Icons.auto_awesome_rounded,
+              title: s.t('Hareketli Temalar', 'Animated Themes'),
+            ),
+            const SizedBox(height: 10),
+            _buildThemePresetGrid(
+              presets: AppThemePreset.animatedPresets,
+              activePreset: activePreset,
+              theme: theme,
+              colorScheme: colorScheme,
+              s: s,
+            ),
+            const SizedBox(height: 12),
+            Material(
+              color: colorScheme.surfaceContainerHighest.withAlpha(135),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(color: colorScheme.outlineVariant),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: SwitchListTile(
+                key: const ValueKey<String>(
+                  'settings_theme_pause_animation_switch',
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 2,
+                ),
+                dense: true,
+                secondary: Icon(
+                  isAnimationPaused
+                      ? Icons.pause_circle_outline_rounded
+                      : Icons.motion_photos_on_rounded,
+                  size: 20,
+                  color: colorScheme.primary,
+                ),
+                title: Text(
+                  s.t('Animasyonu Duraklat', 'Pause Animation'),
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: Text(
+                  s.t(
+                    'Arka plan animasyonunu sabitler (uygulama küçültülünce otomatik durur).',
+                    'Freezes background motion (auto-pauses when minimized).',
+                  ),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontSize: 11.5,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                value: isAnimationPaused,
+                onChanged: (value) =>
+                    AppThemeController.shared.setAnimationPaused(value),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Material(
+              color: colorScheme.surfaceContainerHighest.withAlpha(135),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(color: colorScheme.outlineVariant),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: SwitchListTile(
+                key: const ValueKey<String>(
+                  'settings_theme_eco_animation_switch',
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 2,
+                ),
+                dense: true,
+                secondary: Icon(
+                  Icons.battery_saver_rounded,
+                  size: 20,
+                  color: colorScheme.primary,
+                ),
+                title: Text(
+                  s.t('Pil Dostu Animasyon', 'Battery-Saver Motion'),
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: Text(
+                  s.t(
+                    'Daha az yaprak ve daha sakin hızla sıfır kasma sağlar.',
+                    'Fewer particles and gentler speed for zero lag.',
+                  ),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontSize: 11.5,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                value: isEcoAnimation,
+                onChanged: isAnimationPaused
+                    ? null
+                    : (value) =>
+                        AppThemeController.shared.setEcoAnimation(value),
+              ),
+            ),
+            if (canSeeSpecialThemes &&
+                AppThemePreset.specialPresets.isNotEmpty) ...<Widget>[
+              const SizedBox(height: 18),
+              Divider(height: 1, color: colorScheme.outlineVariant),
+              const SizedBox(height: 16),
+              // 3. Alt Kategori: Özel Temalar (yalnızca yetkili & geliştirici hesaplarda görünür)
+              _buildThemeSubcategoryHeader(
+                theme: theme,
+                colorScheme: colorScheme,
+                icon: Icons.workspace_premium_rounded,
+                title: s.t('Özel Temalar', 'Special Themes'),
+              ),
+              const SizedBox(height: 10),
+              _buildThemePresetGrid(
+                presets: AppThemePreset.specialPresets,
+                activePreset: activePreset,
+                theme: theme,
+                colorScheme: colorScheme,
+                s: s,
+              ),
+            ],
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildThemeSubcategoryHeader({
+    required ThemeData theme,
+    required ColorScheme colorScheme,
+    required IconData icon,
+    required String title,
+  }) {
+    return Row(
+      children: <Widget>[
+        Icon(icon, size: 16, color: colorScheme.primary),
+        const SizedBox(width: 7),
+        Text(
+          title,
+          style: theme.textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: colorScheme.onSurface,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildThemePresetGrid({
+    required List<AppThemePreset> presets,
+    required AppThemePreset activePreset,
+    required ThemeData theme,
+    required ColorScheme colorScheme,
+    required AppStrings s,
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const spacing = 10.0;
+        final itemWidth = (constraints.maxWidth - spacing) / 2;
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: presets.map((preset) {
+            final isSelected = activePreset == preset;
+            final title = preset.titleForLocale(isEnglish: s.isEn);
+            final subtitle = preset.subtitleForLocale(isEnglish: s.isEn);
+            final isFullWidth = preset == AppThemePreset.classic;
+
+            return SizedBox(
+              width: isFullWidth ? constraints.maxWidth : itemWidth,
+              child: Material(
+                color: isSelected
+                    ? colorScheme.primaryContainer.withAlpha(185)
+                    : colorScheme.surfaceContainerHighest.withAlpha(155),
+                borderRadius: BorderRadius.circular(14),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  key: ValueKey<String>(
+                    'settings_theme_${preset.storageKey}',
+                  ),
+                  onTap: () => AppThemeController.shared.setPreset(preset),
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: isSelected
+                            ? colorScheme.primary
+                            : colorScheme.outlineVariant,
+                        width: isSelected ? 2 : 1,
+                      ),
+                    ),
+                    child: isFullWidth
+                        ? Row(
+                            children: <Widget>[
+                              AppThemePreviewSwatch(
+                                preset: preset,
+                                width: 56,
+                                height: 40,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: <Widget>[
+                                    Text(
+                                      title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style:
+                                          theme.textTheme.labelLarge?.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                        color: isSelected
+                                            ? colorScheme.onPrimaryContainer
+                                            : colorScheme.onSurface,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      subtitle,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style:
+                                          theme.textTheme.bodySmall?.copyWith(
+                                        fontSize: 11.5,
+                                        color: isSelected
+                                            ? colorScheme.onPrimaryContainer
+                                                .withAlpha(205)
+                                            : colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (isSelected)
+                                Icon(
+                                  Icons.check_circle_rounded,
+                                  size: 20,
+                                  color: colorScheme.primary,
+                                ),
+                            ],
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Stack(
+                                children: <Widget>[
+                                  AppThemePreviewSwatch(
+                                    preset: preset,
+                                    width: double.infinity,
+                                    height: 58,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  if (isSelected)
+                                    Positioned(
+                                      top: 6,
+                                      right: 6,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.black.withAlpha(140),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.check_rounded,
+                                          size: 14,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.labelLarge?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: isSelected
+                                      ? colorScheme.onPrimaryContainer
+                                      : colorScheme.onSurface,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                subtitle,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontSize: 11,
+                                  height: 1.25,
+                                  color: isSelected
+                                      ? colorScheme.onPrimaryContainer
+                                          .withAlpha(205)
+                                      : colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(growable: false),
+        );
+      },
     );
   }
 

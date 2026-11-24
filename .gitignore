@@ -52,5 +52,6 @@ app.*.map.json
 android/key.properties
 android/app/google-services.json
 tools/article_studio/admin_config.local.json
+tools/article_studio/firebase_service_account.local.json
 *.jks
 *.keystore

@@ -166,6 +166,11 @@ abstract final class AppTheme {
       AppThemePreset.nightDepth => _nightDepth(),
       AppThemePreset.softMist => _softMist(),
       AppThemePreset.electricCoral => _electricCoral(),
+      AppThemePreset.amethystGalaxy => _amethystGalaxy(),
+      AppThemePreset.oceanDepths => _oceanDepths(),
+      AppThemePreset.warmLatteBokeh => _warmLatteBokeh(),
+      AppThemePreset.sageSunlight => _sageSunlight(),
+      AppThemePreset.sakuraGarden => _sakuraGarden(),
     };
   }
 
@@ -417,10 +422,261 @@ abstract final class AppTheme {
     return _buildGradientTheme(colorScheme: colorScheme, visuals: visuals);
   }
 
+  /// Hareketli 1 — Ametist Galaksi:
+  /// Koyu mor-gece uzay zemini üzerinde yarı saydam koyu buzlu cam yüzeyler,
+  /// net açık renkli yazılar ve ametist mor / gül-mercan vurgular.
+  static ThemeData _amethystGalaxy() {
+    final base = ColorScheme.fromSeed(
+      seedColor: const Color(0xFFA855F7),
+      brightness: Brightness.dark,
+    );
+    final colorScheme = base.copyWith(
+      primary: const Color(0xFFC084FC),
+      onPrimary: const Color(0xFF1A072E),
+      primaryContainer: const Color(0xD93B1760),
+      onPrimaryContainer: const Color(0xFFF3E8FF),
+      secondary: const Color(0xFFF48FB1),
+      onSecondary: const Color(0xFF33081C),
+      secondaryContainer: const Color(0xD94C1838),
+      onSecondaryContainer: const Color(0xFFFFE4F0),
+      tertiary: const Color(0xFF93C5FD),
+      onTertiary: const Color(0xFF0A1F40),
+      tertiaryContainer: const Color(0xD91E2952),
+      onTertiaryContainer: const Color(0xFFE5F0FF),
+      surface: const Color(0xFF0E081C),
+      onSurface: const Color(0xFFF5F0FF),
+      onSurfaceVariant: const Color(0xFFC9BFE6),
+      surfaceContainerLowest: const Color(0xED0B0617),
+      surfaceContainerLow: const Color(0xDB150D2B),
+      surfaceContainer: const Color(0xE31B1236),
+      surfaceContainerHigh: const Color(0xED241845),
+      surfaceContainerHighest: const Color(0xDE2D1F54),
+      outline: const Color(0xFF836EA8),
+      outlineVariant: const Color(0x6BA68CE0),
+    );
+
+    const visuals = AppThemeVisuals(
+      preset: AppThemePreset.amethystGalaxy,
+      appBarColor: Color(0xA6100921),
+      navBarColor: Color(0xE0110A24),
+      dialogSurfaceColor: Color(0xFA170E2E),
+      readerPaperColor: Color(0xE6110A22),
+      readerSurfaceColor: Color(0xED1D1338),
+      readerTextColor: Color(0xFFF3EEFF),
+      readerSecondaryTextColor: Color(0xFFC4B8E3),
+      readerDividerColor: Color(0x61A68CE0),
+      readerAccentColor: Color(0xFFC084FC),
+      readerBrightness: Brightness.dark,
+    );
+
+    return _buildGradientTheme(colorScheme: colorScheme, visuals: visuals);
+  }
+
+  /// Hareketli 2 — Okyanus Derinlikleri:
+  /// Derin petrol-lacivert sualtı zemini üzerinde yarı saydam koyu deniz camı
+  /// yüzeyler, net açık yazılar ve biyolüminesans turkuaz vurgular.
+  static ThemeData _oceanDepths() {
+    final base = ColorScheme.fromSeed(
+      seedColor: const Color(0xFF14B8A6),
+      brightness: Brightness.dark,
+    );
+    final colorScheme = base.copyWith(
+      primary: const Color(0xFF42D9D9),
+      onPrimary: const Color(0xFF032329),
+      primaryContainer: const Color(0xD90B3D47),
+      onPrimaryContainer: const Color(0xFFE0FCFC),
+      secondary: const Color(0xFF6FEBC9),
+      onSecondary: const Color(0xFF042B22),
+      secondaryContainer: const Color(0xD90D3E36),
+      onSecondaryContainer: const Color(0xFFE0FFF5),
+      tertiary: const Color(0xFF7DD3FC),
+      onTertiary: const Color(0xFF06253A),
+      tertiaryContainer: const Color(0xD910334D),
+      onTertiaryContainer: const Color(0xFFE3F5FF),
+      surface: const Color(0xFF06151D),
+      onSurface: const Color(0xFFECF8FA),
+      onSurfaceVariant: const Color(0xFFA9CFD8),
+      surfaceContainerLowest: const Color(0xED041017),
+      surfaceContainerLow: const Color(0xDB091E29),
+      surfaceContainer: const Color(0xE30E2734),
+      surfaceContainerHigh: const Color(0xED133140),
+      surfaceContainerHighest: const Color(0xDE1A3D4F),
+      outline: const Color(0xFF568A99),
+      outlineVariant: const Color(0x666CC4D4),
+    );
+
+    const visuals = AppThemeVisuals(
+      preset: AppThemePreset.oceanDepths,
+      appBarColor: Color(0xA606161F),
+      navBarColor: Color(0xE0071822),
+      dialogSurfaceColor: Color(0xFA0A202B),
+      readerPaperColor: Color(0xE6071720),
+      readerSurfaceColor: Color(0xED0E2633),
+      readerTextColor: Color(0xFFEAF7FA),
+      readerSecondaryTextColor: Color(0xFFA3CAD4),
+      readerDividerColor: Color(0x5E6CC4D4),
+      readerAccentColor: Color(0xFF42D9D9),
+      readerBrightness: Brightness.dark,
+    );
+
+    return _buildGradientTheme(colorScheme: colorScheme, visuals: visuals);
+  }
+
+  /// Hareketli 3 — Sıcak Latte Bokeh:
+  /// Mavi ışıksız sıcak latte-kum zemini üzerinde krem buzlu cam yüzeyler,
+  /// yüksek kontrastlı koyu kömür yazılar (#292524 / #57534E) ve kehribar vurgular.
+  static ThemeData _warmLatteBokeh() {
+    final base = ColorScheme.fromSeed(
+      seedColor: const Color(0xFFB45309),
+      brightness: Brightness.light,
+    );
+    final colorScheme = base.copyWith(
+      primary: const Color(0xFFA84D0C),
+      onPrimary: Colors.white,
+      primaryContainer: const Color(0xEBFFE7CE),
+      onPrimaryContainer: const Color(0xFF3E1A04),
+      secondary: const Color(0xFF8C5319),
+      onSecondary: Colors.white,
+      secondaryContainer: const Color(0xEBF7E5CC),
+      onSecondaryContainer: const Color(0xFF351D06),
+      tertiary: const Color(0xFF7C4D3A),
+      onTertiary: Colors.white,
+      tertiaryContainer: const Color(0xEBF5E2DA),
+      onTertiaryContainer: const Color(0xFF331B12),
+      surface: const Color(0xFFFBF7F0),
+      onSurface: const Color(0xFF292524),
+      onSurfaceVariant: const Color(0xFF57534E),
+      surfaceContainerLowest: const Color(0xF7FFFFFF),
+      surfaceContainerLow: const Color(0xE8FFFDF9),
+      surfaceContainer: const Color(0xEEFAF2E7),
+      surfaceContainerHigh: const Color(0xF2F5E9DA),
+      surfaceContainerHighest: const Color(0xEBECE0D0),
+      outline: const Color(0xFF8C7B6B),
+      outlineVariant: const Color(0x66B59C84),
+    );
+
+    const visuals = AppThemeVisuals(
+      preset: AppThemePreset.warmLatteBokeh,
+      appBarColor: Color(0xB8FBF7F0),
+      navBarColor: Color(0xE3FAF3E8),
+      dialogSurfaceColor: Color(0xFAFCF8F2),
+      readerPaperColor: Color(0xEEFFFDF8),
+      readerSurfaceColor: Color(0xEEF5EADA),
+      readerTextColor: Color(0xFF292524),
+      readerSecondaryTextColor: Color(0xFF57534E),
+      readerDividerColor: Color(0x5EB59C84),
+      readerAccentColor: Color(0xFFA84D0C),
+      readerBrightness: Brightness.light,
+    );
+
+    return _buildGradientTheme(colorScheme: colorScheme, visuals: visuals);
+  }
+
+  /// Hareketli 4 — Adaçayı & Gün Işığı:
+  /// Fildişi-krem zemini üzerinde ferah adaçayı cam yüzeyler, yüksek kontrastlı
+  /// koyu kömür yazılar (#292524 / #57534E) ve doğal adaçayı yeşili vurgular.
+  static ThemeData _sageSunlight() {
+    final base = ColorScheme.fromSeed(
+      seedColor: const Color(0xFF3B6E4C),
+      brightness: Brightness.light,
+    );
+    final colorScheme = base.copyWith(
+      primary: const Color(0xFF356A48),
+      onPrimary: Colors.white,
+      primaryContainer: const Color(0xEBDCF0E1),
+      onPrimaryContainer: const Color(0xFF102E1B),
+      secondary: const Color(0xFF8A6118),
+      onSecondary: Colors.white,
+      secondaryContainer: const Color(0xEBF8ECCB),
+      onSecondaryContainer: const Color(0xFF332204),
+      tertiary: const Color(0xFF4A6B62),
+      onTertiary: Colors.white,
+      tertiaryContainer: const Color(0xEBDCECE8),
+      onTertiaryContainer: const Color(0xFF132C26),
+      surface: const Color(0xFFF5F9F3),
+      onSurface: const Color(0xFF292524),
+      onSurfaceVariant: const Color(0xFF57534E),
+      surfaceContainerLowest: const Color(0xF7FFFFFF),
+      surfaceContainerLow: const Color(0xE8FCFEFA),
+      surfaceContainer: const Color(0xEEF2F7EF),
+      surfaceContainerHigh: const Color(0xF2EBF2E7),
+      surfaceContainerHighest: const Color(0xEBE3ECDF),
+      outline: const Color(0xFF728273),
+      outlineVariant: const Color(0x6692A894),
+    );
+
+    const visuals = AppThemeVisuals(
+      preset: AppThemePreset.sageSunlight,
+      appBarColor: Color(0xB8F5F9F3),
+      navBarColor: Color(0xE3F2F7EE),
+      dialogSurfaceColor: Color(0xFAF8FBF6),
+      readerPaperColor: Color(0xEEFCFDFB),
+      readerSurfaceColor: Color(0xEEECF3E8),
+      readerTextColor: Color(0xFF292524),
+      readerSecondaryTextColor: Color(0xFF57534E),
+      readerDividerColor: Color(0x5E92A894),
+      readerAccentColor: Color(0xFF356A48),
+      readerBrightness: Brightness.light,
+    );
+
+    return _buildGradientTheme(colorScheme: colorScheme, visuals: visuals);
+  }
+
+  /// Özel Tema 1 — Sakura Bahçesi:
+  /// Keskin, bulanıksız şeftali-pembe kiraz çiçekleri ve dere atmosferi;
+  /// koyu erik-kahve (#361923) yüksek kontrastlı yazılar ve gül-krem yüzeyler.
+  static ThemeData _sakuraGarden() {
+    final base = ColorScheme.fromSeed(
+      seedColor: const Color(0xFFB84A6E),
+      brightness: Brightness.light,
+    );
+    final colorScheme = base.copyWith(
+      primary: const Color(0xFFA83B60),
+      onPrimary: Colors.white,
+      primaryContainer: const Color(0xEBFFE0EA),
+      onPrimaryContainer: const Color(0xFF3A1220),
+      secondary: const Color(0xFF56343F),
+      onSecondary: const Color(0xFFFFF7F9),
+      secondaryContainer: const Color(0xEBF7DCE5),
+      onSecondaryContainer: const Color(0xFF361923),
+      tertiary: const Color(0xFF8C4A5E),
+      onTertiary: Colors.white,
+      tertiaryContainer: const Color(0xEBFFE8EC),
+      onTertiaryContainer: const Color(0xFF3A1822),
+      surface: const Color(0xFFFFF5F7),
+      onSurface: const Color(0xFF361923),
+      onSurfaceVariant: const Color(0xFF694552),
+      surfaceContainerLowest: const Color(0xF7FFFFFF),
+      surfaceContainerLow: const Color(0xE0FFF7F9),
+      surfaceContainer: const Color(0xEBFFF0F4),
+      surfaceContainerHigh: const Color(0xF0FCE7EE),
+      surfaceContainerHighest: const Color(0xEBF5DCE5),
+      outline: const Color(0xFF9C6D7D),
+      outlineVariant: const Color(0x66C76282),
+    );
+
+    const visuals = AppThemeVisuals(
+      preset: AppThemePreset.sakuraGarden,
+      appBarColor: Color(0xB8FFF3F6),
+      navBarColor: Color(0xE6FFF4F7),
+      dialogSurfaceColor: Color(0xFAFFF8FA),
+      readerPaperColor: Color(0xF0FFF9FA),
+      readerSurfaceColor: Color(0xEEFAE8EE),
+      readerTextColor: Color(0xFF361923),
+      readerSecondaryTextColor: Color(0xFF694552),
+      readerDividerColor: Color(0x5EC76282),
+      readerAccentColor: Color(0xFFA83B60),
+      readerBrightness: Brightness.light,
+    );
+
+    return _buildGradientTheme(colorScheme: colorScheme, visuals: visuals);
+  }
+
   static ThemeData _buildGradientTheme({
     required ColorScheme colorScheme,
     required AppThemeVisuals visuals,
   }) {
+    final isDark = colorScheme.brightness == Brightness.dark;
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
@@ -433,9 +689,8 @@ abstract final class AppTheme {
         surfaceTintColor: Colors.transparent,
         backgroundColor: visuals.appBarColor,
         foregroundColor: colorScheme.onSurface,
-        systemOverlayStyle: colorScheme.brightness == Brightness.dark
-            ? SystemUiOverlayStyle.light
-            : SystemUiOverlayStyle.dark,
+        systemOverlayStyle:
+            isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
       ),
       navigationBarTheme: NavigationBarThemeData(
         height: 68,
@@ -454,6 +709,30 @@ abstract final class AppTheme {
           side: BorderSide(color: colorScheme.outlineVariant),
         ),
       ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: colorScheme.surfaceContainerHigh,
+        hintStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+        labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: colorScheme.outlineVariant),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: colorScheme.outlineVariant),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: colorScheme.primary, width: 1.6),
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: colorScheme.surfaceContainerHigh,
+        selectedColor: colorScheme.primaryContainer,
+        side: BorderSide(color: colorScheme.outlineVariant),
+        labelStyle: TextStyle(color: colorScheme.onSurface),
+      ),
       dialogTheme: DialogThemeData(
         backgroundColor: visuals.dialogSurfaceColor,
         surfaceTintColor: Colors.transparent,
@@ -468,9 +747,9 @@ abstract final class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: colorScheme.brightness == Brightness.dark
+        backgroundColor: isDark
             ? const Color(0xFF1F2A4D)
-            : const Color(0xFF232836),
+            : const Color(0xFF292524),
         contentTextStyle: const TextStyle(color: Colors.white),
       ),
     );
