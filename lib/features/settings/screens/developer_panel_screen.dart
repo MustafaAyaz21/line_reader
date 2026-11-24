@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -52,6 +53,8 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
   bool _onlyMissingArticles = false;
   DevGeneratedArticle? _draftArticle;
   bool _isGeneratingArticle = false;
+  int _articleGenElapsedSec = 0;
+  Timer? _articleGenTimer;
   bool _isGeneratingAudio = false;
   bool _isLoading = true;
   bool _isSubmitting = false;
@@ -90,6 +93,7 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
 
   @override
   void dispose() {
+    _articleGenTimer?.cancel();
     _tabController.dispose();
     _emailController.dispose();
     _codeController.dispose();
@@ -941,7 +945,15 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
     final token = await _requireToken();
     if (token == null) return;
 
-    setState(() => _isGeneratingArticle = true);
+    _articleGenTimer?.cancel();
+    setState(() {
+      _isGeneratingArticle = true;
+      _articleGenElapsedSec = 0;
+    });
+    _articleGenTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted || !_isGeneratingArticle) return;
+      setState(() => _articleGenElapsedSec += 1);
+    });
     try {
       final generated = await _service.generateArticle(
         token,
@@ -969,7 +981,14 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
         isError: true,
       );
     } finally {
-      if (mounted) setState(() => _isGeneratingArticle = false);
+      _articleGenTimer?.cancel();
+      _articleGenTimer = null;
+      if (mounted) {
+        setState(() {
+          _isGeneratingArticle = false;
+          _articleGenElapsedSec = 0;
+        });
+      }
     }
   }
 
@@ -1232,6 +1251,89 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
     );
   }
 
+  Widget _buildArticleGenProgressBox(
+    ThemeData theme,
+    ColorScheme colorScheme,
+    AppStrings s,
+  ) {
+    final elapsed = _articleGenElapsedSec;
+    const expectedSec = 10;
+    final progress = (elapsed / expectedSec).clamp(0.08, 0.92);
+    final remaining = expectedSec - elapsed;
+    final stageLabel = elapsed < 4
+        ? s.t('Makale yazılıyor...', 'Writing article...')
+        : elapsed < 8
+            ? s.t(
+                'Kelime anlamları ve çeviriler hazırlanıyor...',
+                'Preparing meanings and translations...',
+              )
+            : elapsed <= 14
+                ? s.t('Son kontroller yapılıyor...', 'Finalizing...')
+                : s.t(
+                    'Yedek model deneniyor, lütfen bekleyin...',
+                    'Trying fallback model, please wait...',
+                  );
+    final timingLabel = remaining > 0
+        ? s.t(
+            '$elapsed sn geçti • Tahmini ~$remaining sn kaldı',
+            '${elapsed}s elapsed • ~${remaining}s left',
+          )
+        : s.t(
+            '$elapsed sn geçti • Neredeyse hazır',
+            '${elapsed}s elapsed • Almost done',
+          );
+
+    return Container(
+      key: const ValueKey<String>('dev_panel_article_gen_progress'),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colorScheme.primaryContainer.withAlpha(75),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colorScheme.primary.withAlpha(80)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  stageLabel,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Text(
+                '$elapsed sn',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 6,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            timingLabel,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontSize: 11.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildExpandableDraftFeatureBox({
     required Key key,
     required ThemeData theme,
@@ -1419,10 +1521,17 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
                         : const Icon(Icons.auto_awesome_rounded, size: 18),
                     label: Text(
                       _isGeneratingArticle
-                          ? s.t('Gemini Makale Üretiyor...', 'Generating...')
+                          ? s.t(
+                              'Üretiliyor... ($_articleGenElapsedSec sn)',
+                              'Generating... (${_articleGenElapsedSec}s)',
+                            )
                           : s.t('Gemini ile Makale Üret', 'Generate with Gemini'),
                     ),
                   ),
+                  if (_isGeneratingArticle) ...<Widget>[
+                    const SizedBox(height: 10),
+                    _buildArticleGenProgressBox(theme, colorScheme, s),
+                  ],
                 ],
               ),
             ),

@@ -1191,9 +1191,9 @@ function buildArticleGenerationPrompt(level, topic) {
     '  "word_relations": { "lowercase_word": { "syn": ["1-3 exact contextual English synonyms"], "ant": ["1-2 exact contextual English antonyms"] } }',
     "}",
     "Rules:",
-    "1. Include ALL meaningful content words from the article in word_meanings (40 to 120 words, lowercase base/appeared forms) with their EXACT contextual Turkish meaning in this article.",
+    "1. Include 30 to 55 key content words from the article in word_meanings (lowercase base/appeared forms) with their EXACT contextual Turkish meaning in this article.",
     "2. Include EVERY sentence from content in sentence_translations with exact punctuation.",
-    "3. Include 25 to 60 key content words in word_relations with ONLY synonyms and antonyms that match the EXACT sense used in this article's sentences.",
+    "3. Include 15 to 30 key content words in word_relations with ONLY synonyms and antonyms that match the EXACT sense used in this article's sentences.",
   ].join("\n");
 }
 
@@ -1272,61 +1272,44 @@ async function generateArticleWithWorkersAi(ai, level, topic) {
 async function generateArticleWithGemini(apiKey, level, topic) {
   const prompt = buildArticleGenerationPrompt(level, topic);
 
-  const flashModels = [
+  // En hızlı ve kararlı Flash modelleri (gereksiz /models listeleme çağrısı yapılmaz)
+  const models = [
+    "gemini-2.5-flash",
     "gemini-flash-latest",
-    "gemini-3.8-flash",
-    "gemini-3-flash-preview",
+    "gemini-2.0-flash",
   ];
-  const proModels = [
-    "gemini-pro-latest",
-  ];
-  // API anahtarının desteklediği aktif Flash ve Pro modellerini otomatik keşfet.
-  try {
-    const listRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`
-    );
-    if (listRes.ok) {
-      const listData = await listRes.json();
-      const apiModels = Array.isArray(listData?.models) ? listData.models : [];
-      for (const m of apiModels) {
-        const name = String(m?.name || "").replace(/^models\//, "");
-        const methods = Array.isArray(m?.supportedGenerationMethods)
-          ? m.supportedGenerationMethods
-          : [];
-        if (
-          !methods.includes("generateContent") ||
-          !name.includes("gemini") ||
-          name.includes("tts") ||
-          name.includes("image") ||
-          name.includes("omni")
-        ) {
-          continue;
-        }
-        if (name.includes("flash") && !flashModels.includes(name)) {
-          flashModels.push(name);
-        } else if (name.includes("pro") && !proModels.includes(name)) {
-          proModels.push(name);
-        }
-      }
-    }
-  } catch (_) {}
-
-  const models = [...flashModels.slice(0, 4), ...proModels.slice(0, 3)];
   let lastError = "Gemini yanıt vermedi.";
 
   for (const model of models) {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.65,
-          responseMimeType: "application/json",
-        },
-      }),
-    });
+    const genConfig = {
+      temperature: 0.65,
+      responseMimeType: "application/json",
+    };
+    if (model.includes("2.5")) {
+      genConfig.thinkingConfig = { thinkingBudget: 0 };
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 18000);
+    let res;
+    try {
+      res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: genConfig,
+        }),
+      });
+    } catch (err) {
+      lastError = `${model} zaman aşımı/ağ hatası: ${String(err?.message || err)}`;
+      continue;
+    } finally {
+      clearTimeout(timer);
+    }
+
     if (!res.ok) {
       const errText = await res.text().catch(() => "");
       lastError = `HTTP ${res.status} (${model}): ${errText.slice(0, 160)}`;

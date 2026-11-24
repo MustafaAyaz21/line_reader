@@ -1236,6 +1236,16 @@
           </button>
         </div>
 
+        <div id="aiGenProgressBox" style="display:none;margin-top:8px;padding:10px 12px;border-radius:10px;border:1px solid rgba(99,102,241,.38);background:rgba(99,102,241,.10);">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;font-weight:700;margin-bottom:6px;">
+            <span id="aiGenStageLabel">Makale yazılıyor...</span>
+            <span id="aiGenTimingLabel" style="color:var(--accent);font-variant-numeric:tabular-nums;">0 sn • Tahmini ~8-12 sn</span>
+          </div>
+          <div style="height:6px;border-radius:999px;background:rgba(255,255,255,.10);overflow:hidden;">
+            <div id="aiGenProgressFill" style="height:100%;width:10%;background:linear-gradient(90deg,#6366f1,#38bdf8);transition:width .4s ease;"></div>
+          </div>
+        </div>
+
         <div class="ai-settings-drawer" id="aiSettingsDrawer">
           <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
             <input
@@ -2850,7 +2860,44 @@
       isGeneratingArticle = true;
       const originalLabel = aiEl.generateBtn.textContent;
       aiEl.generateBtn.disabled = true;
-      aiEl.generateBtn.textContent = "⏳ Oluşturuluyor...";
+      aiEl.generateBtn.textContent = "⏳ Oluşturuluyor (0 sn)";
+
+      const progressBox = document.getElementById("aiGenProgressBox");
+      const stageEl = document.getElementById("aiGenStageLabel");
+      const timingEl = document.getElementById("aiGenTimingLabel");
+      const fillEl = document.getElementById("aiGenProgressFill");
+      let genElapsed = 0;
+      let genPhase = "article";
+      if (progressBox) progressBox.style.display = "block";
+      if (stageEl) stageEl.textContent = "Makale yazılıyor...";
+      if (timingEl) timingEl.textContent = "0 sn geçti • Tahmini ~8-12 sn";
+      if (fillEl) fillEl.style.width = "10%";
+      const genTimer = setInterval(() => {
+        genElapsed += 1;
+        if (genPhase === "article") {
+          aiEl.generateBtn.textContent = `⏳ Oluşturuluyor (${genElapsed} sn)`;
+          const pct = Math.min(92, Math.max(10, Math.round((genElapsed / 10) * 100)));
+          if (fillEl) fillEl.style.width = `${pct}%`;
+          if (stageEl) {
+            stageEl.textContent = genElapsed < 4
+              ? "Makale yazılıyor..."
+              : genElapsed < 8
+                ? "Kelime anlamları ve çeviriler hazırlanıyor..."
+                : "Son kontroller yapılıyor...";
+          }
+          if (timingEl) {
+            const rem = 10 - genElapsed;
+            timingEl.textContent = rem > 0
+              ? `${genElapsed} sn geçti • Tahmini ~${rem} sn kaldı`
+              : `${genElapsed} sn geçti • Neredeyse hazır`;
+          }
+        } else {
+          aiEl.generateBtn.textContent = `🎙 Podcast sesi (${genElapsed} sn)`;
+          if (fillEl) fillEl.style.width = "95%";
+          if (stageEl) stageEl.textContent = "Podcast AI sesi ve Whisper cümle zaman damgaları hazırlanıyor...";
+          if (timingEl) timingEl.textContent = `${genElapsed} sn geçti • Ses uzunluğuna göre 10-25 sn`;
+        }
+      }, 1000);
 
       try {
         const res = await fetch("/api/ai/generate-article", {
@@ -2915,7 +2962,8 @@
         const wmCount = parseWordMeaningsText(fresh.word_meanings_text).count;
         const autoPodcast = Boolean(document.getElementById("aiAutoPodcastCheck")?.checked);
         if (autoPodcast) {
-          aiEl.generateBtn.textContent = "🎙 Podcast sesi üretiliyor...";
+          genPhase = "podcast";
+          aiEl.generateBtn.textContent = `🎙 Podcast sesi (${genElapsed} sn)...`;
           const audioOk = await generatePodcastAudioForArticle(fresh, null, true);
           if (audioOk) {
             showToast(`✨ ${chosenLevel} makale + 🎙 Podcast sesi hazır (${wc} kelime • ${wmCount} anlam).`, "success");
@@ -2928,6 +2976,8 @@
       } catch (err) {
         showToast(err.message || "Gemini makale oluşturma hatası.", "error");
       } finally {
+        clearInterval(genTimer);
+        if (progressBox) progressBox.style.display = "none";
         isGeneratingArticle = false;
         aiEl.generateBtn.disabled = false;
         aiEl.generateBtn.textContent = originalLabel;

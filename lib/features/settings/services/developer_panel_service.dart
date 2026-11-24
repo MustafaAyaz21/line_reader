@@ -374,9 +374,13 @@ class DeveloperPanelService {
         }
         final streamed = await _httpClient.send(req).timeout(attemptTimeout);
         final res = await http.Response.fromStream(streamed);
-        if (res.statusCode == 404 &&
-            isFirstWithFallback &&
-            !res.body.trimLeft().startsWith('{')) {
+        final hasMore = i < bases.length - 1;
+        final isProxyOrGatewayError = res.statusCode == 502 ||
+            res.statusCode == 503 ||
+            res.statusCode == 504 ||
+            (res.statusCode == 404 && !res.body.trimLeft().startsWith('{'));
+        if (isProxyOrGatewayError && hasMore) {
+          lastError = 'HTTP ${res.statusCode} ($base)';
           continue;
         }
         _preferredBaseUrl = base;
