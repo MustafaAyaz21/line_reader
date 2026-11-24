@@ -674,10 +674,32 @@ class ArticleAudioController extends ChangeNotifier {
         if (_isDisposed) return false;
 
         if (localPath != null && localPath.isNotEmpty) {
-          await _podcastPlayer.setSourceFile(localPath);
+          try {
+            await _podcastPlayer.setSourceFile(localPath);
+          } catch (_) {
+            // Bozuk yerel dosya oynatılamadıysa önbellekten sil.
+            try {
+              final f = File(localPath);
+              if (await f.exists()) await f.delete();
+            } catch (_) {}
+            rethrow;
+          }
         } else {
-          final resolvedUrl = _resolveAbsoluteAudioUrl(rawUrl);
-          await _podcastPlayer.setSourceUrl(resolvedUrl);
+          final candidates = _candidateAudioUrls(rawUrl);
+          Object? lastErr;
+          var loadedUrl = false;
+          for (final url in candidates) {
+            try {
+              await _podcastPlayer.setSourceUrl(url);
+              loadedUrl = true;
+              break;
+            } catch (err) {
+              lastErr = err;
+            }
+          }
+          if (!loadedUrl) {
+            throw lastErr ?? Exception('Podcast audio could not be loaded');
+          }
         }
 
         _podcastLoaded = true;
@@ -743,6 +765,95 @@ class ArticleAudioController extends ChangeNotifier {
     return urls;
   }
 
+  /// İndirilen veya önbellekteki baytların gerçekten geçerli bir ses dosyası
+  /// (M4A/MP4 `ftyp`, WAV `RIFF`, MP3 `ID3`/sync) olduğunu doğrular;
+  /// Cloudflare Pages SPA fallback'inin döndürdüğü `200 text/html` sayfalarını
+  /// kesin olarak reddeder.
+  static bool isValidAudioBytes(List<int> bytes, {String? contentType}) {
+    if (bytes.length < 1024) return false;
+    final ct = (contentType ?? '').toLowerCase();
+    if (ct.contains('text/html') ||
+        ct.contains('application/json') ||
+        ct.contains('text/plain') ||
+        ct.contains('application/xml')) {
+      return false;
+    }
+    // HTML / metin başlangıç kontrolü (`<!DOCTYPE`, `<html`, `{`)
+    var firstNonWs = 0;
+    while (firstNonWs < bytes.length &&
+        firstNonWs < 32 &&
+        (bytes[firstNonWs] == 0x20 ||
+            bytes[firstNonWs] == 0x09 ||
+            bytes[firstNonWs] == 0x0A ||
+            bytes[firstNonWs] == 0x0D ||
+            bytes[firstNonWs] == 0xEF ||
+            bytes[firstNonWs] == 0xBB ||
+            bytes[firstNonWs] == 0xBF)) {
+      firstNonWs++;
+    }
+    if (firstNonWs < bytes.length && bytes[firstNonWs] == 0x3C /* '<' */) {
+      return false;
+    }
+    // M4A / MP4 container: offset 4..7 == 'ftyp'
+    if (bytes.length >= 12 &&
+        bytes[4] == 0x66 &&
+        bytes[5] == 0x74 &&
+        bytes[6] == 0x79 &&
+        bytes[7] == 0x70) {
+      return true;
+    }
+    // WAV container: 'RIFF'
+    if (bytes.length >= 12 &&
+        bytes[0] == 0x52 &&
+        bytes[1] == 0x49 &&
+        bytes[2] == 0x46 &&
+        bytes[3] == 0x46) {
+      return true;
+    }
+    // MP3 ID3 tag veya MPEG frame sync (0xFF 0xE0+)
+    if (bytes.length >= 3 &&
+        bytes[0] == 0x49 &&
+        bytes[1] == 0x44 &&
+        bytes[2] == 0x33) {
+      return true;
+    }
+    if (bytes.length >= 2 && bytes[0] == 0xFF && (bytes[1] & 0xE0) == 0xE0) {
+      return true;
+    }
+    // OGG ('OggS')
+    if (bytes.length >= 4 &&
+        bytes[0] == 0x4F &&
+        bytes[1] == 0x67 &&
+        bytes[2] == 0x67 &&
+        bytes[3] == 0x53) {
+      return true;
+    }
+    return false;
+  }
+
+  Future<bool> _isValidCachedAudioFile(File file) async {
+    try {
+      if (!await file.exists()) return false;
+      final len = await file.length();
+      if (len < 1024) return false;
+      final raf = await file.open();
+      try {
+        final header = await raf.read(32);
+        // Header + minimum boyut bilgisini doğrulamak için sentetik uzunluk yerine
+        // header'ı kontrol ediyoruz.
+        final padded = List<int>.filled(1024, 0);
+        for (var i = 0; i < header.length && i < padded.length; i++) {
+          padded[i] = header[i];
+        }
+        return isValidAudioBytes(padded);
+      } finally {
+        await raf.close();
+      }
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<String?> _resolvePodcastLocalFile(String rawUrl) async {
     final customResolver = _audioFileResolver;
     if (customResolver != null) {
@@ -762,11 +873,17 @@ class ArticleAudioController extends ChangeNotifier {
           ? '.wav'
           : (lowerUrl.endsWith('.mp3') ? '.mp3' : '.m4a');
       final cacheFile = File(p.join(cacheDir.path, '$safeId$ext'));
-      if (await cacheFile.exists() && await cacheFile.length() > 1024) {
+      if (await cacheFile.exists()) {
+        if (await _isValidCachedAudioFile(cacheFile)) {
+          try {
+            await cacheFile.setLastModified(DateTime.now());
+          } catch (_) {}
+          return cacheFile.path;
+        }
+        // Önceden bozuk/HTML önbellek yazılmışsa temizle ve yeniden indir.
         try {
-          await cacheFile.setLastModified(DateTime.now());
+          await cacheFile.delete();
         } catch (_) {}
-        return cacheFile.path;
       }
 
       for (final url in _candidateAudioUrls(rawUrl)) {
@@ -777,7 +894,9 @@ class ArticleAudioController extends ChangeNotifier {
                 headers: const <String, String>{'User-Agent': 'LineReaderApp'},
               )
               .timeout(const Duration(seconds: 20));
-          if (response.statusCode == 200 && response.bodyBytes.length > 1024) {
+          final ct = response.headers['content-type'];
+          if (response.statusCode == 200 &&
+              isValidAudioBytes(response.bodyBytes, contentType: ct)) {
             await cacheFile.writeAsBytes(response.bodyBytes, flush: true);
             unawaited(_pruneAudioCache(cacheDir, maxFiles: 8));
             return cacheFile.path;
