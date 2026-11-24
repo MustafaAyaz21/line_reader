@@ -217,120 +217,149 @@ class _SettingsScreenState extends State<SettingsScreen> {
             final prefs = DisplayPreferencesController.shared;
             final auth = widget.authController;
 
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
-              children: <Widget>[
-                _SettingsCategoryCard(
-                  key: const ValueKey<String>('settings_cat_profile'),
-                  icon: auth.isAuthorizedStaff
-                      ? Icons.code_rounded
-                      : Icons.person_outline_rounded,
-                  iconBg: colorScheme.primaryContainer,
-                  iconColor: colorScheme.onPrimaryContainer,
-                  title: s.t('Profil ve Hesap', 'Profile & Account'),
-                  subtitle: _profileSummary(s),
-                  onTap: () => _openSubPage(
-                    context: context,
-                    titleBuilder: (ls) =>
-                        ls.t('Profil ve Hesap', 'Profile & Account'),
-                    bodyBuilder: (ctx, th, cs, ls) => RefreshIndicator(
-                      onRefresh: () async {
-                        if (widget.authController.isAuthenticated) {
-                          await widget.authController
-                              .refreshEntitlement(forceTokenRefresh: true);
-                        }
-                      },
-                      child: ListView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
-                        children: <Widget>[
-                          _buildAccountCard(ctx, th, cs, ls),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _SettingsCategoryCard(
-                  key: const ValueKey<String>('settings_cat_appearance'),
-                  icon: Icons.palette_outlined,
-                  iconBg: colorScheme.secondaryContainer,
-                  iconColor: colorScheme.onSecondaryContainer,
-                  title: s.t('Görünüm ve Temalar', 'Appearance & Themes'),
-                  subtitle: '$langLabel • $activeTheme',
-                  onTap: () => _openSubPage(
-                    context: context,
-                    titleBuilder: (ls) =>
-                        ls.t('Görünüm ve Temalar', 'Appearance & Themes'),
-                    bodyBuilder: (ctx, th, cs, ls) => ListView(
+            final cards = <Widget>[
+              _SettingsCategoryCard(
+                key: const ValueKey<String>('settings_cat_profile'),
+                expandFill: true,
+                icon: auth.isAuthorizedStaff
+                    ? Icons.code_rounded
+                    : Icons.person_outline_rounded,
+                iconBg: colorScheme.primaryContainer,
+                iconColor: colorScheme.onPrimaryContainer,
+                title: s.t('Profil ve Hesap', 'Profile & Account'),
+                subtitle: _profileSummary(s),
+                onTap: () => _openSubPage(
+                  context: context,
+                  titleBuilder: (ls) =>
+                      ls.t('Profil ve Hesap', 'Profile & Account'),
+                  bodyBuilder: (ctx, th, cs, ls) => RefreshIndicator(
+                    onRefresh: () async {
+                      if (widget.authController.isAuthenticated) {
+                        await widget.authController
+                            .refreshEntitlement(forceTokenRefresh: true);
+                      }
+                    },
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
                       children: <Widget>[
-                        _SectionTitle(label: ls.t('Dil Seçimi', 'Language')),
-                        const SizedBox(height: 8),
-                        _buildLanguageCard(th, cs, ls),
-                        const SizedBox(height: 22),
-                        _SectionTitle(
-                          label: ls.t('Uygulama Teması', 'App Theme'),
-                        ),
-                        const SizedBox(height: 8),
-                        _buildThemeSelectorCard(ctx, th, cs, ls),
+                        _buildAccountCard(ctx, th, cs, ls),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
-                _SettingsCategoryCard(
-                  key: const ValueKey<String>('settings_cat_features'),
-                  icon: Icons.tune_rounded,
-                  iconBg: colorScheme.tertiaryContainer,
-                  iconColor: colorScheme.onTertiaryContainer,
-                  title: s.t('Özellikler', 'Features'),
-                  subtitle:
-                      'IPA: ${prefs.appIpaMode.label(isEnglish: isEn)} • ${s.t('Eş & Zıt Anlam', 'Synonyms & Antonyms')}',
-                  onTap: () => _openSubPage(
-                    context: context,
-                    titleBuilder: (ls) => ls.t('Özellikler', 'Features'),
-                    bodyBuilder: (ctx, th, cs, ls) =>
-                        _buildFeaturesBody(th, cs, ls),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _SettingsCategoryCard(
-                  key: const ValueKey<String>('settings_cat_quick_lookup'),
-                  icon: Icons.manage_search_rounded,
-                  iconBg: colorScheme.primaryContainer.withAlpha(200),
-                  iconColor: colorScheme.primary,
-                  title: s.t("Line'da Bak", 'Quick Lookup'),
-                  subtitle:
-                      'IPA: ${prefs.overlayIpaMode.label(isEnglish: isEn)} • ${s.t('Mini kart özelleştirme', 'Customize mini card')}',
-                  onTap: () => _openSubPage(
-                    context: context,
-                    titleBuilder: (ls) =>
-                        ls.t("Line'da Bak Ayarları", 'Quick Lookup Settings'),
-                    bodyBuilder: (ctx, th, cs, ls) =>
-                        _buildQuickLookupBody(th, cs, ls),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _SettingsCategoryCard(
-                  key: const ValueKey<String>('settings_cat_how_to_use'),
-                  icon: Icons.help_outline_rounded,
-                  iconBg: colorScheme.secondaryContainer.withAlpha(210),
-                  iconColor: colorScheme.onSecondaryContainer,
-                  title: s.t('Nasıl Kullanılır?', 'How to Use'),
-                  subtitle: s.t(
-                    'Tüm özelliklerin adım adım hızlı rehberi',
-                    'Step-by-step quick guide to every feature',
-                  ),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const HowToUseScreen(),
+              ),
+              _SettingsCategoryCard(
+                key: const ValueKey<String>('settings_cat_appearance'),
+                expandFill: true,
+                icon: Icons.palette_outlined,
+                iconBg: colorScheme.secondaryContainer,
+                iconColor: colorScheme.onSecondaryContainer,
+                title: s.t('Görünüm ve Temalar', 'Appearance & Themes'),
+                subtitle: '$langLabel • $activeTheme',
+                onTap: () => _openSubPage(
+                  context: context,
+                  titleBuilder: (ls) =>
+                      ls.t('Görünüm ve Temalar', 'Appearance & Themes'),
+                  bodyBuilder: (ctx, th, cs, ls) => ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
+                    children: <Widget>[
+                      _SectionTitle(label: ls.t('Dil Seçimi', 'Language')),
+                      const SizedBox(height: 8),
+                      _buildLanguageCard(th, cs, ls),
+                      const SizedBox(height: 22),
+                      _SectionTitle(
+                        label: ls.t('Uygulama Teması', 'App Theme'),
                       ),
-                    );
-                  },
+                      const SizedBox(height: 8),
+                      _buildThemeSelectorCard(ctx, th, cs, ls),
+                    ],
+                  ),
                 ),
-              ],
+              ),
+              _SettingsCategoryCard(
+                key: const ValueKey<String>('settings_cat_features'),
+                expandFill: true,
+                icon: Icons.tune_rounded,
+                iconBg: colorScheme.tertiaryContainer,
+                iconColor: colorScheme.onTertiaryContainer,
+                title: s.t('Özellikler', 'Features'),
+                subtitle:
+                    'IPA: ${prefs.appIpaMode.label(isEnglish: isEn)} • ${s.t('Eş & Zıt Anlam', 'Synonyms & Antonyms')}',
+                onTap: () => _openSubPage(
+                  context: context,
+                  titleBuilder: (ls) => ls.t('Özellikler', 'Features'),
+                  bodyBuilder: (ctx, th, cs, ls) =>
+                      _buildFeaturesBody(th, cs, ls),
+                ),
+              ),
+              _SettingsCategoryCard(
+                key: const ValueKey<String>('settings_cat_quick_lookup'),
+                expandFill: true,
+                icon: Icons.manage_search_rounded,
+                iconBg: colorScheme.primaryContainer.withAlpha(200),
+                iconColor: colorScheme.primary,
+                title: s.t("Line'da Bak", 'Quick Lookup'),
+                subtitle:
+                    'IPA: ${prefs.overlayIpaMode.label(isEnglish: isEn)} • ${s.t('Mini kart', 'Mini card')}',
+                onTap: () => _openSubPage(
+                  context: context,
+                  titleBuilder: (ls) =>
+                      ls.t("Line'da Bak Ayarları", 'Quick Lookup Settings'),
+                  bodyBuilder: (ctx, th, cs, ls) =>
+                      _buildQuickLookupBody(th, cs, ls),
+                ),
+              ),
+              _SettingsCategoryCard(
+                key: const ValueKey<String>('settings_cat_how_to_use'),
+                expandFill: true,
+                icon: Icons.help_outline_rounded,
+                iconBg: colorScheme.secondaryContainer.withAlpha(210),
+                iconColor: colorScheme.onSecondaryContainer,
+                title: s.t('Nasıl Kullanılır?', 'How to Use'),
+                subtitle: s.t(
+                  'Tüm özelliklerin adım adım hızlı rehberi',
+                  'Step-by-step quick guide to every feature',
+                ),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const HowToUseScreen(),
+                    ),
+                  );
+                },
+              ),
+            ];
+
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                const verticalPadding = 32.0; // top 14 + bottom 18
+                const cardSpacing = 12.0;
+                const minCardHeight = 88.0;
+                final minContentHeight = (cards.length * minCardHeight) +
+                    ((cards.length - 1) * cardSpacing) +
+                    verticalPadding;
+                final totalHeight = constraints.maxHeight > minContentHeight
+                    ? constraints.maxHeight
+                    : minContentHeight;
+
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
+                  child: SizedBox(
+                    height: totalHeight - verticalPadding,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        for (var i = 0; i < cards.length; i++) ...<Widget>[
+                          Expanded(child: cards[i]),
+                          if (i < cards.length - 1)
+                            const SizedBox(height: cardSpacing),
+                        ],
+                      ],
+                    ),
+                  ),
+                );
+              },
             );
           },
         ),
@@ -634,19 +663,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ColorScheme colorScheme,
     AppStrings s,
   ) {
+    final auth = widget.authController;
+    final isAuthenticated = auth.isAuthenticated;
+    final isPremium = auth.isUnlimited;
     final activePreset = AppThemeController.shared.preset;
-    final canSeeSpecialThemes = widget.authController.hasSpecialThemes;
+    final canSeeSpecialThemes = auth.hasSpecialThemes;
     final activeTitle = activePreset.titleForLocale(isEnglish: s.isEn);
 
-    final staticSubtitle = !activePreset.isAnimatedTheme &&
-            !activePreset.isSpecialTheme
-        ? '${s.t('Seçili', 'Active')}: $activeTitle'
-        : s.t('Varsayılan ve 4 hareketsiz renk teması', 'Classic & 4 static color themes');
+    final staticSubtitle = !isAuthenticated
+        ? s.t('Üye olup temayı kullanabilirsiniz', 'Sign up to use themes')
+        : (!activePreset.isAnimatedTheme && !activePreset.isSpecialTheme
+            ? '${s.t('Seçili', 'Active')}: $activeTitle'
+            : s.t(
+                'Varsayılan ve 4 hareketsiz renk teması',
+                'Classic & 4 static color themes',
+              ));
 
-    final animatedSubtitle = activePreset.isAnimatedTheme &&
-            !activePreset.isSpecialTheme
-        ? '${s.t('Seçili', 'Active')}: $activeTitle'
-        : s.t('4 sakin hareketli vektör tema', '4 calm animated vector themes');
+    final animatedSubtitle = !isPremium
+        ? s.t("Premium'a özel", 'Premium only')
+        : (activePreset.isAnimatedTheme && !activePreset.isSpecialTheme
+            ? '${s.t('Seçili', 'Active')}: $activeTitle'
+            : s.t(
+                '4 sakin hareketli vektör tema',
+                '4 calm animated vector themes',
+              ));
 
     final specialSubtitle = activePreset.isSpecialTheme
         ? '${s.t('Seçili', 'Active')}: $activeTitle'
@@ -655,9 +695,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
+        if (!isAuthenticated) ...<Widget>[
+          _buildGuestThemeLockBanner(
+            context: context,
+            theme: theme,
+            colorScheme: colorScheme,
+            s: s,
+            bannerKey: const ValueKey<String>('settings_theme_guest_banner'),
+            buttonKey: const ValueKey<String>('settings_theme_guest_signup_btn'),
+          ),
+          const SizedBox(height: 10),
+        ],
         _SettingsCategoryCard(
           key: const ValueKey<String>('settings_theme_cat_static'),
-          icon: Icons.layers_outlined,
+          icon: isAuthenticated
+              ? Icons.layers_outlined
+              : Icons.lock_outline_rounded,
           iconBg: colorScheme.primaryContainer,
           iconColor: colorScheme.onPrimaryContainer,
           title: s.t('Hareketsiz Temalar', 'Static Themes'),
@@ -666,12 +719,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             context: context,
             titleBuilder: (ls) => ls.t('Hareketsiz Temalar', 'Static Themes'),
             bodyBuilder: (ctx, th, cs, ls) => _buildThemeCategoryPage(
+              context: ctx,
               presets: AppThemePreset.staticPresets,
               description: ls.t(
                 'Ana menü, kartlar, kelime listeleri, tarayıcı çevresi ve makale okuma alanına anında uygulanır.',
                 'Applies instantly to Home, cards, word lists, browser chrome, and article reading areas.',
               ),
               showAnimationControls: false,
+              requiresPremium: false,
               theme: th,
               colorScheme: cs,
               s: ls,
@@ -681,7 +736,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const SizedBox(height: 10),
         _SettingsCategoryCard(
           key: const ValueKey<String>('settings_theme_cat_animated'),
-          icon: Icons.auto_awesome_rounded,
+          icon: isPremium
+              ? Icons.auto_awesome_rounded
+              : Icons.workspace_premium_rounded,
           iconBg: colorScheme.secondaryContainer,
           iconColor: colorScheme.onSecondaryContainer,
           title: s.t('Hareketli Temalar', 'Animated Themes'),
@@ -690,12 +747,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             context: context,
             titleBuilder: (ls) => ls.t('Hareketli Temalar', 'Animated Themes'),
             bodyBuilder: (ctx, th, cs, ls) => _buildThemeCategoryPage(
+              context: ctx,
               presets: AppThemePreset.animatedPresets,
               description: ls.t(
                 'Göz yormayan, sakin vektör animasyonlu temalar. Uygulama küçültülünce otomatik duraklayıp pil tasarrufu sağlar.',
                 'Calm, eye-friendly vector animated themes. Auto-pauses when minimized to save battery.',
               ),
               showAnimationControls: true,
+              requiresPremium: true,
               theme: th,
               colorScheme: cs,
               s: ls,
@@ -716,12 +775,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               context: context,
               titleBuilder: (ls) => ls.t('Özel Temalar', 'Special Themes'),
               bodyBuilder: (ctx, th, cs, ls) => _buildThemeCategoryPage(
+                context: ctx,
                 presets: AppThemePreset.specialPresets,
                 description: ls.t(
                   'Hesabınıza özel tanımlanmış koleksiyon temaları.',
                   'Exclusive collection themes unlocked for your account.',
                 ),
                 showAnimationControls: true,
+                requiresPremium: false,
                 theme: th,
                 colorScheme: cs,
                 s: ls,
@@ -733,14 +794,144 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildThemeCategoryPage({
-    required List<AppThemePreset> presets,
-    required String description,
-    required bool showAnimationControls,
+  Widget _buildGuestThemeLockBanner({
+    required BuildContext context,
+    required ThemeData theme,
+    required ColorScheme colorScheme,
+    required AppStrings s,
+    Key? bannerKey,
+    Key? buttonKey,
+  }) {
+    return Card(
+      key: bannerKey,
+      margin: EdgeInsets.zero,
+      color: colorScheme.primaryContainer.withAlpha(115),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colorScheme.primary.withAlpha(90)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withAlpha(32),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.lock_outline_rounded,
+                    size: 20,
+                    color: colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        s.t(
+                          'Kayıt olmayan kullanıcılar tema kullanamaz',
+                          'Unregistered users cannot use themes',
+                        ),
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        s.t(
+                          'Üye olup temayı kullanabilirsiniz.',
+                          'Sign up to unlock and use themes.',
+                        ),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              key: buttonKey,
+              onPressed: () {
+                AuthScreen.show(
+                  context,
+                  controller: widget.authController,
+                  initialSignUpTab: true,
+                );
+              },
+              icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
+              label: Text(s.t('Kayıt Ol', 'Sign Up')),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPremiumThemeBanner({
     required ThemeData theme,
     required ColorScheme colorScheme,
     required AppStrings s,
   }) {
+    return Container(
+      key: const ValueKey<String>('settings_theme_animated_premium_banner'),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: colorScheme.secondaryContainer.withAlpha(155),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colorScheme.secondary.withAlpha(95)),
+      ),
+      child: Row(
+        children: <Widget>[
+          Icon(
+            Icons.workspace_premium_rounded,
+            size: 22,
+            color: colorScheme.secondary,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              s.t("Premium'a özel", 'Premium only'),
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: colorScheme.onSecondaryContainer,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildThemeCategoryPage({
+    required BuildContext context,
+    required List<AppThemePreset> presets,
+    required String description,
+    required bool showAnimationControls,
+    required bool requiresPremium,
+    required ThemeData theme,
+    required ColorScheme colorScheme,
+    required AppStrings s,
+  }) {
+    final auth = widget.authController;
+    final isAuthenticated = auth.isAuthenticated;
+    final isPremium = auth.isUnlimited;
+    final isLockedForGuest = !isAuthenticated;
+    final isLockedForPremium = requiresPremium && !isPremium;
+    final isLocked = isLockedForGuest || isLockedForPremium;
+
     final activePreset = AppThemeController.shared.preset;
     final isAnimationPaused = AppThemeController.shared.isAnimationPaused;
     final isEcoAnimation = AppThemeController.shared.isEcoAnimation;
@@ -748,6 +939,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
       children: <Widget>[
+        if (isLockedForGuest) ...<Widget>[
+          _buildGuestThemeLockBanner(
+            context: context,
+            theme: theme,
+            colorScheme: colorScheme,
+            s: s,
+            bannerKey: const ValueKey<String>(
+              'settings_theme_subpage_guest_banner',
+            ),
+            buttonKey: const ValueKey<String>(
+              'settings_theme_subpage_guest_signup_btn',
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (isLockedForPremium) ...<Widget>[
+          _buildPremiumThemeBanner(
+            theme: theme,
+            colorScheme: colorScheme,
+            s: s,
+          ),
+          const SizedBox(height: 12),
+        ],
         Card(
           margin: EdgeInsets.zero,
           child: Padding(
@@ -766,11 +980,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _buildThemePresetGrid(
                   presets: presets,
                   activePreset: activePreset,
+                  isLocked: isLocked,
                   theme: theme,
                   colorScheme: colorScheme,
                   s: s,
                 ),
-                if (showAnimationControls) ...<Widget>[
+                if (showAnimationControls && !isLocked) ...<Widget>[
                   const SizedBox(height: 14),
                   Material(
                     color: colorScheme.surfaceContainerHighest.withAlpha(135),
@@ -873,6 +1088,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildThemePresetGrid({
     required List<AppThemePreset> presets,
     required AppThemePreset activePreset,
+    required bool isLocked,
     required ThemeData theme,
     required ColorScheme colorScheme,
     required AppStrings s,
@@ -892,137 +1108,166 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             return SizedBox(
               width: isFullWidth ? constraints.maxWidth : itemWidth,
-              child: Material(
-                color: isSelected
-                    ? colorScheme.primaryContainer.withAlpha(185)
-                    : colorScheme.surfaceContainerHighest.withAlpha(155),
-                borderRadius: BorderRadius.circular(14),
-                clipBehavior: Clip.antiAlias,
-                child: InkWell(
-                  key: ValueKey<String>(
-                    'settings_theme_${preset.storageKey}',
-                  ),
-                  onTap: () => AppThemeController.shared.setPreset(preset),
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: isSelected
-                            ? colorScheme.primary
-                            : colorScheme.outlineVariant,
-                        width: isSelected ? 2 : 1,
-                      ),
+              child: Opacity(
+                opacity: isLocked && !isSelected ? 0.65 : 1.0,
+                child: Material(
+                  color: isSelected
+                      ? colorScheme.primaryContainer.withAlpha(185)
+                      : colorScheme.surfaceContainerHighest.withAlpha(155),
+                  borderRadius: BorderRadius.circular(14),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    key: ValueKey<String>(
+                      'settings_theme_${preset.storageKey}',
                     ),
-                    child: isFullWidth
-                        ? Row(
-                            children: <Widget>[
-                              AppThemePreviewSwatch(
-                                preset: preset,
-                                width: 56,
-                                height: 40,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                    onTap: isLocked
+                        ? null
+                        : () => AppThemeController.shared.setPreset(preset),
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isSelected
+                              ? colorScheme.primary
+                              : colorScheme.outlineVariant,
+                          width: isSelected ? 2 : 1,
+                        ),
+                      ),
+                      child: isFullWidth
+                          ? Row(
+                              children: <Widget>[
+                                AppThemePreviewSwatch(
+                                  preset: preset,
+                                  width: 56,
+                                  height: 40,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: <Widget>[
+                                      Text(
+                                        title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: theme.textTheme.labelLarge
+                                            ?.copyWith(
+                                          fontWeight: FontWeight.w700,
+                                          color: isSelected
+                                              ? colorScheme.onPrimaryContainer
+                                              : colorScheme.onSurface,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        subtitle,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style:
+                                            theme.textTheme.bodySmall?.copyWith(
+                                          fontSize: 11.5,
+                                          color: isSelected
+                                              ? colorScheme.onPrimaryContainer
+                                                  .withAlpha(205)
+                                              : colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (isSelected)
+                                  Icon(
+                                    Icons.check_circle_rounded,
+                                    size: 20,
+                                    color: colorScheme.primary,
+                                  )
+                                else if (isLocked)
+                                  Icon(
+                                    Icons.lock_outline_rounded,
+                                    size: 18,
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                              ],
+                            )
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Stack(
                                   children: <Widget>[
-                                    Text(
-                                      title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style:
-                                          theme.textTheme.labelLarge?.copyWith(
-                                        fontWeight: FontWeight.w700,
-                                        color: isSelected
-                                            ? colorScheme.onPrimaryContainer
-                                            : colorScheme.onSurface,
-                                      ),
+                                    AppThemePreviewSwatch(
+                                      preset: preset,
+                                      width: double.infinity,
+                                      height: 58,
+                                      borderRadius: BorderRadius.circular(10),
                                     ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      subtitle,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style:
-                                          theme.textTheme.bodySmall?.copyWith(
-                                        fontSize: 11.5,
-                                        color: isSelected
-                                            ? colorScheme.onPrimaryContainer
-                                                .withAlpha(205)
-                                            : colorScheme.onSurfaceVariant,
+                                    if (isSelected)
+                                      Positioned(
+                                        top: 6,
+                                        right: 6,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withAlpha(140),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.check_rounded,
+                                            size: 14,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      )
+                                    else if (isLocked)
+                                      Positioned(
+                                        top: 6,
+                                        right: 6,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(3),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withAlpha(140),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.lock_outline_rounded,
+                                            size: 13,
+                                            color: Colors.white,
+                                          ),
+                                        ),
                                       ),
-                                    ),
                                   ],
                                 ),
-                              ),
-                              if (isSelected)
-                                Icon(
-                                  Icons.check_circle_rounded,
-                                  size: 20,
-                                  color: colorScheme.primary,
-                                ),
-                            ],
-                          )
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              Stack(
-                                children: <Widget>[
-                                  AppThemePreviewSwatch(
-                                    preset: preset,
-                                    width: double.infinity,
-                                    height: 58,
-                                    borderRadius: BorderRadius.circular(10),
+                                const SizedBox(height: 8),
+                                Text(
+                                  title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.labelLarge?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: isSelected
+                                        ? colorScheme.onPrimaryContainer
+                                        : colorScheme.onSurface,
                                   ),
-                                  if (isSelected)
-                                    Positioned(
-                                      top: 6,
-                                      right: 6,
-                                      child: Container(
-                                        padding: const EdgeInsets.all(2),
-                                        decoration: BoxDecoration(
-                                          color: Colors.black.withAlpha(140),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(
-                                          Icons.check_rounded,
-                                          size: 14,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.labelLarge?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  color: isSelected
-                                      ? colorScheme.onPrimaryContainer
-                                      : colorScheme.onSurface,
                                 ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                subtitle,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  fontSize: 11,
-                                  height: 1.25,
-                                  color: isSelected
-                                      ? colorScheme.onPrimaryContainer
-                                          .withAlpha(205)
-                                      : colorScheme.onSurfaceVariant,
+                                const SizedBox(height: 2),
+                                Text(
+                                  subtitle,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    fontSize: 11,
+                                    height: 1.25,
+                                    color: isSelected
+                                        ? colorScheme.onPrimaryContainer
+                                            .withAlpha(205)
+                                        : colorScheme.onSurfaceVariant,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
+                              ],
+                            ),
+                    ),
                   ),
                 ),
               ),
@@ -1551,6 +1796,7 @@ class _SettingsCategoryCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.expandFill = false,
   });
 
   final IconData icon;
@@ -1559,59 +1805,73 @@ class _SettingsCategoryCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final bool expandFill;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final iconBoxSize = expandFill ? 52.0 : 44.0;
+    final iconSize = expandFill ? 26.0 : 22.0;
 
     return Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          child: Row(
-            children: <Widget>[
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: iconBg,
-                  borderRadius: BorderRadius.circular(14),
+        child: Center(
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: expandFill ? 18 : 16,
+              vertical: expandFill ? 14 : 16,
+            ),
+            child: Row(
+              children: <Widget>[
+                Container(
+                  width: iconBoxSize,
+                  height: iconBoxSize,
+                  decoration: BoxDecoration(
+                    color: iconBg,
+                    borderRadius: BorderRadius.circular(expandFill ? 16 : 14),
+                  ),
+                  child: Icon(icon, color: iconColor, size: iconSize),
                 ),
-                child: Icon(icon, color: iconColor, size: 22),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontSize: expandFill ? 17 : null,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      subtitle,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontSize: expandFill ? 13 : null,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ],
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: expandFill ? 24 : 22,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ],
+            ),
           ),
         ),
       ),

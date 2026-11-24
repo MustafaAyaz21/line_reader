@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -15,7 +16,179 @@ import 'package:linereader/features/articles/models/article.dart';
 import 'package:linereader/features/articles/models/article_reader_models.dart';
 import 'package:linereader/features/articles/screens/article_reader_screen.dart';
 import 'package:linereader/features/auth/controllers/auth_controller.dart';
+import 'package:linereader/features/auth/data/auth_local_repository.dart';
+import 'package:linereader/features/auth/models/auth_user.dart';
+import 'package:linereader/features/auth/screens/auth_screen.dart';
+import 'package:linereader/features/auth/services/auth_service.dart';
+import 'package:linereader/features/auth/services/entitlement_service.dart';
 import 'package:linereader/features/settings/screens/settings_screen.dart';
+
+class _FakeThemeAuthBackend implements AuthBackend {
+  _FakeThemeAuthBackend({this.user});
+
+  final AppAuthUser? user;
+  final StreamController<AppAuthUser?> _controller =
+      StreamController<AppAuthUser?>.broadcast();
+
+  @override
+  bool get isConfigured => true;
+
+  @override
+  AppAuthUser? get currentUser => user;
+
+  @override
+  Stream<AppAuthUser?> get authStateChanges => _controller.stream;
+
+  @override
+  Future<void> initialize() async {}
+
+  @override
+  Future<String?> getIdToken({bool forceRefresh = false}) async =>
+      user != null ? 'fake-token' : null;
+
+  @override
+  Future<AuthActionResult> signInWithGoogle() async =>
+      const AuthActionResult.cancelled();
+
+  @override
+  Future<AuthActionResult> signInWithEmail({
+    required String email,
+    required String password,
+  }) async =>
+      const AuthActionResult.cancelled();
+
+  @override
+  Future<AuthActionResult> signUpWithEmail({
+    required String email,
+    required String password,
+    String? displayName,
+  }) async =>
+      const AuthActionResult.cancelled();
+
+  @override
+  Future<AuthActionResult> sendEmailVerification() async =>
+      const AuthActionResult.cancelled();
+
+  @override
+  Future<AppAuthUser?> reloadCurrentUser() async => user;
+
+  @override
+  Future<AuthActionResult> sendPasswordResetEmail(String email) async =>
+      const AuthActionResult.cancelled();
+
+  @override
+  Future<void> signOut() async {}
+}
+
+class _FakeThemeAuthLocalStore implements AuthLocalStore {
+  _FakeThemeAuthLocalStore({
+    this.isUnlimited = false,
+    this.hasSpecialThemes = false,
+    this.guestMode = false,
+  });
+
+  final bool isUnlimited;
+  final bool hasSpecialThemes;
+  bool guestMode;
+
+  @override
+  Future<bool> isGuestModeEnabled() async => guestMode;
+
+  @override
+  Future<void> setGuestModeEnabled(bool enabled) async {
+    guestMode = enabled;
+  }
+
+  @override
+  Future<({String dateKey, int usedCount})> loadGuestQuota() async =>
+      (dateKey: '', usedCount: 0);
+
+  @override
+  Future<void> saveGuestQuota({
+    required String dateKey,
+    required int usedCount,
+  }) async {}
+
+  @override
+  Future<({
+    bool isUnlimited,
+    String? codeUsed,
+    String? role,
+    bool hasSpecialThemes,
+  })> loadCachedEntitlement() async => (
+        isUnlimited: isUnlimited,
+        codeUsed: null,
+        role: isUnlimited ? 'premium' : null,
+        hasSpecialThemes: hasSpecialThemes,
+      );
+
+  @override
+  Future<void> saveCachedEntitlement({
+    required bool isUnlimited,
+    String? codeUsed,
+    String? role,
+    bool hasSpecialThemes = false,
+  }) async {}
+}
+
+class _FakeThemeEntitlementClient implements EntitlementClient {
+  _FakeThemeEntitlementClient({
+    this.isUnlimited = false,
+    this.hasSpecialThemes = false,
+  });
+
+  final bool isUnlimited;
+  final bool hasSpecialThemes;
+
+  @override
+  Future<EntitlementStatus?> fetchEntitlement(String idToken) async =>
+      EntitlementStatus(
+        isUnlimited: isUnlimited,
+        role: isUnlimited ? 'premium' : 'user',
+        hasSpecialThemes: hasSpecialThemes,
+      );
+
+  @override
+  Future<RedeemCodeResult> redeemCode({
+    required String idToken,
+    required String code,
+  }) async =>
+      const RedeemCodeResult(isSuccess: false, message: 'unused');
+
+  @override
+  void dispose() {}
+}
+
+Future<AuthController> _createTestAuthController({
+  required bool authenticated,
+  bool isPremium = false,
+  bool hasSpecialThemes = false,
+}) async {
+  final controller = AuthController(
+    backend: _FakeThemeAuthBackend(
+      user: authenticated
+          ? const AppAuthUser(
+              uid: 'u-theme-1',
+              email: 'reader@example.com',
+              displayName: 'Reader',
+              provider: AuthProviderType.email,
+              emailVerified: true,
+            )
+          : null,
+    ),
+    localStore: _FakeThemeAuthLocalStore(
+      isUnlimited: isPremium,
+      hasSpecialThemes: hasSpecialThemes,
+      guestMode: !authenticated,
+    ),
+    entitlementClient: _FakeThemeEntitlementClient(
+      isUnlimited: isPremium,
+      hasSpecialThemes: hasSpecialThemes,
+    ),
+  );
+  await controller.initialize();
+  return controller;
+}
 
 class _InMemorySettingsRepository extends SettingsRepository {
   _InMemorySettingsRepository() : super(AppDatabase.instance);
@@ -143,7 +316,7 @@ void main() {
       store: SqliteAppLanguageStore(settingsRepo),
     );
     final apiKeyController = ApiKeyController(settingsRepo);
-    final authController = AuthController();
+    final authController = await _createTestAuthController(authenticated: true);
 
     await tester.pumpWidget(
       AppLocaleScope(
@@ -368,7 +541,10 @@ void main() {
         store: SqliteAppLanguageStore(settingsRepo),
       );
       final apiKeyController = ApiKeyController(settingsRepo);
-      final authController = AuthController();
+      final authController = await _createTestAuthController(
+        authenticated: true,
+        isPremium: true,
+      );
 
       await tester.pumpWidget(
         AppLocaleScope(
@@ -504,6 +680,201 @@ void main() {
 
       controller.enforceSpecialThemeAccess(hasSpecialThemes: false);
       expect(controller.preset, AppThemePreset.classic);
+    },
+  );
+
+  test(
+    'AppThemeController.enforceThemeAccess restricts guests to Classic and animated themes to Premium',
+    () async {
+      final repo = _InMemorySettingsRepository();
+      final controller = AppThemeController(repository: repo);
+
+      // Misafir kullanıcı hiçbir özel/statik/hareketli temayı koruyamaz
+      await controller.setPreset(AppThemePreset.electricCoral);
+      controller.enforceThemeAccess(
+        isAuthenticated: false,
+        isPremium: false,
+        hasSpecialThemes: false,
+      );
+      expect(controller.preset, AppThemePreset.classic);
+
+      // Standart kayıtlı kullanıcı statik temayı koruyabilir
+      await controller.setPreset(AppThemePreset.electricCoral);
+      controller.enforceThemeAccess(
+        isAuthenticated: true,
+        isPremium: false,
+        hasSpecialThemes: false,
+      );
+      expect(controller.preset, AppThemePreset.electricCoral);
+
+      // Standart kullanıcıda hareketli tema otomatik Classic'e döner
+      await controller.setPreset(AppThemePreset.oceanDepths);
+      controller.enforceThemeAccess(
+        isAuthenticated: true,
+        isPremium: false,
+        hasSpecialThemes: false,
+      );
+      expect(controller.preset, AppThemePreset.classic);
+
+      // Premium kullanıcıda hareketli tema aktif kalır
+      await controller.setPreset(AppThemePreset.oceanDepths);
+      controller.enforceThemeAccess(
+        isAuthenticated: true,
+        isPremium: true,
+        hasSpecialThemes: false,
+      );
+      expect(controller.preset, AppThemePreset.oceanDepths);
+    },
+  );
+
+  testWidgets(
+    'Guest users cannot select themes and Kayıt Ol button opens AuthScreen',
+    (WidgetTester tester) async {
+      AppThemeController.shared.resetForTesting();
+      addTearDown(() => AppThemeController.shared.resetForTesting());
+
+      final settingsRepo = _InMemorySettingsRepository();
+      final localeController = AppLocaleController(
+        store: SqliteAppLanguageStore(settingsRepo),
+      );
+      final apiKeyController = ApiKeyController(settingsRepo);
+      final authController = await _createTestAuthController(
+        authenticated: false,
+      );
+
+      await tester.pumpWidget(
+        AppLocaleScope(
+          controller: localeController,
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            home: SettingsScreen(
+              apiKeyController: apiKeyController,
+              authController: authController,
+              localeController: localeController,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const ValueKey<String>('settings_cat_appearance')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Kayıt olmayan kullanıcılar tema kullanamaz'),
+        findsOneWidget,
+      );
+      expect(find.text('Üye olup temayı kullanabilirsiniz.'), findsOneWidget);
+      expect(find.text("Premium'a özel"), findsOneWidget);
+
+      // Hareketsiz temalara girip bir temaya basılsa bile aktif olmamalı
+      await tester.tap(
+        find.byKey(const ValueKey<String>('settings_theme_cat_static')),
+      );
+      await tester.pumpAndSettle();
+
+      final electricCoralTile = find.byKey(
+        const ValueKey<String>('settings_theme_electric_coral'),
+      );
+      await tester.scrollUntilVisible(
+        electricCoralTile,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(electricCoralTile);
+      await tester.pumpAndSettle();
+      expect(AppThemeController.shared.preset, AppThemePreset.classic);
+
+      // Kayıt Ol butonuna basınca AuthScreen açılmalı
+      final signUpBtn = find.byKey(
+        const ValueKey<String>('settings_theme_subpage_guest_signup_btn'),
+      );
+      await tester.scrollUntilVisible(
+        signUpBtn,
+        -200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(signUpBtn);
+      await tester.pumpAndSettle();
+      expect(find.byType(AuthScreen), findsOneWidget);
+
+      apiKeyController.dispose();
+      localeController.dispose();
+      authController.dispose();
+    },
+  );
+
+  testWidgets(
+    'Standard authenticated users see Premium-only lock on Animated Themes',
+    (WidgetTester tester) async {
+      AppThemeController.shared.resetForTesting();
+      addTearDown(() => AppThemeController.shared.resetForTesting());
+
+      final settingsRepo = _InMemorySettingsRepository();
+      final localeController = AppLocaleController(
+        store: SqliteAppLanguageStore(settingsRepo),
+      );
+      final apiKeyController = ApiKeyController(settingsRepo);
+      final authController = await _createTestAuthController(
+        authenticated: true,
+        isPremium: false,
+      );
+
+      await tester.pumpWidget(
+        AppLocaleScope(
+          controller: localeController,
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            home: SettingsScreen(
+              apiKeyController: apiKeyController,
+              authController: authController,
+              localeController: localeController,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const ValueKey<String>('settings_cat_appearance')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey<String>('settings_theme_guest_banner')),
+        findsNothing,
+      );
+      expect(find.text("Premium'a özel"), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(const ValueKey<String>('settings_theme_cat_animated')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(
+          const ValueKey<String>('settings_theme_animated_premium_banner'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text("Premium'a özel"), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey<String>('settings_theme_pause_animation_switch')),
+        findsNothing,
+      );
+
+      final oceanTile = find.byKey(
+        const ValueKey<String>('settings_theme_ocean_depths'),
+      );
+      await tester.tap(oceanTile);
+      await tester.pumpAndSettle();
+      expect(AppThemeController.shared.preset, AppThemePreset.classic);
+
+      apiKeyController.dispose();
+      localeController.dispose();
+      authController.dispose();
     },
   );
 }

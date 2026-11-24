@@ -103,6 +103,11 @@ class CloudflareEntitlementService implements EntitlementClient {
         !ordered.contains(_fallbackBaseUrl)) {
       ordered.add(_fallbackBaseUrl);
     }
+    if (_fallbackBaseUrl.isNotEmpty &&
+        ApiConfig.browserAiSecondaryFallbackEndpoint.startsWith('http') &&
+        !ordered.contains(ApiConfig.browserAiSecondaryFallbackEndpoint)) {
+      ordered.add(ApiConfig.browserAiSecondaryFallbackEndpoint);
+    }
     return ordered;
   }
 

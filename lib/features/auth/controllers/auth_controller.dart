@@ -83,7 +83,9 @@ class AuthController extends ChangeNotifier {
       isAuthenticated && (_hasSpecialThemes || isAuthorizedStaff);
 
   void _enforceSpecialThemeFallback() {
-    AppThemeController.shared.enforceSpecialThemeAccess(
+    AppThemeController.shared.enforceThemeAccess(
+      isAuthenticated: isAuthenticated,
+      isPremium: isUnlimited,
       hasSpecialThemes: hasSpecialThemes,
     );
   }
@@ -347,15 +349,20 @@ class AuthController extends ChangeNotifier {
   Future<void> continueAsGuest() async {
     _user = null;
     _isUnlimited = false;
+    _hasSpecialThemes = false;
     _entitlementCodeUsed = null;
     _entitlementRole = null;
     _sessionLookupCount = 0;
     _status = AuthSessionStatus.guest;
     _resetQuotaInMemoryIfNewDay();
+    _enforceSpecialThemeFallback();
     _safeNotify();
     try {
       await _localStore.setGuestModeEnabled(true);
-      await _localStore.saveCachedEntitlement(isUnlimited: false);
+      await _localStore.saveCachedEntitlement(
+        isUnlimited: false,
+        hasSpecialThemes: false,
+      );
     } catch (error) {
       debugPrint('[AuthController] Misafir modu kaydetme hatasi: $error');
     }

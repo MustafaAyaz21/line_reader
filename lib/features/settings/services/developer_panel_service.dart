@@ -340,6 +340,11 @@ class DeveloperPanelService {
     if (_fallbackBaseUrl.isNotEmpty && !ordered.contains(_fallbackBaseUrl)) {
       ordered.add(_fallbackBaseUrl);
     }
+    if (_fallbackBaseUrl.isNotEmpty &&
+        ApiConfig.browserAiSecondaryFallbackEndpoint.isNotEmpty &&
+        !ordered.contains(ApiConfig.browserAiSecondaryFallbackEndpoint)) {
+      ordered.add(ApiConfig.browserAiSecondaryFallbackEndpoint);
+    }
     return ordered;
   }
 

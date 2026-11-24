@@ -292,34 +292,40 @@ class FirebaseAuthBackend implements AuthBackend {
         message: 'Doğrulanacak aktif kullanıcı bulunamadı.',
       );
     }
-    try {
-      await user.sendEmailVerification(
-        ActionCodeSettings(
-          url: 'https://line-reader.pages.dev/verified',
-          handleCodeInApp: false,
-        ),
-      );
-      return const AuthActionResult.success(
-        message: 'Doğrulama bağlantısı e-posta adresinize gönderildi.',
-      );
-    } catch (_) {
-      // Authorized domains henüz eklenmediyse standart doğrulama maili gönder.
+    const continueUrls = <String>[
+      'https://linereaderr.netlify.app/verified',
+      'https://line-reader.pages.dev/verified',
+    ];
+    for (final url in continueUrls) {
       try {
-        await user.sendEmailVerification();
+        await user.sendEmailVerification(
+          ActionCodeSettings(
+            url: url,
+            handleCodeInApp: false,
+          ),
+        );
         return const AuthActionResult.success(
           message: 'Doğrulama bağlantısı e-posta adresinize gönderildi.',
         );
-      } on FirebaseAuthException catch (error) {
-        return AuthActionResult.failure(
-          errorCode: error.code,
-          message: _mapFirebaseError(error.code),
-        );
-      } catch (_) {
-        return const AuthActionResult.failure(
-          errorCode: 'verification_send_failed',
-          message: 'Doğrulama e-postası gönderilemedi. Biraz sonra tekrar deneyin.',
-        );
-      }
+      } catch (_) {}
+    }
+
+    // Authorized domains henüz eklenmediyse standart doğrulama maili gönder.
+    try {
+      await user.sendEmailVerification();
+      return const AuthActionResult.success(
+        message: 'Doğrulama bağlantısı e-posta adresinize gönderildi.',
+      );
+    } on FirebaseAuthException catch (error) {
+      return AuthActionResult.failure(
+        errorCode: error.code,
+        message: _mapFirebaseError(error.code),
+      );
+    } catch (_) {
+      return const AuthActionResult.failure(
+        errorCode: 'verification_send_failed',
+        message: 'Doğrulama e-postası gönderilemedi. Biraz sonra tekrar deneyin.',
+      );
     }
   }
 

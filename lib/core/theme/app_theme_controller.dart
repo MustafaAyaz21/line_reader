@@ -109,6 +109,30 @@ class AppThemeController extends ChangeNotifier {
     }
   }
 
+  /// Kullanıcı oturum / Premium / Özel Tema yetkilerine göre aktif temayı doğrular:
+  /// - Misafir / giriş yapmamış: Yalnızca Klasik (varsayılan) tema.
+  /// - Standart üye: Yalnızca hareketsiz (statik) temalar.
+  /// - Premium üye / Geliştirici: Hareketsiz + Hareketli temalar.
+  /// - Özel tema yetkisi olanlar / Geliştirici: Özel temalar da dahil.
+  void enforceThemeAccess({
+    required bool isAuthenticated,
+    required bool isPremium,
+    required bool hasSpecialThemes,
+  }) {
+    if (_preset == AppThemePreset.classic) return;
+    if (!isAuthenticated) {
+      setPreset(AppThemePreset.classic);
+      return;
+    }
+    if (_preset.isSpecialTheme && !hasSpecialThemes) {
+      setPreset(AppThemePreset.classic);
+      return;
+    }
+    if (_preset.isAnimatedTheme && !_preset.isSpecialTheme && !isPremium) {
+      setPreset(AppThemePreset.classic);
+    }
+  }
+
   @visibleForTesting
   void resetForTesting() {
     _preset = AppThemePreset.classic;

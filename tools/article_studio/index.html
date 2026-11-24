@@ -175,12 +175,94 @@
       border-radius: 8px;
     }
 
-    /* Main 3-column workspace */
+    /* Main 3-column workspace (collapsible left/right panels) */
     .workspace {
       flex: 1;
       display: grid;
       grid-template-columns: 310px minmax(420px, 1fr) 390px;
       min-height: 0;
+    }
+
+    .sidebar.list-collapsed .sidebar-filters-wrap,
+    .sidebar.list-collapsed .article-list {
+      display: none;
+    }
+
+    .sidebar.list-collapsed .sidebar-top {
+      border-bottom: none;
+    }
+
+    .workspace.preview-collapsed {
+      grid-template-columns: 310px minmax(420px, 1fr);
+    }
+
+    .workspace.preview-collapsed .preview-pane {
+      display: none;
+    }
+
+    /* Ana Menü (Hero) Modu: Makale seçili değilken Gemini ile Oluştur ekranın tam ortasında durur */
+    .editor-column.hero-mode {
+      justify-content: center;
+      align-items: center;
+      padding: 32px 24px;
+      background: radial-gradient(circle at 50% 35%, rgba(99, 102, 241, 0.14), transparent 62%);
+    }
+
+    .editor-column.hero-mode .ai-studio-bar {
+      width: 100%;
+      max-width: 780px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 26px 24px;
+      background: var(--surface);
+      box-shadow: 0 22px 54px rgba(0, 0, 0, 0.34);
+    }
+
+    .editor-column.hero-mode .editor-pane {
+      display: none;
+    }
+
+    .ai-hero-heading {
+      display: none;
+      text-align: center;
+      margin-bottom: 18px;
+    }
+
+    .editor-column.hero-mode .ai-hero-heading {
+      display: block;
+    }
+
+    .ai-hero-heading h2 {
+      margin: 0 0 6px;
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    .ai-hero-heading p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .panel-toggle-btn {
+      padding: 6px 10px;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+    }
+
+    .panel-toggle-btn:hover {
+      color: var(--text);
+      border-color: var(--primary);
     }
 
     /* Left Sidebar */
@@ -758,12 +840,45 @@
       font-weight: 700;
     }
 
+    .phone-card-preview,
     .book-preview {
-      border-radius: 16px;
+      flex-shrink: 0;
+    }
+
+    .book-preview {
+      border-radius: 18px;
       border: 1px solid var(--border);
-      padding: 22px 20px;
-      min-height: 300px;
+      padding: 20px 18px;
+      height: auto;
+      overflow: visible;
       transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    .preview-word-hit {
+      cursor: pointer;
+      border-bottom: 1px dotted rgba(96, 165, 250, 0.45);
+      border-radius: 3px;
+      transition: background 0.15s ease;
+    }
+
+    .preview-word-hit:hover,
+    .preview-word-hit.active {
+      background: rgba(59, 130, 246, 0.22);
+    }
+
+    .preview-word-popup {
+      margin-top: 12px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-shrink: 0;
     }
 
     .book-preview.tone-white {
@@ -1038,37 +1153,51 @@
 
   <main class="workspace" id="articlesWorkspace">
     <!-- Sol: Seviye Filtreleri ve Makale Listesi -->
-    <aside class="sidebar">
+    <aside class="sidebar" id="articlesSidebar">
       <div class="sidebar-top">
-        <button class="btn btn-primary" id="newArticleBtn" style="width:100%; justify-content:center;">
-          + Yeni Makale Ekle
+        <button type="button" class="btn btn-sm" id="studioHomeBtn" style="width:100%;justify-content:center;" title="Ana Menü (Gemini ile Oluştur)">
+          🏠 Ana Menü
         </button>
-        <input
-          type="text"
-          id="searchInput"
-          class="search-input"
-          placeholder="Başlık veya açıklama ara..."
-        />
-        <div class="level-filters" id="levelFilters"></div>
-        <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
-          <select id="sortSelect" class="search-input" style="flex:1;padding:6px 8px;font-size:12px;">
-            <option value="date_desc">📅 Tarih (En yeni)</option>
-            <option value="date_asc">📅 Tarih (En eski)</option>
-            <option value="level_asc">🎯 Seviye (A1→C2)</option>
-            <option value="title_asc">🔤 İsim (A→Z)</option>
-          </select>
-          <label style="display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--text-muted);white-space:nowrap;cursor:pointer;">
-            <input type="checkbox" id="onlyMissingCheck" />
-            Eksikler
-          </label>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button class="btn btn-primary" id="newArticleBtn" style="flex:1; justify-content:center;">
+            + Yeni Makale Ekle
+          </button>
+          <button type="button" class="panel-toggle-btn" id="toggleArticleListBtn" title="Makale listesini gizle / göster">
+            ▾
+          </button>
+        </div>
+        <div class="sidebar-filters-wrap" style="display:flex;flex-direction:column;gap:10px;">
+          <input
+            type="text"
+            id="searchInput"
+            class="search-input"
+            placeholder="Başlık veya açıklama ara..."
+          />
+          <div class="level-filters" id="levelFilters"></div>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:2px;">
+            <select id="sortSelect" class="search-input" style="flex:1;padding:6px 8px;font-size:12px;">
+              <option value="date_desc">📅 Tarih (En yeni)</option>
+              <option value="date_asc">📅 Tarih (En eski)</option>
+              <option value="level_asc">🎯 Seviye (A1→C2)</option>
+              <option value="title_asc">🔤 İsim (A→Z)</option>
+            </select>
+            <label style="display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--text-muted);white-space:nowrap;cursor:pointer;">
+              <input type="checkbox" id="onlyMissingCheck" />
+              Eksikler
+            </label>
+          </div>
         </div>
       </div>
       <div class="article-list" id="articleList"></div>
     </aside>
 
     <!-- Orta: Gemini Üretici + Makale Editörü -->
-    <section class="editor-column">
+    <section class="editor-column hero-mode" id="editorColumn">
       <div class="ai-studio-bar">
+        <div class="ai-hero-heading">
+          <h2>✨ Yeni Makale Oluştur</h2>
+          <p>Seviye seçip tek tıkla Gemini + Podcast AI ile makale üretin veya soldan mevcut bir makaleyi açın.</p>
+        </div>
         <div class="ai-studio-row">
           <select id="aiLevelSelect" class="ai-select" title="Oluşturulacak makalenin CEFR seviyesi">
             <option value="A1">A1 • Başlangıç</option>
@@ -1101,6 +1230,9 @@
           <button type="button" class="btn btn-sm" id="toggleGeminiSettingsBtn" title="Yerel Gemini API anahtarı ayarı">
             <span id="aiKeyDot" class="ai-key-dot"></span>
             Gemini Ayarı
+          </button>
+          <button type="button" class="panel-toggle-btn" id="expandPreviewBtn" style="display:none;margin-left:auto;" title="Canlı önizlemeyi aç">
+            👁 Önizleme
           </button>
         </div>
 
@@ -1141,6 +1273,7 @@
         <button class="tone-btn active" data-tone="dark" style="background:#14171d;color:#eee;">Koyu</button>
         <button class="mini-btn" id="prevFontDec">A-</button>
         <button class="mini-btn" id="prevFontInc">A+</button>
+        <button type="button" class="panel-toggle-btn" id="collapsePreviewBtn" style="padding:4px 8px;" title="Canlı önizlemeyi gizle">✕</button>
       </div>
       <div class="preview-scroll" id="previewScroll"></div>
     </aside>
@@ -2384,6 +2517,17 @@
       reader.readAsText(file, "UTF-8");
     }
 
+    function formatPreviewParagraph(paragraph, wmMap) {
+      const escaped = escapeHtml(paragraph);
+      return escaped.replace(/\b([A-Za-z][A-Za-z'\-]*)\b/g, (match) => {
+        const key = match.toLowerCase();
+        if (wmMap[key]) {
+          return `<span class="preview-word-hit" data-word="${escapeHtml(key)}">${match}</span>`;
+        }
+        return match;
+      });
+    }
+
     function renderPreview() {
       const article = state.articles[state.selectedIndex];
       if (!article) {
@@ -2397,7 +2541,10 @@
       const readTime = (article.reading_time || "").trim() || estimateReadingTime(article.content);
       const paragraphs = splitParagraphs(article.content);
       const parsedWm = parseWordMeaningsText(article.word_meanings_text || "");
-      const wmEntries = Object.entries(parsedWm.map);
+      const wmMap = {};
+      for (const [k, v] of Object.entries(parsedWm.map)) {
+        wmMap[k.toLowerCase()] = v;
+      }
 
       el.previewScroll.innerHTML = `
         <div class="preview-section-label">Seviye Listesi Kartı</div>
@@ -2409,7 +2556,7 @@
           </span>
         </div>
 
-        <div class="preview-section-label">Kitap Okuma Ekranı</div>
+        <div class="preview-section-label">Kitap Okuma Ekranı (Mobil Görünüm)</div>
         <div class="book-preview tone-${state.previewTone}">
           <div class="book-meta">
             <span style="color:${meta.color};">${meta.code} • ${meta.label}</span>
@@ -2423,25 +2570,87 @@
           <div class="book-body" style="font-size:${state.previewFontSize}px;">
             ${paragraphs.length === 0
               ? `<p style="color:var(--p-sub);">Makale metni yazdıkça burada kitap düzeninde görünecek...</p>`
-              : paragraphs.map(p => `<p>${escapeHtml(p)}</p>`).join("")}
+              : paragraphs.map(p => `<p>${formatPreviewParagraph(p, wmMap)}</p>`).join("")}
           </div>
         </div>
-
-        ${wmEntries.length > 0 ? `
-          <div class="preview-section-label">Kelime Anlamları (${wmEntries.length})</div>
-          <div class="wm-preview-box">
-            ${wmEntries.slice(0, 25).map(([k, v]) => `
-              <div class="wm-preview-row">
-                <span class="wm-preview-key">${escapeHtml(k)}</span>: ${escapeHtml(v)}
-              </div>
-            `).join("")}
-            ${wmEntries.length > 25 ? `<div style="font-size:11.5px;color:var(--text-muted);">+${wmEntries.length - 25} kelime daha...</div>` : ""}
-          </div>
-        ` : ""}
+        <div id="previewWordPopup" class="preview-word-popup" style="display:none;"></div>
       `;
+
+      const popup = document.getElementById("previewWordPopup");
+      el.previewScroll.querySelectorAll(".preview-word-hit").forEach(span => {
+        span.addEventListener("click", () => {
+          el.previewScroll.querySelectorAll(".preview-word-hit.active").forEach(s => s.classList.remove("active"));
+          span.classList.add("active");
+          const w = span.dataset.word || "";
+          const meaning = wmMap[w] || "";
+          if (popup && meaning) {
+            popup.innerHTML = `
+              <div>
+                <strong style="color:var(--primary);">${escapeHtml(w)}</strong>
+                <span style="margin-left:8px;">${escapeHtml(meaning)}</span>
+              </div>
+              <button type="button" class="mini-btn" id="closePreviewWordPopup">✕</button>
+            `;
+            popup.style.display = "flex";
+            document.getElementById("closePreviewWordPopup")?.addEventListener("click", () => {
+              popup.style.display = "none";
+              span.classList.remove("active");
+            });
+          }
+        });
+      });
+    }
+
+    // Sol Makale Listesi (Yeni Makale Ekle sabit kalır, sadece altı gizlenir) & Sağ Canlı Önizleme aç/kapat
+    (function initPanelToggles() {
+      const ws = document.getElementById("articlesWorkspace");
+      const sidebar = document.getElementById("articlesSidebar");
+      const toggleArticleListBtn = document.getElementById("toggleArticleListBtn");
+      const studioHomeBtn = document.getElementById("studioHomeBtn");
+      const collapsePreview = document.getElementById("collapsePreviewBtn");
+      const expandPreview = document.getElementById("expandPreviewBtn");
+
+      function goStudioHome() {
+        state.selectedIndex = -1;
+        renderAll();
+      }
+
+      function syncPanelButtons() {
+        const listClosed = sidebar?.classList.contains("list-collapsed");
+        const pClosed = ws.classList.contains("preview-collapsed");
+        if (toggleArticleListBtn) {
+          toggleArticleListBtn.textContent = listClosed ? "▸" : "▾";
+          toggleArticleListBtn.title = listClosed ? "Makale listesini göster" : "Makale listesini gizle";
+        }
+        if (expandPreview) expandPreview.style.display = pClosed ? "inline-flex" : "none";
+      }
+
+      studioHomeBtn?.addEventListener("click", goStudioHome);
+      toggleArticleListBtn?.addEventListener("click", () => {
+        sidebar?.classList.toggle("list-collapsed");
+        syncPanelButtons();
+      });
+      collapsePreview?.addEventListener("click", () => {
+        ws.classList.add("preview-collapsed");
+        syncPanelButtons();
+      });
+      expandPreview?.addEventListener("click", () => {
+        ws.classList.remove("preview-collapsed");
+        syncPanelButtons();
+      });
+      syncPanelButtons();
+    })();
+
+    function syncHeroMode() {
+      const editorCol = document.getElementById("editorColumn");
+      const isHome = state.selectedIndex < 0 || !state.articles[state.selectedIndex];
+      if (editorCol) {
+        editorCol.classList.toggle("hero-mode", isHome);
+      }
     }
 
     function renderAll() {
+      syncHeroMode();
       updateStatusPill();
       renderLevelFilters();
       renderArticleList();
@@ -2870,7 +3079,7 @@
         state.updatedAt = data.updated_at || "";
         const rawList = Array.isArray(data) ? data : (Array.isArray(data.articles) ? data.articles : []);
         state.articles = rawList.map(normalizeArticle);
-        state.selectedIndex = state.articles.length > 0 ? 0 : -1;
+        state.selectedIndex = -1;
         state.dirty = false;
         await refreshRepoStatus();
         renderAll();

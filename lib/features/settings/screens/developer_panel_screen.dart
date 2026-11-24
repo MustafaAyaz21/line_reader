@@ -57,6 +57,13 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
   bool _isSubmitting = false;
   String? _errorMessage;
 
+  // Makaleler sekmesi açılır/kapanır bölüm durumları (yığın önleme)
+  bool _isPublishSectionExpanded = false;
+  bool _isPublishedSectionExpanded = false;
+  bool _isDraftMeaningsExpanded = false;
+  bool _isDraftSentencesExpanded = false;
+  bool _isDraftRelationsExpanded = false;
+
   static const List<String> _levels = <String>[
     'A1',
     'A2',
@@ -946,6 +953,9 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
         _draftArticle = generated;
         _draftTitleController.text = generated.title;
         _draftContentController.text = generated.content;
+        _isDraftMeaningsExpanded = false;
+        _isDraftSentencesExpanded = false;
+        _isDraftRelationsExpanded = false;
       });
       _showSnack(
         context.l10n.t(
@@ -1027,6 +1037,10 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
           _articleTopicController.clear();
           _draftTitleController.clear();
           _draftContentController.clear();
+          _isDraftMeaningsExpanded = false;
+          _isDraftSentencesExpanded = false;
+          _isDraftRelationsExpanded = false;
+          _isPublishedSectionExpanded = true;
         });
         await _loadAll();
       }
@@ -1147,6 +1161,163 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
     return '$dd.$mm.${dt.year} $hh:$min';
   }
 
+  Widget _buildSectionToggleButton({
+    required Key key,
+    required ThemeData theme,
+    required ColorScheme colorScheme,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool isExpanded,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        key: key,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          child: Row(
+            children: <Widget>[
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: isExpanded
+                      ? colorScheme.primaryContainer
+                      : colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Icon(
+                  icon,
+                  size: 20,
+                  color: isExpanded
+                      ? colorScheme.onPrimaryContainer
+                      : colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      title,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                isExpanded
+                    ? Icons.keyboard_arrow_up_rounded
+                    : Icons.keyboard_arrow_down_rounded,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExpandableDraftFeatureBox({
+    required Key key,
+    required ThemeData theme,
+    required ColorScheme colorScheme,
+    required IconData icon,
+    required String title,
+    required int count,
+    required bool isExpanded,
+    required VoidCallback onToggle,
+    required Widget Function() expandedContentBuilder,
+  }) {
+    final hasItems = count > 0;
+    return Material(
+      color: colorScheme.surface.withAlpha(210),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: isExpanded
+              ? colorScheme.primary
+              : colorScheme.outlineVariant,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          InkWell(
+            key: key,
+            onTap: hasItems ? onToggle : null,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
+                children: <Widget>[
+                  Icon(
+                    icon,
+                    size: 17,
+                    color: hasItems
+                        ? colorScheme.primary
+                        : colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '$title ($count)',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: hasItems
+                            ? colorScheme.onSurface
+                            : colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  if (hasItems)
+                    Icon(
+                      isExpanded
+                          ? Icons.expand_less_rounded
+                          : Icons.expand_more_rounded,
+                      size: 20,
+                      color: colorScheme.primary,
+                    )
+                  else
+                    Text(
+                      'Yok',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          if (isExpanded && hasItems) ...<Widget>[
+            Divider(height: 1, color: colorScheme.outlineVariant),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 170),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(10),
+                child: expandedContentBuilder(),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildArticlesTab(
     ThemeData theme,
     ColorScheme colorScheme,
@@ -1158,265 +1329,467 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 36),
       children: <Widget>[
-        Card(
-          margin: EdgeInsets.zero,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                Text(
-                  s.t('Telefondan Makale Üret', 'Generate Article on Mobile'),
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+        // 1. Açılır/Kapanır Bölüm: Makale Yayınla (Gemini + Masaüstü benzeri taslak ekranı)
+        _buildSectionToggleButton(
+          key: const ValueKey<String>('dev_panel_toggle_publish_section_btn'),
+          theme: theme,
+          colorScheme: colorScheme,
+          icon: Icons.auto_awesome_rounded,
+          title: s.t('Makale Yayınla', 'Publish Article'),
+          subtitle: draft != null
+              ? s.t(
+                  'Taslak hazır: ${draft.title}',
+                  'Draft ready: ${draft.title}',
+                )
+              : s.t(
+                  'Gemini ile yeni makale ve Podcast AI sesi üret',
+                  'Generate new article & Podcast AI audio with Gemini',
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  s.t(
-                    'PC açmadan Gemini ile metin, kelime anlamları, çeviriler, eş/zıt anlamlar ve Podcast AI sesi üretip anında yayınla.',
-                    'Generate text, meanings, translations, synonyms/antonyms, and Podcast AI audio with Gemini and publish instantly.',
-                  ),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: _levels.map((lvl) {
-                    return ChoiceChip(
-                      label: Text(lvl),
-                      selected: _selectedLevel == lvl,
-                      onSelected: busy
-                          ? null
-                          : (_) => setState(() => _selectedLevel = lvl),
-                    );
-                  }).toList(growable: false),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  key: const ValueKey<String>('dev_panel_article_topic_field'),
-                  controller: _articleTopicController,
-                  enabled: !busy,
-                  decoration: InputDecoration(
-                    labelText: s.t(
-                      'Konu (boş bırakırsan Gemini seçer)',
-                      'Topic (optional — Gemini picks if blank)',
-                    ),
-                    hintText: 'e.g. Future of Space Travel',
-                    isDense: true,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                FilledButton.icon(
-                  key: const ValueKey<String>('dev_panel_generate_article_btn'),
-                  onPressed: busy ? null : _handleGenerateArticle,
-                  icon: _isGeneratingArticle
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.auto_awesome_rounded, size: 18),
-                  label: Text(
-                    _isGeneratingArticle
-                        ? s.t('Gemini Makale Üretiyor...', 'Generating...')
-                        : s.t('Gemini ile Makale Üret', 'Generate with Gemini'),
-                  ),
-                ),
-              ],
-            ),
+          isExpanded: _isPublishSectionExpanded,
+          onTap: () => setState(
+            () => _isPublishSectionExpanded = !_isPublishSectionExpanded,
           ),
         ),
-        if (draft != null) ...<Widget>[
-          const SizedBox(height: 14),
+        if (_isPublishSectionExpanded) ...<Widget>[
+          const SizedBox(height: 10),
           Card(
             margin: EdgeInsets.zero,
-            color: colorScheme.primaryContainer.withAlpha(65),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  Row(
-                    children: <Widget>[
-                      Chip(
-                        label: Text(
-                          draft.level,
-                          style: const TextStyle(fontWeight: FontWeight.w800),
-                        ),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          s.t('Taslak Hazır', 'Draft Ready'),
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: busy
-                            ? null
-                            : () => setState(() => _draftArticle = null),
-                        icon: const Icon(Icons.close_rounded, size: 18),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _draftTitleController,
-                    enabled: !busy,
-                    decoration: InputDecoration(
-                      labelText: s.t('Başlık', 'Title'),
-                      isDense: true,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
+                  Text(
+                    s.t('Gemini ile Makale Üret', 'Generate Article with Gemini'),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _draftContentController,
-                    enabled: !busy,
-                    maxLines: 6,
-                    minLines: 4,
-                    decoration: InputDecoration(
-                      labelText: s.t('Metin', 'Content'),
-                      isDense: true,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
+                  const SizedBox(height: 6),
+                  Text(
+                    s.t(
+                      'Seviye seçip metin, kelime anlamları, çeviriler, eş/zıt anlamlar ve Podcast AI sesini üret.',
+                      'Pick a level to generate text, meanings, translations, synonyms/antonyms, and Podcast AI audio.',
+                    ),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   Wrap(
                     spacing: 6,
                     runSpacing: 6,
-                    children: <Widget>[
-                      _MiniStatBadge(
-                        label: '${draft.wordMeanings.length} kelime',
-                      ),
-                      _MiniStatBadge(
-                        label: '${draft.sentenceTranslations.length} cümle',
-                      ),
-                      _MiniStatBadge(
-                        label: '${draft.wordRelations.length} eş/zıt',
-                      ),
-                      _MiniStatBadge(
-                        label: draft.hasAudio
-                            ? '🎙 Podcast Hazır (${draft.audioDurationSec ?? 0} sn)'
-                            : '🎙 Ses yok',
-                        highlighted: draft.hasAudio,
-                      ),
-                    ],
+                    children: _levels.map((lvl) {
+                      return ChoiceChip(
+                        label: Text(lvl),
+                        selected: _selectedLevel == lvl,
+                        onSelected: busy
+                            ? null
+                            : (_) => setState(() => _selectedLevel = lvl),
+                      );
+                    }).toList(growable: false),
                   ),
                   const SizedBox(height: 10),
-                  Row(
-                    children: <Widget>[
-                      Text(
-                        s.t('Podcast Sesi:', 'Voice:'),
-                        style: theme.textTheme.labelMedium,
+                  TextField(
+                    key: const ValueKey<String>('dev_panel_article_topic_field'),
+                    controller: _articleTopicController,
+                    enabled: !busy,
+                    decoration: InputDecoration(
+                      labelText: s.t(
+                        'Konu (boş bırakırsan Gemini seçer)',
+                        'Topic (optional — Gemini picks if blank)',
                       ),
-                      const SizedBox(width: 8),
-                      DropdownButton<String>(
-                        value: _selectedVoice,
-                        isDense: true,
-                        onChanged: busy
-                            ? null
-                            : (val) {
-                                if (val != null) {
-                                  setState(() => _selectedVoice = val);
-                                }
-                              },
-                        items: _voices
-                            .map(
-                              (v) => DropdownMenuItem<String>(
-                                value: v,
-                                child: Text(v),
-                              ),
-                            )
-                            .toList(growable: false),
+                      hintText: 'e.g. Future of Space Travel',
+                      isDense: true,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      const Spacer(),
-                      OutlinedButton.icon(
-                        key: const ValueKey<String>(
-                          'dev_panel_generate_audio_btn',
-                        ),
-                        onPressed: busy ? null : _handleGenerateAudio,
-                        icon: _isGeneratingAudio
-                            ? const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.podcasts_rounded, size: 17),
-                        label: Text(
-                          _isGeneratingAudio
-                              ? s.t('Ses Üretiliyor...', 'Generating...')
-                              : s.t('Podcast Sesi Üret', 'Generate Audio'),
-                        ),
-                      ),
-                    ],
-                  ),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    dense: true,
-                    title: Text(
-                      s.t(
-                        'Gizli olarak kaydet (kullanıcılar görmez)',
-                        'Save as hidden',
-                      ),
-                      style: theme.textTheme.bodySmall,
                     ),
-                    value: draft.isHidden,
-                    onChanged: busy
-                        ? null
-                        : (val) => setState(
-                              () => _draftArticle = draft.copyWith(
-                                isHidden: val,
-                              ),
-                            ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 12),
                   FilledButton.icon(
-                    key: const ValueKey<String>(
-                      'dev_panel_publish_article_btn',
-                    ),
-                    onPressed: busy ? null : _handlePublishArticle,
-                    icon: const Icon(Icons.rocket_launch_rounded, size: 18),
+                    key: const ValueKey<String>('dev_panel_generate_article_btn'),
+                    onPressed: busy ? null : _handleGenerateArticle,
+                    icon: _isGeneratingArticle
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.auto_awesome_rounded, size: 18),
                     label: Text(
-                      draft.isHidden
-                          ? s.t('Gizli Kaydet', 'Save Hidden')
-                          : s.t('Anında Yayınla', 'Publish Instantly'),
+                      _isGeneratingArticle
+                          ? s.t('Gemini Makale Üretiyor...', 'Generating...')
+                          : s.t('Gemini ile Makale Üret', 'Generate with Gemini'),
                     ),
                   ),
                 ],
               ),
             ),
           ),
-        ],
-        const SizedBox(height: 16),
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: Text(
-                '${s.t('Yayındaki Makaleler', 'Published Articles')} (${_articles.length})',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: colorScheme.primary,
-                  fontWeight: FontWeight.w700,
+          if (draft != null) ...<Widget>[
+            const SizedBox(height: 12),
+            Card(
+              margin: EdgeInsets.zero,
+              color: colorScheme.primaryContainer.withAlpha(65),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    Row(
+                      children: <Widget>[
+                        Chip(
+                          label: Text(
+                            draft.level,
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                s.t('Taslak Hazır', 'Draft Ready'),
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              if ((draft.category != null &&
+                                      draft.category!.isNotEmpty) ||
+                                  (draft.author != null &&
+                                      draft.author!.isNotEmpty))
+                                Text(
+                                  <String>[
+                                    if (draft.category != null &&
+                                        draft.category!.isNotEmpty)
+                                      draft.category!,
+                                    if (draft.author != null &&
+                                        draft.author!.isNotEmpty)
+                                      draft.author!,
+                                  ].join(' • '),
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: busy
+                              ? null
+                              : () => setState(() => _draftArticle = null),
+                          icon: const Icon(Icons.close_rounded, size: 18),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _draftTitleController,
+                      enabled: !busy,
+                      decoration: InputDecoration(
+                        labelText: s.t('Başlık', 'Title'),
+                        isDense: true,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                    if (draft.description != null &&
+                        draft.description!.trim().isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surface.withAlpha(185),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: colorScheme.outlineVariant),
+                        ),
+                        child: Text(
+                          draft.description!.trim(),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            height: 1.35,
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _draftContentController,
+                      enabled: !busy,
+                      maxLines: 6,
+                      minLines: 4,
+                      decoration: InputDecoration(
+                        labelText: s.t('Metin', 'Content'),
+                        isDense: true,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    // Açılır/kapanır özellik kutucukları (küçük ekranda yığın olmaz!)
+                    _buildExpandableDraftFeatureBox(
+                      key: const ValueKey<String>(
+                        'dev_panel_draft_toggle_meanings',
+                      ),
+                      theme: theme,
+                      colorScheme: colorScheme,
+                      icon: Icons.translate_rounded,
+                      title: s.t('Kelime Anlamları', 'Word Meanings'),
+                      count: draft.wordMeanings.length,
+                      isExpanded: _isDraftMeaningsExpanded,
+                      onToggle: () => setState(
+                        () => _isDraftMeaningsExpanded =
+                            !_isDraftMeaningsExpanded,
+                      ),
+                      expandedContentBuilder: () => Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: draft.wordMeanings.entries.map((e) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Text(
+                              '${e.key}: ${e.value}',
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          );
+                        }).toList(growable: false),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildExpandableDraftFeatureBox(
+                      key: const ValueKey<String>(
+                        'dev_panel_draft_toggle_sentences',
+                      ),
+                      theme: theme,
+                      colorScheme: colorScheme,
+                      icon: Icons.notes_rounded,
+                      title: s.t('Cümle Çevirileri', 'Sentence Translations'),
+                      count: draft.sentenceTranslations.length,
+                      isExpanded: _isDraftSentencesExpanded,
+                      onToggle: () => setState(
+                        () => _isDraftSentencesExpanded =
+                            !_isDraftSentencesExpanded,
+                      ),
+                      expandedContentBuilder: () => Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: draft.sentenceTranslations.entries.map((e) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  e.key,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  '→ ${e.value}',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(growable: false),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildExpandableDraftFeatureBox(
+                      key: const ValueKey<String>(
+                        'dev_panel_draft_toggle_relations',
+                      ),
+                      theme: theme,
+                      colorScheme: colorScheme,
+                      icon: Icons.compare_arrows_rounded,
+                      title: s.t('Eş / Zıt Anlamlar', 'Synonyms & Antonyms'),
+                      count: draft.wordRelations.length,
+                      isExpanded: _isDraftRelationsExpanded,
+                      onToggle: () => setState(
+                        () => _isDraftRelationsExpanded =
+                            !_isDraftRelationsExpanded,
+                      ),
+                      expandedContentBuilder: () => Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: draft.wordRelations.entries.map((e) {
+                          final val = e.value;
+                          String summary;
+                          if (val is Map) {
+                            final syns = (val['syn'] is List)
+                                ? (val['syn'] as List).join(', ')
+                                : '';
+                            final ants = (val['ant'] is List)
+                                ? (val['ant'] as List).join(', ')
+                                : '';
+                            summary = <String>[
+                              if (syns.isNotEmpty) 'Eş: $syns',
+                              if (ants.isNotEmpty) 'Zıt: $ants',
+                            ].join(' • ');
+                          } else {
+                            summary = val.toString();
+                          }
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Text(
+                              '${e.key} → $summary',
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          );
+                        }).toList(growable: false),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    _MiniStatBadge(
+                      label: draft.hasAudio
+                          ? '🎙 Podcast Hazır (${draft.audioDurationSec ?? 0} sn)'
+                          : '🎙 Podcast sesi henüz üretilmedi',
+                      highlighted: draft.hasAudio,
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: <Widget>[
+                        Text(
+                          s.t('Podcast Sesi:', 'Voice:'),
+                          style: theme.textTheme.labelMedium,
+                        ),
+                        const SizedBox(width: 8),
+                        DropdownButton<String>(
+                          value: _selectedVoice,
+                          isDense: true,
+                          onChanged: busy
+                              ? null
+                              : (val) {
+                                  if (val != null) {
+                                    setState(() => _selectedVoice = val);
+                                  }
+                                },
+                          items: _voices
+                              .map(
+                                (v) => DropdownMenuItem<String>(
+                                  value: v,
+                                  child: Text(v),
+                                ),
+                              )
+                              .toList(growable: false),
+                        ),
+                        const Spacer(),
+                        OutlinedButton.icon(
+                          key: const ValueKey<String>(
+                            'dev_panel_generate_audio_btn',
+                          ),
+                          onPressed: busy ? null : _handleGenerateAudio,
+                          icon: _isGeneratingAudio
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.podcasts_rounded, size: 17),
+                          label: Text(
+                            _isGeneratingAudio
+                                ? s.t('Ses Üretiliyor...', 'Generating...')
+                                : s.t('Podcast Sesi Üret', 'Generate Audio'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      title: Text(
+                        s.t(
+                          'Gizli olarak kaydet (kullanıcılar görmez)',
+                          'Save as hidden',
+                        ),
+                        style: theme.textTheme.bodySmall,
+                      ),
+                      value: draft.isHidden,
+                      onChanged: busy
+                          ? null
+                          : (val) => setState(
+                                () => _draftArticle = draft.copyWith(
+                                  isHidden: val,
+                                ),
+                              ),
+                    ),
+                    const SizedBox(height: 6),
+                    FilledButton.icon(
+                      key: const ValueKey<String>(
+                        'dev_panel_publish_article_btn',
+                      ),
+                      onPressed: busy ? null : _handlePublishArticle,
+                      icon: const Icon(Icons.rocket_launch_rounded, size: 18),
+                      label: Text(
+                        draft.isHidden
+                            ? s.t('Gizli Kaydet', 'Save Hidden')
+                            : s.t('Anında Yayınla', 'Publish Instantly'),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-            FilterChip(
+          ],
+        ],
+        const SizedBox(height: 12),
+        // 2. Açılır/Kapanır Bölüm: Yayındaki Makaleler
+        _buildSectionToggleButton(
+          key: const ValueKey<String>(
+            'dev_panel_toggle_published_section_btn',
+          ),
+          theme: theme,
+          colorScheme: colorScheme,
+          icon: Icons.library_books_outlined,
+          title:
+              '${s.t('Yayındaki Makaleler', 'Published Articles')} (${_articles.length})',
+          subtitle: s.t(
+            'Mevcut makaleleri listele, sırala, gizle veya sil',
+            'Browse, sort, hide, or delete published articles',
+          ),
+          isExpanded: _isPublishedSectionExpanded,
+          onTap: () => setState(
+            () => _isPublishedSectionExpanded = !_isPublishedSectionExpanded,
+          ),
+        ),
+        if (_isPublishedSectionExpanded) ...<Widget>[
+          const SizedBox(height: 10),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: <({String key, String label})>[
+                    (key: 'date_desc', label: s.t('Tarih (Yeni)', 'Newest')),
+                    (key: 'date_asc', label: s.t('Tarih (Eski)', 'Oldest')),
+                    (key: 'level_asc', label: s.t('Seviye (A1–C2)', 'Level')),
+                    (key: 'title_asc', label: s.t('İsim (A–Z)', 'Name (A–Z)')),
+                  ].map((opt) {
+                    return ChoiceChip(
+                      key: ValueKey<String>('dev_panel_sort_${opt.key}'),
+                      label: Text(opt.label, style: theme.textTheme.labelSmall),
+                      selected: _articleSortMode == opt.key,
+                      visualDensity: VisualDensity.compact,
+                      onSelected: (_) =>
+                          setState(() => _articleSortMode = opt.key),
+                    );
+                  }).toList(growable: false),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilterChip(
               key: const ValueKey<String>('dev_panel_only_missing_chip'),
               label: Text(
                 s.t('Sadece Eksikler', 'Missing Only'),
@@ -1426,136 +1799,118 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
               visualDensity: VisualDensity.compact,
               onSelected: (val) => setState(() => _onlyMissingArticles = val),
             ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: <({String key, String label})>[
-            (key: 'date_desc', label: s.t('Tarih (Yeni)', 'Newest')),
-            (key: 'date_asc', label: s.t('Tarih (Eski)', 'Oldest')),
-            (key: 'level_asc', label: s.t('Seviye (A1–C2)', 'Level')),
-            (key: 'title_asc', label: s.t('İsim (A–Z)', 'Name (A–Z)')),
-          ].map((opt) {
-            return ChoiceChip(
-              key: ValueKey<String>('dev_panel_sort_${opt.key}'),
-              label: Text(opt.label, style: theme.textTheme.labelSmall),
-              selected: _articleSortMode == opt.key,
-              visualDensity: VisualDensity.compact,
-              onSelected: (_) => setState(() => _articleSortMode = opt.key),
-            );
-          }).toList(growable: false),
-        ),
-        const SizedBox(height: 8),
-        Builder(
-          builder: (context) {
-            final filtered = _filteredSortedArticles();
-            if (filtered.isEmpty) {
-              return Card(
-                margin: EdgeInsets.zero,
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Text(
-                    s.t('Bu filtreye uygun makale yok.', 'No matching articles.'),
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              );
-            }
-            return Column(
-              children: filtered.take(50).map((item) {
-                final missing = item.missingLabels;
-                final dateLabel = _formatPublishedDate(item.publishedAt);
+          ),
+          const SizedBox(height: 8),
+          Builder(
+            builder: (context) {
+              final filtered = _filteredSortedArticles();
+              if (filtered.isEmpty) {
                 return Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: ListTile(
-                    dense: true,
-                    leading: CircleAvatar(
-                      radius: 17,
-                      backgroundColor: item.isHidden
-                          ? colorScheme.surfaceContainerHighest
-                          : colorScheme.secondaryContainer,
-                      child: Text(
-                        item.level,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          color: item.isHidden
-                              ? colorScheme.onSurfaceVariant
-                              : colorScheme.onSecondaryContainer,
-                        ),
-                      ),
-                    ),
-                    title: Text(
-                      item.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                  margin: EdgeInsets.zero,
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Text(
+                      s.t('Bu filtreye uygun makale yok.', 'No matching articles.'),
+                      textAlign: TextAlign.center,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: item.isHidden
-                            ? colorScheme.onSurfaceVariant
-                            : colorScheme.onSurface,
+                        color: colorScheme.onSurfaceVariant,
                       ),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          '${item.hasAudio ? "🎙 Podcast AI" : "🔊 Cihaz TTS"}${item.isHidden ? " • Gizli" : ""}${dateLabel != null ? " • $dateLabel" : ""}',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        if (missing.isNotEmpty) ...<Widget>[
-                          const SizedBox(height: 3),
-                          Text(
-                            'Eksik: ${missing.join(", ")}',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: colorScheme.error,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        IconButton(
-                          onPressed: busy
-                              ? null
-                              : () => _handleToggleArticleHidden(item),
-                          icon: Icon(
-                            item.isHidden
-                                ? Icons.visibility_off_outlined
-                                : Icons.visibility_outlined,
-                            size: 19,
-                          ),
-                          tooltip: item.isHidden
-                              ? s.t('Görünür Yap', 'Unhide')
-                              : s.t('Gizle', 'Hide'),
-                        ),
-                        IconButton(
-                          onPressed:
-                              busy ? null : () => _handleDeleteArticle(item),
-                          icon: Icon(
-                            Icons.delete_outline_rounded,
-                            size: 19,
-                            color: colorScheme.error,
-                          ),
-                          tooltip: s.delete,
-                        ),
-                      ],
                     ),
                   ),
                 );
-              }).toList(growable: false),
-            );
-          },
-        ),
+              }
+              return Column(
+                children: filtered.take(50).map((item) {
+                  final missing = item.missingLabels;
+                  final dateLabel = _formatPublishedDate(item.publishedAt);
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ListTile(
+                      dense: true,
+                      leading: CircleAvatar(
+                        radius: 17,
+                        backgroundColor: item.isHidden
+                            ? colorScheme.surfaceContainerHighest
+                            : colorScheme.secondaryContainer,
+                        child: Text(
+                          item.level,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: item.isHidden
+                                ? colorScheme.onSurfaceVariant
+                                : colorScheme.onSecondaryContainer,
+                          ),
+                        ),
+                      ),
+                      title: Text(
+                        item.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: item.isHidden
+                              ? colorScheme.onSurfaceVariant
+                              : colorScheme.onSurface,
+                        ),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(
+                            '${item.hasAudio ? "🎙 Podcast AI" : "🔊 Cihaz TTS"}${item.isHidden ? " • Gizli" : ""}${dateLabel != null ? " • $dateLabel" : ""}',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          if (missing.isNotEmpty) ...<Widget>[
+                            const SizedBox(height: 3),
+                            Text(
+                              'Eksik: ${missing.join(", ")}',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: colorScheme.error,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          IconButton(
+                            onPressed: busy
+                                ? null
+                                : () => _handleToggleArticleHidden(item),
+                            icon: Icon(
+                              item.isHidden
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                              size: 19,
+                            ),
+                            tooltip: item.isHidden
+                                ? s.t('Görünür Yap', 'Unhide')
+                                : s.t('Gizle', 'Hide'),
+                          ),
+                          IconButton(
+                            onPressed: busy
+                                ? null
+                                : () => _handleDeleteArticle(item),
+                            icon: Icon(
+                              Icons.delete_outline_rounded,
+                              size: 19,
+                              color: colorScheme.error,
+                            ),
+                            tooltip: s.delete,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(growable: false),
+              );
+            },
+          ),
+        ],
       ],
     );
   }

@@ -869,8 +869,14 @@ void main() {
         expect(codes.length, 1);
         expect(find.text(codes.first['code']! as String), findsOneWidget);
 
-        // 3) Makaleler sekmesine geç: Gemini üret -> Podcast AI sesi üret -> Anında yayınla
+        // 3) Makaleler sekmesine geç: Makale Yayınla bölümünü aç -> Gemini üret -> Podcast AI sesi üret -> Anında yayınla
         await tester.tap(find.text('Makaleler'));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(
+            const ValueKey<String>('dev_panel_toggle_publish_section_btn'),
+          ),
+        );
         await tester.pumpAndSettle();
         await tester.tap(
           find.byKey(const ValueKey<String>('dev_panel_generate_article_btn')),
@@ -878,7 +884,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('Taslak Hazır'), findsOneWidget);
 
-        await tester.drag(find.byType(ListView).last, const Offset(0, -420));
+        await tester.drag(find.byType(ListView).last, const Offset(0, -520));
         await tester.pumpAndSettle();
         final audioBtn = find.byKey(
           const ValueKey<String>('dev_panel_generate_audio_btn'),
@@ -887,7 +893,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.textContaining('Podcast Hazır (42 sn)'), findsOneWidget);
 
-        await tester.drag(find.byType(ListView).last, const Offset(0, -250));
+        await tester.drag(find.byType(ListView).last, const Offset(0, -320));
         await tester.pumpAndSettle();
         final publishBtn = find.byKey(
           const ValueKey<String>('dev_panel_publish_article_btn'),
@@ -896,6 +902,8 @@ void main() {
         await tester.pumpAndSettle();
         expect(articles.length, 1);
         expect(articles.first['has_audio'], isTrue);
+        await tester.drag(find.byType(ListView).last, const Offset(0, -240));
+        await tester.pumpAndSettle();
         expect(find.text('Future of Space Travel'), findsOneWidget);
 
         authController.dispose();

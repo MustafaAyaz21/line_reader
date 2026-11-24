@@ -61,17 +61,8 @@
       font-size: 32px;
       color: var(--ok);
     }
-    h1 {
-      margin: 0 0 10px;
-      font-size: 22px;
-      font-weight: 800;
-    }
-    p {
-      margin: 0;
-      font-size: 14.5px;
-      line-height: 1.5;
-      color: var(--muted);
-    }
+    h1 { margin: 0 0 10px; font-size: 22px; font-weight: 800; }
+    p { margin: 0; font-size: 14.5px; line-height: 1.5; color: var(--muted); }
     .spinner {
       width: 24px;
       height: 24px;
@@ -87,9 +78,7 @@
       margin-top: 22px;
       animation: fadeIn 0.3s ease-out forwards;
     }
-    .fallback-wrap.visible {
-      display: block;
-    }
+    .fallback-wrap.visible { display: block; }
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(6px); }
       to { opacity: 1; transform: translateY(0); }
@@ -131,10 +120,8 @@
         }
       }
 
-      // Hemen arka plandaki açık Line Reader uygulamasına dönmeyi dene.
       setTimeout(tryOpenApp, 250);
 
-      // Eğer tarayıcı otomatik geçişi engellediyse 5 saniye sonra yedek butonu göster.
       setTimeout(function () {
         var spinner = document.getElementById("spinner");
         var wrap = document.getElementById("fallbackWrap");
