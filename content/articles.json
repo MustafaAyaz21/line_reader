@@ -1,7 +1,599 @@
 {
   "version": 1,
-  "updated_at": "2026-11-24T00:11:51.889Z",
+  "updated_at": "2026-11-24T02:20:57.565Z",
   "articles": [
+    {
+      "id": "b1-how-sea-otters-guard-the-giant-kelp-forests",
+      "level": "B1",
+      "title": "How Sea Otters Guard the Giant Kelp Forests",
+      "description": "Discover how playful sea otters protect fragile Pacific kelp forests from hungry sea urchins and help maintain vital ocean ecosystems.",
+      "reading_time": "1 - 3 dk",
+      "reading_time_minutes": 2,
+      "language": "en",
+      "content": "Along the cold and rocky coastlines of the northern Pacific Ocean, magnificent underwater forests of giant kelp rise toward the surface. Kelp is a fascinating type of large brown seaweed that can grow up to thirty centimeters in a single day under ideal conditions. These dense golden-green towers create a thriving habitat for thousands of diverse marine animals, offering both safe shelter and abundant food. However, these lush underwater environments face a continuous threat from small, hungry creatures: spiky sea urchins.\n\nSea urchins love to feed on the lower stems of kelp plants, which anchor the seaweed firmly to the rocky ocean floor. When urchins chew through these vital anchors, the tall plants detach and drift away, quickly dying in the open sea. If their numbers increase without limits, swarms of urchins can rapidly wipe out vast underwater areas, leaving behind barren rocky deserts. Fortunately, this fragile marine ecosystem has a charming and fiercely capable defender: the sea otter.\n\nSea otters are among the rare marine mammals that regularly use tools to survive. Floating peacefully on their backs, they often place flat stones on their chests to smash open the hard, spiky shells of urchins and crabs. Unlike whales and seals, otters lack a thick layer of fat called blubber, so they depend on waterproof fur and a fast metabolism. To maintain their body heat in the icy waves, they must eat roughly a quarter of their body weight every single day.\n\nBy devouring countless urchins every week, sea otters keep the grazing population strictly under control. As a direct result, kelp forests can regenerate and flourish, creating balanced conditions that benefit fish, seabirds, and even the global climate. Healthy kelp absorbs immense amounts of carbon dioxide from the atmosphere, helping reduce ocean acidity. Biologists call the sea otter a keystone species because its presence preserves the whole community. Through their simple daily meals, these playful animals demonstrate the remarkable balance of ocean life.",
+      "published_at": "2026-11-24T02:13:31.360Z",
+      "category": "Nature",
+      "author": "Line Reader",
+      "word_meanings": {
+        "magnificent": "görkemli, muhteşem",
+        "ideal": "ideal, en uygun",
+        "thriving": "gelişen, canlı",
+        "diverse": "çeşitli, farklı",
+        "shelter": "barınak, sığınak",
+        "abundant": "bol, bereketli",
+        "lush": "gür, bereketli",
+        "continuous": "sürekli, kesintisiz",
+        "spiky": "dikenli",
+        "anchor": "sabitlemek, bağlamak",
+        "firmly": "sıkıca, sağlam şekilde",
+        "detach": "kopmak, ayrılmak",
+        "drift": "sürüklenmek",
+        "swarms": "sürüleri, yığınları",
+        "barren": "çorak, verimsiz",
+        "fragile": "narin, kırılgan",
+        "capable": "yetenekli, becerikli",
+        "defender": "savunucu, koruyucu",
+        "rare": "nadir",
+        "peacefully": "huzurla, sakince",
+        "smash": "kırmak, parçalamak",
+        "lack": "yoksun olmak, bulunmamak",
+        "depend on": "bel bağlamak, güvenmek",
+        "maintain": "korumak, sürdürmek",
+        "devouring": "oburca yiyerek, tüketerek",
+        "countless": "sayısız",
+        "grazing": "otlayan, bitki yiyen",
+        "strictly": "kesinlikle, sıkıca",
+        "regenerate": "yenilenmek, yeniden oluşmak",
+        "flourish": "gelişmek, serpilmek",
+        "balanced": "dengeli",
+        "absorbs": "soğurur, içine çeker",
+        "immense": "muazzam, devasa",
+        "reduce": "azaltmak, düşürmek",
+        "preserves": "korur, muhafaza eder",
+        "playful": "oyuncu, neşeli",
+        "demonstrate": "göstermek, sergilemek",
+        "remarkable": "olağanüstü, dikkate değer"
+      },
+      "word_relations": {
+        "magnificent": {
+          "syn": [
+            "splendid",
+            "impressive",
+            "grand"
+          ],
+          "ant": [
+            "ordinary",
+            "unimpressive"
+          ]
+        },
+        "ideal": {
+          "syn": [
+            "optimal",
+            "perfect",
+            "flawless"
+          ],
+          "ant": [
+            "unfavorable",
+            "poor"
+          ]
+        },
+        "thriving": {
+          "syn": [
+            "flourishing",
+            "prospering",
+            "blooming"
+          ],
+          "ant": [
+            "declining",
+            "failing"
+          ]
+        },
+        "diverse": {
+          "syn": [
+            "varied",
+            "assorted",
+            "different"
+          ],
+          "ant": [
+            "uniform",
+            "identical"
+          ]
+        },
+        "shelter": {
+          "syn": [
+            "refuge",
+            "protection",
+            "cover"
+          ],
+          "ant": [
+            "exposure"
+          ]
+        },
+        "abundant": {
+          "syn": [
+            "plentiful",
+            "copious",
+            "rich"
+          ],
+          "ant": [
+            "scarce",
+            "meager"
+          ]
+        },
+        "lush": {
+          "syn": [
+            "verdant",
+            "dense",
+            "luxuriant"
+          ],
+          "ant": [
+            "barren",
+            "sparse"
+          ]
+        },
+        "continuous": {
+          "syn": [
+            "constant",
+            "ongoing",
+            "unending"
+          ],
+          "ant": [
+            "intermittent",
+            "occasional"
+          ]
+        },
+        "spiky": {
+          "syn": [
+            "prickly",
+            "sharp",
+            "barbed"
+          ],
+          "ant": [
+            "smooth",
+            "blunt"
+          ]
+        },
+        "anchor": {
+          "syn": [
+            "secure",
+            "fasten",
+            "fix"
+          ],
+          "ant": [
+            "release",
+            "loosen"
+          ]
+        },
+        "firmly": {
+          "syn": [
+            "tightly",
+            "securely",
+            "solidly"
+          ],
+          "ant": [
+            "loosely",
+            "weakly"
+          ]
+        },
+        "detach": {
+          "syn": [
+            "separate",
+            "disconnect",
+            "loosen"
+          ],
+          "ant": [
+            "attach",
+            "connect"
+          ]
+        },
+        "drift": {
+          "syn": [
+            "float",
+            "glide",
+            "wander"
+          ],
+          "ant": [
+            "stay",
+            "settle"
+          ]
+        },
+        "swarms": {
+          "syn": [
+            "crowds",
+            "hordes",
+            "masses"
+          ]
+        },
+        "barren": {
+          "syn": [
+            "desolate",
+            "bare",
+            "lifeless"
+          ],
+          "ant": [
+            "fertile",
+            "productive"
+          ]
+        },
+        "fragile": {
+          "syn": [
+            "delicate",
+            "vulnerable",
+            "frail"
+          ],
+          "ant": [
+            "resilient",
+            "robust"
+          ]
+        },
+        "capable": {
+          "syn": [
+            "competent",
+            "skilled",
+            "able"
+          ],
+          "ant": [
+            "inept",
+            "incapable"
+          ]
+        },
+        "defender": {
+          "syn": [
+            "protector",
+            "guardian",
+            "champion"
+          ],
+          "ant": [
+            "attacker",
+            "enemy"
+          ]
+        },
+        "rare": {
+          "syn": [
+            "uncommon",
+            "unusual",
+            "scarce"
+          ],
+          "ant": [
+            "common",
+            "widespread"
+          ]
+        },
+        "peacefully": {
+          "syn": [
+            "calmly",
+            "serenely",
+            "quietly"
+          ],
+          "ant": [
+            "agitatedly",
+            "violently"
+          ]
+        },
+        "smash": {
+          "syn": [
+            "crack",
+            "shatter",
+            "crush"
+          ],
+          "ant": [
+            "repair",
+            "mend"
+          ]
+        },
+        "lack": {
+          "syn": [
+            "need",
+            "miss",
+            "require"
+          ],
+          "ant": [
+            "possess",
+            "have"
+          ]
+        },
+        "depend on": {
+          "syn": [
+            "rely on",
+            "count on",
+            "lean on"
+          ],
+          "ant": [
+            "distrust"
+          ]
+        },
+        "maintain": {
+          "syn": [
+            "preserve",
+            "sustain",
+            "keep"
+          ],
+          "ant": [
+            "lose",
+            "neglect"
+          ]
+        },
+        "devouring": {
+          "syn": [
+            "consuming",
+            "eating",
+            "swallowing"
+          ],
+          "ant": [
+            "rejecting"
+          ]
+        },
+        "countless": {
+          "syn": [
+            "innumerable",
+            "myriad",
+            "infinite"
+          ],
+          "ant": [
+            "few",
+            "limited"
+          ]
+        },
+        "grazing": {
+          "syn": [
+            "feeding",
+            "foraging",
+            "browsing"
+          ]
+        },
+        "strictly": {
+          "syn": [
+            "firmly",
+            "rigorously",
+            "tightly"
+          ],
+          "ant": [
+            "loosely",
+            "mildly"
+          ]
+        },
+        "regenerate": {
+          "syn": [
+            "renew",
+            "recover",
+            "revive"
+          ],
+          "ant": [
+            "deteriorate",
+            "wither"
+          ]
+        },
+        "flourish": {
+          "syn": [
+            "thrive",
+            "prosper",
+            "grow"
+          ],
+          "ant": [
+            "decline",
+            "wither"
+          ]
+        },
+        "balanced": {
+          "syn": [
+            "stable",
+            "harmonious",
+            "even"
+          ],
+          "ant": [
+            "unstable",
+            "uneven"
+          ]
+        },
+        "absorbs": {
+          "syn": [
+            "soaks up",
+            "takes in",
+            "captures"
+          ],
+          "ant": [
+            "releases",
+            "emits"
+          ]
+        },
+        "immense": {
+          "syn": [
+            "enormous",
+            "huge",
+            "massive"
+          ],
+          "ant": [
+            "tiny",
+            "slight"
+          ]
+        },
+        "reduce": {
+          "syn": [
+            "lower",
+            "decrease",
+            "lessen"
+          ],
+          "ant": [
+            "increase",
+            "raise"
+          ]
+        },
+        "preserves": {
+          "syn": [
+            "safeguards",
+            "protects",
+            "defends"
+          ],
+          "ant": [
+            "destroys",
+            "damages"
+          ]
+        },
+        "playful": {
+          "syn": [
+            "lively",
+            "cheerful",
+            "frisky"
+          ],
+          "ant": [
+            "serious",
+            "somber"
+          ]
+        },
+        "demonstrate": {
+          "syn": [
+            "show",
+            "exhibit",
+            "reveal"
+          ],
+          "ant": [
+            "conceal",
+            "hide"
+          ]
+        },
+        "remarkable": {
+          "syn": [
+            "extraordinary",
+            "notable",
+            "striking"
+          ],
+          "ant": [
+            "ordinary",
+            "unremarkable"
+          ]
+        }
+      },
+      "paragraph_translations": [
+        "Kuzey Pasifik Okyanusu'nun soğuk ve kayalık kıyıları boyunca, dev kelp yosunlarının muhteşem su altı ormanları yüzeye doğru yükselir. Kelp, ideal koşullar altında tek bir günde otuz santimetreye kadar uzayabilen büyüleyici bir büyük kahverengi deniz yosunu türüdür. Bu yoğun altın-yeşil kuleler, hem güvenli bir barınak hem de bol miktarda yiyecek sunarak binlerce çeşitli deniz canlısı için gelişen bir yaşam alanı oluşturur. Ancak bu gür su altı ortamları, küçük ve aç canlılar olan dikenli denizkestanelerinden gelen sürekli bir tehditle karşı karşıyadır.",
+        "Denizkestaneleri, deniz yosununu kayalık okyanus tabanına sıkıca sabitleyen kelp bitkilerinin alt gövdeleriyle beslenmeyi çok sever. Kestaneler bu hayati çıpaları kemirerek kopardığında, uzun bitkiler yerinden ayrılıp sürüklenir ve açık denizde hızla ölür. Sayıları sınırsız bir şekilde artarsa, kestane sürüleri geride çorak kayalık çöller bırakarak uçsuz bucaksız su altı alanlarını hızla yok edebilir. Neyse ki, bu narin deniz ekosisteminin sevimli ve son derece yetenekli bir savunucusu vardır: deniz samuru.",
+        "Deniz samurları, hayatta kalmak için düzenli olarak alet kullanan nadir deniz memelileri arasındadır. Sakince sırtüstü yüzerek, kestanelerin ve yengeçlerin sert, dikenli kabuklarını kırmak için göğüslerine sık sık düz taşlar koyarlar. Balinaların ve fokların aksine samurlar, balina yağı adı verilen kalın bir yağ tabakasından yoksundur; bu yüzden su geçirmez kürke ve hızlı bir metabolizmaya güvenirler. Buzlu dalgalarda vücut ısılarını korumak için, her gün yaklaşık olarak kendi vücut ağırlıklarının dörtte birini yemek zorundadırlar.",
+        "Deniz samurları, her hafta sayısız kestaneyi silip süpürerek otlayan popülasyonu kesin bir şekilde kontrol altında tutar. Bunun doğrudan bir sonucu olarak, kelp ormanları yenilenip serpilebilir; bu da balıklara, deniz kuşlarına ve hatta küresel iklime fayda sağlayan dengeli koşullar yaratır. Sağlıklı kelp, atmosferden muazzam miktarda karbondioksit soğurarak okyanus asitliğini azaltmaya yardımcı olur. Biyologlar deniz samurunu bir kilit taşı tür olarak adlandırır, çünkü varlığı tüm topluluğu korur. Bu oyuncu hayvanlar, basit günlük öğünleri aracılığıyla okyanus yaşamının olağanüstü dengesini gözler önüne serer."
+      ],
+      "sentence_translations": {
+        "Along the cold and rocky coastlines of the northern Pacific Ocean, magnificent underwater forests of giant kelp rise toward the surface.": "Kuzey Pasifik Okyanusu'nun soğuk ve kayalık kıyıları boyunca, dev kelp yosunlarının muhteşem su altı ormanları yüzeye doğru yükselir.",
+        "Kelp is a fascinating type of large brown seaweed that can grow up to thirty centimeters in a single day under ideal conditions.": "Kelp, ideal koşullar altında tek bir günde otuz santimetreye kadar uzayabilen büyüleyici bir büyük kahverengi deniz yosunu türüdür.",
+        "These dense golden-green towers create a thriving habitat for thousands of diverse marine animals, offering both safe shelter and abundant food.": "Bu yoğun altın-yeşil kuleler, hem güvenli bir barınak hem de bol miktarda yiyecek sunarak binlerce çeşitli deniz canlısı için gelişen bir yaşam alanı oluşturur.",
+        "However, these lush underwater environments face a continuous threat from small, hungry creatures: spiky sea urchins.": "Ancak bu gür su altı ortamları, küçük ve aç canlılar olan dikenli denizkestanelerinden gelen sürekli bir tehditle karşı karşıyadır.",
+        "Sea urchins love to feed on the lower stems of kelp plants, which anchor the seaweed firmly to the rocky ocean floor.": "Denizkestaneleri, deniz yosununu kayalık okyanus tabanına sıkıca sabitleyen kelp bitkilerinin alt gövdeleriyle beslenmeyi çok sever.",
+        "When urchins chew through these vital anchors, the tall plants detach and drift away, quickly dying in the open sea.": "Kestaneler bu hayati çıpaları kemirerek kopardığında, uzun bitkiler yerinden ayrılıp sürüklenir ve açık denizde hızla ölür.",
+        "If their numbers increase without limits, swarms of urchins can rapidly wipe out vast underwater areas, leaving behind barren rocky deserts.": "Sayıları sınırsız bir şekilde artarsa, kestane sürüleri geride çorak kayalık çöller bırakarak uçsuz bucaksız su altı alanlarını hızla yok edebilir.",
+        "Fortunately, this fragile marine ecosystem has a charming and fiercely capable defender: the sea otter.": "Neyse ki, bu narin deniz ekosisteminin sevimli ve son derece yetenekli bir savunucusu vardır: deniz samuru.",
+        "Sea otters are among the rare marine mammals that regularly use tools to survive.": "Deniz samurları, hayatta kalmak için düzenli olarak alet kullanan nadir deniz memelileri arasındadır.",
+        "Floating peacefully on their backs, they often place flat stones on their chests to smash open the hard, spiky shells of urchins and crabs.": "Sakince sırtüstü yüzerek, kestanelerin ve yengeçlerin sert, dikenli kabuklarını kırmak için göğüslerine sık sık düz taşlar koyarlar.",
+        "Unlike whales and seals, otters lack a thick layer of fat called blubber, so they depend on waterproof fur and a fast metabolism.": "Balinaların ve fokların aksine samurlar, balina yağı adı verilen kalın bir yağ tabakasından yoksundur; bu yüzden su geçirmez kürke ve hızlı bir metabolizmaya güvenirler.",
+        "To maintain their body heat in the icy waves, they must eat roughly a quarter of their body weight every single day.": "Buzlu dalgalarda vücut ısılarını korumak için, her gün yaklaşık olarak kendi vücut ağırlıklarının dörtte birini yemek zorundadırlar.",
+        "By devouring countless urchins every week, sea otters keep the grazing population strictly under control.": "Deniz samurları, her hafta sayısız kestaneyi silip süpürerek otlayan popülasyonu kesin bir şekilde kontrol altında tutar.",
+        "As a direct result, kelp forests can regenerate and flourish, creating balanced conditions that benefit fish, seabirds, and even the global climate.": "Bunun doğrudan bir sonucu olarak, kelp ormanları yenilenip serpilebilir; bu da balıklara, deniz kuşlarına ve hatta küresel iklime fayda sağlayan dengeli koşullar yaratır.",
+        "Healthy kelp absorbs immense amounts of carbon dioxide from the atmosphere, helping reduce ocean acidity.": "Sağlıklı kelp, atmosferden muazzam miktarda karbondioksit soğurarak okyanus asitliğini azaltmaya yardımcı olur.",
+        "Biologists call the sea otter a keystone species because its presence preserves the whole community.": "Biyologlar deniz samurunu bir kilit taşı tür olarak adlandırır, çünkü varlığı tüm topluluğu korur.",
+        "Through their simple daily meals, these playful animals demonstrate the remarkable balance of ocean life.": "Bu oyuncu hayvanlar, basit günlük öğünleri aracılığıyla okyanus yaşamının olağanüstü dengesini gözler önüne serer."
+      },
+      "audio_url": "https://line-reader.pages.dev/audio/b1-how-sea-otters-guard-the-giant-kelp-forests.m4a",
+      "audio_segments": [
+        {
+          "p": 0,
+          "s": 0,
+          "start_ms": 0,
+          "end_ms": 10380
+        },
+        {
+          "p": 0,
+          "s": 1,
+          "start_ms": 10380,
+          "end_ms": 18340
+        },
+        {
+          "p": 0,
+          "s": 2,
+          "start_ms": 18920,
+          "end_ms": 28120
+        },
+        {
+          "p": 0,
+          "s": 3,
+          "start_ms": 29780,
+          "end_ms": 38440
+        },
+        {
+          "p": 1,
+          "s": 0,
+          "start_ms": 39500,
+          "end_ms": 46180
+        },
+        {
+          "p": 1,
+          "s": 1,
+          "start_ms": 46180,
+          "end_ms": 54080
+        },
+        {
+          "p": 1,
+          "s": 2,
+          "start_ms": 54080,
+          "end_ms": 64300
+        },
+        {
+          "p": 1,
+          "s": 3,
+          "start_ms": 64160,
+          "end_ms": 71900
+        },
+        {
+          "p": 2,
+          "s": 0,
+          "start_ms": 72120,
+          "end_ms": 77220
+        },
+        {
+          "p": 2,
+          "s": 1,
+          "start_ms": 77220,
+          "end_ms": 85340
+        },
+        {
+          "p": 2,
+          "s": 2,
+          "start_ms": 85800,
+          "end_ms": 93920
+        },
+        {
+          "p": 2,
+          "s": 3,
+          "start_ms": 93980,
+          "end_ms": 101320
+        },
+        {
+          "p": 3,
+          "s": 0,
+          "start_ms": 101320,
+          "end_ms": 107740
+        },
+        {
+          "p": 3,
+          "s": 1,
+          "start_ms": 107740,
+          "end_ms": 116860
+        },
+        {
+          "p": 3,
+          "s": 2,
+          "start_ms": 117260,
+          "end_ms": 123560
+        },
+        {
+          "p": 3,
+          "s": 3,
+          "start_ms": 123580,
+          "end_ms": 129380
+        },
+        {
+          "p": 3,
+          "s": 4,
+          "start_ms": 129000,
+          "end_ms": 129980
+        }
+      ]
+    },
     {
       "id": "b1-the-peaceful-solitude-of-wild-arctic-seals",
       "level": "B1",
