@@ -1,7 +1,627 @@
 {
   "version": 1,
-  "updated_at": "2026-11-24T02:20:57.565Z",
+  "updated_at": "2026-11-24T02:32:35.502Z",
   "articles": [
+    {
+      "id": "a2-the-incredible-marathon-across-the-sahara-desert",
+      "level": "A2",
+      "title": "The Incredible Marathon Across the Sahara Desert",
+      "description": "Discover the Marathon des Sables, a 250-kilometer race in the Sahara Desert. Learn how runners survive extreme heat and heavy packs to test their physical and mental limits.",
+      "reading_time": "1 - 3 dk",
+      "reading_time_minutes": 2,
+      "language": "en",
+      "content": "The Marathon des Sables is widely considered one of the hardest footraces on Earth. Every year, hundreds of brave runners travel to the vast Sahara Desert in Morocco. They want to test their physical strength in a very difficult and dry environment. This incredible race is approximately 250 kilometers long. It usually takes six long days to complete the full distance. The sun is extremely strong, and the golden sand is everywhere. It is a huge challenge for anyone who loves running, nature, and extreme adventure.\n\nThe rules of this famous race are very interesting and strict. Runners must be completely self-sufficient for the entire week. This means they carry all their own equipment on their backs. They need to pack their food, extra clothes, and a warm sleeping bag in a heavy backpack. The organizers only provide a limited amount of water and a simple tent for the night. Because the backpacks are heavy, runners must choose their items very carefully. Every single gram is important when you are walking for many hours in the intense heat.\n\nThe natural environment is the biggest enemy during this desert marathon. In the daytime, the temperature often reaches 50 degrees Celsius. The sand is very soft, so it is difficult to keep a steady and fast pace. Sometimes, there are sudden sandstorms that make it hard to see the path. Runners must wear special gaiters over their shoes to keep the sand out. Their feet often get painful blisters and injuries, but they must continue moving forward to reach the next station.\n\nWhy do so many people choose to suffer in the hot desert? Most participants are not professional athletes. They are regular people who want to find their personal limits. They want to see exactly how much their bodies and minds can handle. When they finally finish the race, they feel a great sense of pride and achievement. It is a life-changing experience that teaches them about patience, health, and courage. It clearly shows that the human spirit is truly powerful and resilient.",
+      "published_at": "2026-11-24T02:31:06.247Z",
+      "category": "Sports",
+      "author": "Mustafa Ayaz",
+      "word_meanings": {
+        "considered": "kabul edilen",
+        "footraces": "koşu yarışları",
+        "brave": "cesur",
+        "vast": "muazzam",
+        "strength": "güç",
+        "environment": "ortam",
+        "incredible": "inanılmaz",
+        "approximately": "yaklaşık",
+        "complete": "tamamlamak",
+        "distance": "mesafe",
+        "extremely": "son derece",
+        "challenge": "zorluk",
+        "adventure": "macera",
+        "famous": "ünlü",
+        "strict": "sıkı",
+        "self-sufficient": "kendi kendine yeten",
+        "entire": "tüm",
+        "equipment": "ekipman",
+        "pack": "paketlemek",
+        "sleeping bag": "uyku tulumu",
+        "heavy": "ağır",
+        "organizers": "organizatörler",
+        "provide": "sağlamak",
+        "limited": "sınırlı",
+        "items": "eşyalar",
+        "important": "önemli",
+        "intense": "yoğun",
+        "enemy": "düşman",
+        "reaches": "ulaşır",
+        "steady": "istikrarlı",
+        "pace": "tempo",
+        "sudden": "ani",
+        "sandstorms": "kum fırtınaları",
+        "gaiters": "tozluklar",
+        "painful": "acılı",
+        "blisters": "su toplaması",
+        "continue": "devam etmek",
+        "forward": "ileri",
+        "participants": "katılımcılar",
+        "professional": "profesyonel",
+        "limits": "sınırlar",
+        "achievement": "başarı",
+        "patience": "sabır",
+        "courage": "cesaret",
+        "resilient": "dirençli"
+      },
+      "word_relations": {
+        "considered": {
+          "syn": [
+            "regarded",
+            "viewed"
+          ],
+          "ant": [
+            "ignored"
+          ]
+        },
+        "footraces": {
+          "syn": [
+            "running events",
+            "marathons"
+          ]
+        },
+        "brave": {
+          "syn": [
+            "courageous",
+            "fearless"
+          ],
+          "ant": [
+            "cowardly"
+          ]
+        },
+        "vast": {
+          "syn": [
+            "huge",
+            "immense"
+          ],
+          "ant": [
+            "small"
+          ]
+        },
+        "strength": {
+          "syn": [
+            "power",
+            "force"
+          ],
+          "ant": [
+            "weakness"
+          ]
+        },
+        "environment": {
+          "syn": [
+            "surroundings",
+            "setting"
+          ]
+        },
+        "incredible": {
+          "syn": [
+            "amazing",
+            "unbelievable"
+          ],
+          "ant": [
+            "ordinary"
+          ]
+        },
+        "approximately": {
+          "syn": [
+            "roughly",
+            "nearly"
+          ],
+          "ant": [
+            "exactly"
+          ]
+        },
+        "complete": {
+          "syn": [
+            "finish",
+            "conclude"
+          ],
+          "ant": [
+            "start"
+          ]
+        },
+        "distance": {
+          "syn": [
+            "length",
+            "span"
+          ]
+        },
+        "extremely": {
+          "syn": [
+            "very",
+            "exceedingly"
+          ],
+          "ant": [
+            "slightly"
+          ]
+        },
+        "challenge": {
+          "syn": [
+            "difficulty",
+            "test"
+          ],
+          "ant": [
+            "ease"
+          ]
+        },
+        "adventure": {
+          "syn": [
+            "journey",
+            "quest"
+          ]
+        },
+        "famous": {
+          "syn": [
+            "well-known",
+            "celebrated"
+          ],
+          "ant": [
+            "unknown"
+          ]
+        },
+        "strict": {
+          "syn": [
+            "firm",
+            "rigid"
+          ],
+          "ant": [
+            "flexible"
+          ]
+        },
+        "self-sufficient": {
+          "syn": [
+            "independent",
+            "self-reliant"
+          ],
+          "ant": [
+            "dependent"
+          ]
+        },
+        "entire": {
+          "syn": [
+            "whole",
+            "full"
+          ],
+          "ant": [
+            "partial"
+          ]
+        },
+        "equipment": {
+          "syn": [
+            "gear",
+            "tools"
+          ]
+        },
+        "pack": {
+          "syn": [
+            "load",
+            "store"
+          ],
+          "ant": [
+            "unpack"
+          ]
+        },
+        "sleeping bag": {
+          "syn": [
+            "bedroll"
+          ]
+        },
+        "heavy": {
+          "syn": [
+            "weighty",
+            "bulky"
+          ],
+          "ant": [
+            "light"
+          ]
+        },
+        "organizers": {
+          "syn": [
+            "planners",
+            "managers"
+          ]
+        },
+        "provide": {
+          "syn": [
+            "give",
+            "supply"
+          ],
+          "ant": [
+            "take"
+          ]
+        },
+        "limited": {
+          "syn": [
+            "restricted",
+            "small"
+          ],
+          "ant": [
+            "unlimited"
+          ]
+        },
+        "items": {
+          "syn": [
+            "objects",
+            "things"
+          ]
+        },
+        "important": {
+          "syn": [
+            "vital",
+            "essential"
+          ],
+          "ant": [
+            "trivial"
+          ]
+        },
+        "intense": {
+          "syn": [
+            "extreme",
+            "strong"
+          ],
+          "ant": [
+            "mild"
+          ]
+        },
+        "enemy": {
+          "syn": [
+            "opponent",
+            "foe"
+          ],
+          "ant": [
+            "friend"
+          ]
+        },
+        "reaches": {
+          "syn": [
+            "gets to",
+            "hits"
+          ]
+        },
+        "steady": {
+          "syn": [
+            "stable",
+            "regular"
+          ],
+          "ant": [
+            "unstable"
+          ]
+        },
+        "pace": {
+          "syn": [
+            "speed",
+            "tempo"
+          ]
+        },
+        "sudden": {
+          "syn": [
+            "unexpected",
+            "abrupt"
+          ],
+          "ant": [
+            "gradual"
+          ]
+        },
+        "sandstorms": {
+          "syn": [
+            "dust storms"
+          ]
+        },
+        "gaiters": {
+          "syn": [
+            "covers",
+            "guards"
+          ]
+        },
+        "painful": {
+          "syn": [
+            "aching",
+            "sore"
+          ],
+          "ant": [
+            "painless"
+          ]
+        },
+        "blisters": {
+          "syn": [
+            "sores",
+            "swelling"
+          ]
+        },
+        "continue": {
+          "syn": [
+            "proceed",
+            "keep on"
+          ],
+          "ant": [
+            "stop"
+          ]
+        },
+        "forward": {
+          "syn": [
+            "onward",
+            "ahead"
+          ],
+          "ant": [
+            "backward"
+          ]
+        },
+        "participants": {
+          "syn": [
+            "runners",
+            "entrants"
+          ]
+        },
+        "professional": {
+          "syn": [
+            "expert",
+            "pro"
+          ],
+          "ant": [
+            "amateur"
+          ]
+        },
+        "limits": {
+          "syn": [
+            "boundaries",
+            "thresholds"
+          ]
+        },
+        "achievement": {
+          "syn": [
+            "success",
+            "accomplishment"
+          ],
+          "ant": [
+            "failure"
+          ]
+        },
+        "patience": {
+          "syn": [
+            "calmness",
+            "tolerance"
+          ],
+          "ant": [
+            "impatience"
+          ]
+        },
+        "courage": {
+          "syn": [
+            "bravery",
+            "valor"
+          ],
+          "ant": [
+            "fear"
+          ]
+        },
+        "resilient": {
+          "syn": [
+            "tough",
+            "strong"
+          ],
+          "ant": [
+            "fragile"
+          ]
+        }
+      },
+      "paragraph_translations": [
+        "Marathon des Sables, dünya üzerindeki en zorlu koşu yarışlarından biri olarak kabul edilir. Her yıl, yüzlerce cesur koşucu Fas'taki muazzam Sahra Çölü'ne seyahat eder. Fiziksel güçlerini çok zor ve kurak bir ortamda test etmek isterler. Bu inanılmaz yarış yaklaşık 250 kilometre uzunluğundadır. Tam mesafeyi tamamlamak genellikle altı uzun gün sürer. Güneş son derece güçlüdür ve altın rengi kum her yerdedir. Koşmayı, doğayı ve ekstrem macerayı seven herkes için büyük bir zorluktur.",
+        "Bu ünlü yarışın kuralları çok ilginç ve sıkıdır. Koşucular tüm hafta boyunca tamamen kendi kendilerine yetebilmelidirler. Bu, tüm ekipmanlarını sırtlarında taşıdıkları anlamına gelir. Yiyeceklerini, yedek kıyafetlerini ve sıcak bir uyku tulumunu ağır bir sırt çantasına koymaları gerekir. Organizatörler sadece sınırlı miktarda su ve gece için basit bir çadır sağlarlar. Sırt çantaları ağır olduğu için koşucular eşyalarını çok dikkatli seçmelidirler. Yoğun sıcakta saatlerce yürürken her bir gram önemlidir.",
+        "Bu çöl maratonu sırasında doğal çevre en büyük düşmandır. Gündüzleri sıcaklık genellikle 50 santigrat dereceye ulaşır. Kum çok yumuşaktır, bu yüzden istikrarlı ve hızlı bir tempoda gitmek zordur. Bazen yolu görmeyi zorlaştıran ani kum fırtınaları olur. Koşucular, kumu dışarıda tutmak için ayakkabılarının üzerine özel tozluklar giymelidir. Ayaklarında sık sık acı verici su toplamaları ve yaralanmalar olur, ancak bir sonraki istasyona ulaşmak için ileriye doğru hareket etmeye devam etmelidirler.",
+        "Neden bu kadar çok insan sıcak çölde acı çekmeyi seçiyor? Katılımcıların çoğu profesyonel sporcu değildir. Onlar kendi kişisel sınırlarını bulmak isteyen normal insanlardır. Vücutlarının ve zihinlerinin tam olarak ne kadarını kaldırabileceğini görmek isterler. Yarışı nihayet bitirdiklerinde, büyük bir gurur ve başarı hissi duyarlar. Onlara sabır, sağlık ve cesaret hakkında bilgi veren, hayat değiştiren bir deneyimdir. İnsan ruhunun gerçekten güçlü ve dirençli olduğunu açıkça gösterir."
+      ],
+      "sentence_translations": {
+        "The Marathon des Sables is widely considered one of the hardest footraces on Earth.": "Marathon des Sables, dünya üzerindeki en zorlu koşu yarışlarından biri olarak kabul edilir.",
+        "Every year, hundreds of brave runners travel to the vast Sahara Desert in Morocco.": "Her yıl, yüzlerce cesur koşucu Fas'taki muazzam Sahra Çölü'ne seyahat eder.",
+        "They want to test their physical strength in a very difficult and dry environment.": "Fiziksel güçlerini çok zor ve kurak bir ortamda test etmek isterler.",
+        "This incredible race is approximately 250 kilometers long.": "Bu inanılmaz yarış yaklaşık 250 kilometre uzunluğundadır.",
+        "It usually takes six long days to complete the full distance.": "Tam mesafeyi tamamlamak genellikle altı uzun gün sürer.",
+        "The sun is extremely strong, and the golden sand is everywhere.": "Güneş son derece güçlüdür ve altın rengi kum her yerdedir.",
+        "It is a huge challenge for anyone who loves running, nature, and extreme adventure.": "Koşmayı, doğayı ve ekstrem macerayı seven herkes için büyük bir zorluktur.",
+        "The rules of this famous race are very interesting and strict.": "Bu ünlü yarışın kuralları çok ilginç ve sıkıdır.",
+        "Runners must be completely self-sufficient for the entire week.": "Koşucular tüm hafta boyunca tamamen kendi kendilerine yetebilmelidirler.",
+        "This means they carry all their own equipment on their backs.": "Bu, tüm ekipmanlarını sırtlarında taşıdıkları anlamına gelir.",
+        "They need to pack their food, extra clothes, and a warm sleeping bag in a heavy backpack.": "Yiyeceklerini, yedek kıyafetlerini ve sıcak bir uyku tulumunu ağır bir sırt çantasına koymaları gerekir.",
+        "The organizers only provide a limited amount of water and a simple tent for the night.": "Organizatörler sadece sınırlı miktarda su ve gece için basit bir çadır sağlarlar.",
+        "Because the backpacks are heavy, runners must choose their items very carefully.": "Sırt çantaları ağır olduğu için koşucular eşyalarını çok dikkatli seçmelidirler.",
+        "Every single gram is important when you are walking for many hours in the intense heat.": "Yoğun sıcakta saatlerce yürürken her bir gram önemlidir.",
+        "The natural environment is the biggest enemy during this desert marathon.": "Bu çöl maratonu sırasında doğal çevre en büyük düşmandır.",
+        "In the daytime, the temperature often reaches 50 degrees Celsius.": "Gündüzleri sıcaklık genellikle 50 santigrat dereceye ulaşır.",
+        "The sand is very soft, so it is difficult to keep a steady and fast pace.": "Kum çok yumuşaktır, bu yüzden istikrarlı ve hızlı bir tempoda gitmek zordur.",
+        "Sometimes, there are sudden sandstorms that make it hard to see the path.": "Bazen yolu görmeyi zorlaştıran ani kum fırtınaları olur.",
+        "Runners must wear special gaiters over their shoes to keep the sand out.": "Koşucular, kumu dışarıda tutmak için ayakkabılarının üzerine özel tozluklar giymelidir.",
+        "Their feet often get painful blisters and injuries, but they must continue moving forward to reach the next station.": "Ayaklarında sık sık acı verici su toplamaları ve yaralanmalar olur, ancak bir sonraki istasyona ulaşmak için ileriye doğru hareket etmeye devam etmelidirler.",
+        "Why do so many people choose to suffer in the hot desert?": "Neden bu kadar çok insan sıcak çölde acı çekmeyi seçiyor?",
+        "Most participants are not professional athletes.": "Katılımcıların çoğu profesyonel sporcu değildir.",
+        "They are regular people who want to find their personal limits.": "Onlar kendi kişisel sınırlarını bulmak isteyen normal insanlardır.",
+        "They want to see exactly how much their bodies and minds can handle.": "Vücutlarının ve zihinlerinin tam olarak ne kadarını kaldırabileceğini görmek isterler.",
+        "When they finally finish the race, they feel a great sense of pride and achievement.": "Yarışı nihayet bitirdiklerinde, büyük bir gurur ve başarı hissi duyarlar.",
+        "It is a life-changing experience that teaches them about patience, health, and courage.": "Onlara sabır, sağlık ve cesaret hakkında bilgi veren, hayat değiştiren bir deneyimdir.",
+        "It clearly shows that the human spirit is truly powerful and resilient.": "İnsan ruhunun gerçekten güçlü ve dirençli olduğunu açıkça gösterir."
+      },
+      "audio_url": "https://line-reader.pages.dev/audio/a2-the-incredible-marathon-across-the-sahara-desert.m4a",
+      "audio_segments": [
+        {
+          "p": 0,
+          "s": 0,
+          "start_ms": 0,
+          "end_ms": 4820
+        },
+        {
+          "p": 0,
+          "s": 1,
+          "start_ms": 5920,
+          "end_ms": 10900
+        },
+        {
+          "p": 0,
+          "s": 2,
+          "start_ms": 11000,
+          "end_ms": 15880
+        },
+        {
+          "p": 0,
+          "s": 3,
+          "start_ms": 15920,
+          "end_ms": 20580
+        },
+        {
+          "p": 0,
+          "s": 4,
+          "start_ms": 20820,
+          "end_ms": 24480
+        },
+        {
+          "p": 0,
+          "s": 5,
+          "start_ms": 24680,
+          "end_ms": 29500
+        },
+        {
+          "p": 0,
+          "s": 6,
+          "start_ms": 29560,
+          "end_ms": 35000
+        },
+        {
+          "p": 1,
+          "s": 0,
+          "start_ms": 35360,
+          "end_ms": 39220
+        },
+        {
+          "p": 1,
+          "s": 1,
+          "start_ms": 39460,
+          "end_ms": 42440
+        },
+        {
+          "p": 1,
+          "s": 2,
+          "start_ms": 43500,
+          "end_ms": 46740
+        },
+        {
+          "p": 1,
+          "s": 3,
+          "start_ms": 46900,
+          "end_ms": 52540
+        },
+        {
+          "p": 1,
+          "s": 4,
+          "start_ms": 52600,
+          "end_ms": 57580
+        },
+        {
+          "p": 1,
+          "s": 5,
+          "start_ms": 58080,
+          "end_ms": 62900
+        },
+        {
+          "p": 1,
+          "s": 6,
+          "start_ms": 62940,
+          "end_ms": 68540
+        },
+        {
+          "p": 2,
+          "s": 0,
+          "start_ms": 68540,
+          "end_ms": 72900
+        },
+        {
+          "p": 2,
+          "s": 1,
+          "start_ms": 72900,
+          "end_ms": 77020
+        },
+        {
+          "p": 2,
+          "s": 2,
+          "start_ms": 77060,
+          "end_ms": 82400
+        },
+        {
+          "p": 2,
+          "s": 3,
+          "start_ms": 82620,
+          "end_ms": 87040
+        },
+        {
+          "p": 2,
+          "s": 4,
+          "start_ms": 87040,
+          "end_ms": 90960
+        },
+        {
+          "p": 2,
+          "s": 5,
+          "start_ms": 90960,
+          "end_ms": 97780
+        },
+        {
+          "p": 3,
+          "s": 0,
+          "start_ms": 97820,
+          "end_ms": 101600
+        },
+        {
+          "p": 3,
+          "s": 1,
+          "start_ms": 101620,
+          "end_ms": 104480
+        },
+        {
+          "p": 3,
+          "s": 2,
+          "start_ms": 104480,
+          "end_ms": 107920
+        },
+        {
+          "p": 3,
+          "s": 3,
+          "start_ms": 107920,
+          "end_ms": 111980
+        },
+        {
+          "p": 3,
+          "s": 4,
+          "start_ms": 112240,
+          "end_ms": 117240
+        },
+        {
+          "p": 3,
+          "s": 5,
+          "start_ms": 117240,
+          "end_ms": 121800
+        },
+        {
+          "p": 3,
+          "s": 6,
+          "start_ms": 122560,
+          "end_ms": 127520
+        }
+      ]
+    },
     {
       "id": "b1-how-sea-otters-guard-the-giant-kelp-forests",
       "level": "B1",
