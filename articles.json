@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-11-24T02:53:19.453Z",
+  "updated_at": "2026-11-24T03:08:52.962Z",
   "articles": [
     {
       "id": "b1-the-unseen-mental-battle-of-ultra-cycling",
@@ -6176,6 +6176,163 @@
           "end_ms": 139771
         }
       ]
+    },
+    {
+      "id": "b1-the-impact-of-social-media-on-mental-health",
+      "level": "B1",
+      "title": "The Impact of Social Media on Mental Health",
+      "description": "Social media affects mental health in various ways",
+      "reading_time": "1 - 2 dk",
+      "reading_time_minutes": 1,
+      "language": "en",
+      "content": "Social media has become an essential part of our daily lives. \n\n We use it to connect with friends, share our experiences, and stay updated on current events. \n\n However, excessive social media use can have negative effects on our mental health. \n\n It can lead to feelings of loneliness, anxiety, and depression, and even affect our self-esteem and sleep patterns.",
+      "published_at": "2026-11-24T03:08:52.813Z",
+      "category": "Psychology",
+      "author": "Line Reader",
+      "word_meanings": {
+        "social": "toplumsal",
+        "media": "medya",
+        "mental": "ruhsal",
+        "health": "sağlık",
+        "essential": "temel",
+        "connect": "bağlanmak",
+        "share": "paylaşmak",
+        "updated": "güncel",
+        "excessive": "aşırı",
+        "negative": "olumsuz",
+        "loneliness": "yalnızlık",
+        "anxiety": "kaygı",
+        "depression": "depresyon",
+        "self-esteem": "kendine saygı",
+        "sleep": "uyku",
+        "patterns": "kalıplar",
+        "current": "güncel",
+        "events": "olaylar",
+        "friends": "arkadaşlar",
+        "experiences": "deneyimler",
+        "use": "kullanmak",
+        "lead": "yönlendirmek",
+        "feelings": "hisler"
+      },
+      "sentence_translations": {
+        "Social media has become an essential part of our daily lives.": "Sosyal medya günlük hayatlarımızın temel bir parçası haline geldi.",
+        "We use it to connect with friends, share our experiences, and stay updated on current events.": "Arkadaşlarımızla bağlanmak, deneyimlerimizi paylaşmak ve güncel olaylar hakkında bilgi sahibi olmak için kullanıyoruz.",
+        "However, excessive social media use can have negative effects on our mental health.": "Ancak aşırı sosyal medya kullanımı, ruhsal sağlığımız üzerinde olumsuz etkileri olabilir.",
+        "It can lead to feelings of loneliness, anxiety, and depression, and even affect our self-esteem and sleep patterns.": "Yalnızlık, kaygı ve depresyon hislerine yol açabilir ve hatta kendine saygımızı ve uyku kalıplarımızı etkileyebilir."
+      },
+      "word_relations": {
+        "social": {
+          "syn": [
+            "public",
+            "communal"
+          ],
+          "ant": [
+            "private"
+          ]
+        },
+        "media": {
+          "syn": [
+            "press",
+            "news"
+          ],
+          "ant": [
+            "silence"
+          ]
+        },
+        "mental": {
+          "syn": [
+            "psychological",
+            "emotional"
+          ],
+          "ant": [
+            "physical"
+          ]
+        },
+        "health": {
+          "syn": [
+            "wellness",
+            "fitness"
+          ],
+          "ant": [
+            "illness"
+          ]
+        },
+        "connect": {
+          "syn": [
+            "link",
+            "join"
+          ],
+          "ant": [
+            "disconnect"
+          ]
+        },
+        "share": {
+          "syn": [
+            "distribute",
+            "spread"
+          ],
+          "ant": [
+            "hide"
+          ]
+        },
+        "updated": {
+          "syn": [
+            "current",
+            "latest"
+          ],
+          "ant": [
+            "outdated"
+          ]
+        },
+        "excessive": {
+          "syn": [
+            "extreme",
+            "immoderate"
+          ],
+          "ant": [
+            "moderate"
+          ]
+        },
+        "negative": {
+          "syn": [
+            "bad",
+            "unfavorable"
+          ],
+          "ant": [
+            "positive"
+          ]
+        }
+      },
+      "audio_url": "https://raw.githubusercontent.com/MustafaAyaz21/line_reader/main/audio/b1-the-impact-of-social-media-on-mental-health.wav",
+      "audio_voice": "Kore",
+      "audio_duration_sec": 27,
+      "audio_segments": [
+        {
+          "p": 0,
+          "s": 0,
+          "start_ms": 1120,
+          "end_ms": 5400
+        },
+        {
+          "p": 1,
+          "s": 0,
+          "start_ms": 8360,
+          "end_ms": 14180
+        },
+        {
+          "p": 2,
+          "s": 0,
+          "start_ms": 14500,
+          "end_ms": 19760
+        },
+        {
+          "p": 3,
+          "s": 0,
+          "start_ms": 20160,
+          "end_ms": 26620
+        }
+      ],
+      "is_hidden": false
     }
   ]
 }
