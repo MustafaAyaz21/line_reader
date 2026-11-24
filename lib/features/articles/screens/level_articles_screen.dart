@@ -290,6 +290,10 @@ class _LevelArticleCard extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
     final completedColor =
         isDark ? const Color(0xFF4ADE80) : const Color(0xFF15803D);
+    final podcastColor =
+        isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309);
+    final categoryText = article.category?.trim() ?? '';
+    final authorText = article.author?.trim() ?? '';
     final descriptionText = article.description.isNotEmpty
         ? article.description
         : s.t('Okumak için dokunun.', 'Tap to read.');
@@ -324,70 +328,57 @@ class _LevelArticleCard extends StatelessWidget {
               ),
               const SizedBox(height: 14),
               Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: <Widget>[
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: accentColor.withAlpha(24),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                  Expanded(
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: <Widget>[
-                        Icon(
-                          Icons.schedule_rounded,
-                          size: 15,
-                          color: accentColor,
+                        _CardMetaChip(
+                          icon: Icons.schedule_rounded,
+                          label: article.formattedReadingTime,
+                          foreground: accentColor,
+                          background: accentColor.withAlpha(24),
                         ),
-                        const SizedBox(width: 5),
-                        Text(
-                          article.formattedReadingTime,
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: accentColor,
+                        if (categoryText.isNotEmpty)
+                          _CardMetaChip(
+                            icon: Icons.label_outline_rounded,
+                            label: categoryText,
+                            foreground: colorScheme.onSurfaceVariant,
+                            background: colorScheme.surfaceContainerHighest
+                                .withAlpha(150),
                           ),
-                        ),
+                        if (article.hasPodcastAudio)
+                          _CardMetaChip(
+                            icon: Icons.podcasts_rounded,
+                            label: 'Podcast AI',
+                            foreground: podcastColor,
+                            background: podcastColor.withAlpha(28),
+                          ),
+                        if (authorText.isNotEmpty)
+                          _CardMetaChip(
+                            icon: Icons.person_outline_rounded,
+                            label: authorText,
+                            foreground: colorScheme.onSurfaceVariant,
+                            background: colorScheme.surfaceContainerHighest
+                                .withAlpha(150),
+                          ),
+                        if (isCompleted)
+                          _CardMetaChip(
+                            key: ValueKey<String>(
+                              'article_completed_badge_${article.id}',
+                            ),
+                            icon: Icons.check_circle_rounded,
+                            label: s.t('Tamamlandı', 'Completed'),
+                            foreground: completedColor,
+                            background: completedColor.withAlpha(28),
+                          ),
                       ],
                     ),
                   ),
-                  if (isCompleted) ...<Widget>[
-                    const SizedBox(width: 8),
-                    Container(
-                      key: ValueKey<String>(
-                        'article_completed_badge_${article.id}',
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: completedColor.withAlpha(28),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
-                          Icon(
-                            Icons.check_circle_rounded,
-                            size: 15,
-                            color: completedColor,
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            s.t('Tamamlandı', 'Completed'),
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: completedColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                  const Spacer(),
+                  const SizedBox(width: 8),
                   Icon(
                     Icons.arrow_forward_ios_rounded,
                     size: 14,
@@ -398,6 +389,51 @@ class _LevelArticleCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _CardMetaChip extends StatelessWidget {
+  const _CardMetaChip({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.foreground,
+    required this.background,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color foreground;
+  final Color background;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(icon, size: 14, color: foreground),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: foreground,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

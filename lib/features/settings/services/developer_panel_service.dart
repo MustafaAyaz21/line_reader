@@ -357,8 +357,25 @@ class DeveloperPanelService {
     Object? jsonBody,
     Duration timeout = _timeout,
   }) async {
+    // Uzun süren AI üretim/ses isteklerinde henüz çalışan sunucu seçilmediyse
+    // 3 saniyelik hızlı bir /health yoklamasıyla engelli sunucuyu atla.
+    if (_preferredBaseUrl == null && timeout.inSeconds > 25) {
+      for (final candidate in _orderedBaseUrls()) {
+        try {
+          final probe = await _httpClient
+              .get(Uri.parse('$candidate/health'))
+              .timeout(const Duration(seconds: 3));
+          if (probe.statusCode == 200) {
+            _preferredBaseUrl = candidate;
+            break;
+          }
+        } catch (_) {}
+      }
+    }
+
     final bases = _orderedBaseUrls();
     Object? lastError;
+    http.Response? lastGatewayResponse;
 
     for (var i = 0; i < bases.length; i++) {
       final base = bases[i];
@@ -380,6 +397,7 @@ class DeveloperPanelService {
             res.statusCode == 504 ||
             (res.statusCode == 404 && !res.body.trimLeft().startsWith('{'));
         if (isProxyOrGatewayError && hasMore) {
+          lastGatewayResponse = res;
           lastError = 'HTTP ${res.statusCode} ($base)';
           continue;
         }
@@ -388,6 +406,10 @@ class DeveloperPanelService {
       } catch (err) {
         lastError = err;
       }
+    }
+
+    if (lastGatewayResponse != null) {
+      return lastGatewayResponse;
     }
 
     throw Exception(

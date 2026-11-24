@@ -1943,6 +1943,7 @@
         card.addEventListener("click", (e) => {
           if (e.target.closest("button")) return;
           state.selectedIndex = Number(card.dataset.index);
+          syncHeroMode();
           renderArticleList();
           renderEditor();
           renderPreview();

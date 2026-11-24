@@ -728,12 +728,16 @@ class ArticleAudioController extends ChangeNotifier {
   List<String> _candidateAudioUrls(String rawUrl) {
     final primary = _resolveAbsoluteAudioUrl(rawUrl);
     final urls = <String>[primary];
-    // Cloudflare Pages henüz yayınlamadıysa GitHub raw yedek adresini dene.
+    // Cloudflare Pages henüz yayınlamadıysa veya mobil operatör engellediyse
+    // GitHub raw `content/audio/...` (ve kök) yedek adreslerini dene.
     const pagesPrefix = 'https://line-reader.pages.dev/';
     if (primary.startsWith(pagesPrefix)) {
       final relPath = primary.substring(pagesPrefix.length);
       final rawBase = ApiConfig.articlesGithubFallbackJsonUrl
           .replaceFirst(RegExp(r'/articles\.json$'), '');
+      if (!relPath.startsWith('content/')) {
+        urls.add('$rawBase/content/$relPath');
+      }
       urls.add('$rawBase/$relPath');
     }
     return urls;
