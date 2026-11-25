@@ -1,7 +1,7 @@
 {
-    "latest_version":  "0.1.41",
-    "version_code":  42,
+    "latest_version":  "0.1.42",
+    "version_code":  43,
     "min_version_code":  0,
-    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.41/app-release.apk",
-    "release_notes":  "Yeni LR monogram logosu, Alevi Power özel hareketli teması ve kayan beta duyuru alanı."
+    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.42/app-release.apk",
+    "release_notes":  "E-posta OTP doğrulamasında 6 haneli kutu tasarımı, Google ve e-posta giriş ayrımı, oturum güvenliği ve Web kararlılık güncellemeleri."
 }

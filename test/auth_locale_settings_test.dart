@@ -228,6 +228,10 @@ class _FakeAuthBackend implements AuthBackend {
   }
 
   @override
+  Future<List<String>> fetchSignInMethodsForEmail(String email) async =>
+      const <String>[];
+
+  @override
   Future<String?> getIdToken({bool forceRefresh = false}) async =>
       _current == null ? null : 'fake-jwt-token';
 

@@ -77,6 +77,10 @@ class _FakeThemeAuthBackend implements AuthBackend {
       const AuthActionResult.cancelled();
 
   @override
+  Future<List<String>> fetchSignInMethodsForEmail(String email) async =>
+      const <String>[];
+
+  @override
   Future<void> signOut() async {}
 }
 

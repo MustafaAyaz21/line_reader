@@ -329,10 +329,10 @@ void main() {
         expect(controller.currentSentenceIndex, 0);
         expect(fakePodcast.seeks.last, Duration.zero);
 
-        // Sonraki paragrafa basınca 6500ms'ye atlamalı
+        // Sonraki paragrafa basınca 6500ms + 60ms güvenli aralığa (6560ms) atlamalı
         await controller.nextParagraph();
         expect(controller.currentParagraphIndex, 1);
-        expect(fakePodcast.seeks.last, const Duration(milliseconds: 6500));
+        expect(fakePodcast.seeks.last, const Duration(milliseconds: 6560));
 
         await controller.cycleSpeed();
         expect(fakePodcast.lastPlaybackRate, 1.25);
