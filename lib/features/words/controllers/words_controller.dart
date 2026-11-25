@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../core/sync/cloud_sync_service.dart';
 import '../../translation/models/word_meaning.dart';
 import '../data/word_repository.dart';
 import '../models/saved_word.dart';
@@ -216,6 +217,7 @@ class WordsController extends ChangeNotifier {
           loadLists(),
           loadWordsForList(targetListId),
         ]);
+        CloudSyncService.shared.scheduleSync();
       }
       return status;
     } catch (error) {
@@ -247,6 +249,7 @@ class WordsController extends ChangeNotifier {
           loadLists(),
           loadWordsForList(existingWord.listId),
         ]);
+        CloudSyncService.shared.scheduleSync();
       }
       return status;
     } catch (error) {
@@ -264,6 +267,7 @@ class WordsController extends ChangeNotifier {
         loadLists(),
         loadWordsForList(item.listId),
       ]);
+      CloudSyncService.shared.scheduleSync();
     } catch (error) {
       debugPrint('[WordsController] Kelime silinemedi: $error');
       _errorMessage = 'Kelime silinirken bir sorun oluştu.';

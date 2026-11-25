@@ -170,6 +170,23 @@ class ArticleReadingProgressController extends ChangeNotifier {
     }
   }
 
+  /// Buluttan gelen makale ilerlemesini yerel veritabanıyla birleştirir.
+  Future<void> mergeFromRemote(ArticleReadingProgress remoteItem) async {
+    final existing = _itemsById[remoteItem.articleId];
+    if (existing == null || remoteItem.updatedAt.isAfter(existing.updatedAt)) {
+      _itemsById[remoteItem.articleId] = remoteItem;
+      if (_lastArticleId == null ||
+          lastProgress == null ||
+          remoteItem.updatedAt.isAfter(lastProgress!.updatedAt)) {
+        _lastArticleId = remoteItem.articleId;
+      }
+      _dismissedArticleId = null;
+      _pruneOverflow();
+      notifyListeners();
+      await _persistState();
+    }
+  }
+
   void _pruneOverflow() {
     if (_itemsById.length <= _maxStoredArticles) return;
     final entries = _itemsById.entries.toList()

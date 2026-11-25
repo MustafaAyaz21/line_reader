@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -37,9 +38,32 @@ class CloudSyncService {
   final SettingsRepository _settingsRepository;
 
   bool _isSyncing = false;
+  bool _isApplyingRemoteTheme = false;
+  bool _listenersAttached = false;
+  Timer? _debounceTimer;
 
   void configure({required AuthController authController}) {
     _authController = authController;
+    if (!_listenersAttached) {
+      _listenersAttached = true;
+      AppThemeController.shared.addListener(_onThemeChanged);
+    }
+  }
+
+  void _onThemeChanged() {
+    if (_isApplyingRemoteTheme) return;
+    scheduleSync();
+  }
+
+  /// Yerel veriler (tema, kelimeler, ilerleme) değiştiğinde buluta
+  /// yükleme işlemini kısa bir gecikmeyle (debounce) güvenle tetikler.
+  void scheduleSync({Duration delay = const Duration(milliseconds: 1200)}) {
+    final auth = _authController;
+    if (auth == null || !auth.isAuthenticated) return;
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(delay, () {
+      syncNow();
+    });
   }
 
   /// Kullanıcı oturum açtığında veya uygulamaya girdiğinde çağrılır.
@@ -103,14 +127,42 @@ class CloudSyncService {
 
   Future<void> _applyRemoteToLocal(Map<String, dynamic> remote) async {
     try {
-      // A) Temayı senkronize et
+      // A) Temayı senkronize et (zaman damgası karşılaştırmasıyla)
       final prefs = remote['preferences'];
       if (prefs is Map) {
         final themeKey = prefs['theme'] as String?;
+        final remoteUpdatedAtStr = prefs['theme_updated_at'] as String?;
         if (themeKey != null && themeKey.isNotEmpty) {
           final preset = AppThemePreset.fromStorageKey(themeKey);
-          if (preset != null && AppThemeController.shared.preset != preset) {
-            AppThemeController.shared.setPreset(preset);
+          if (preset != null) {
+            final localUpdatedAtStr =
+                await _settingsRepository.getString('app_theme_updated_at');
+            final localUpdatedAt = localUpdatedAtStr != null
+                ? DateTime.tryParse(localUpdatedAtStr)
+                : null;
+            final remoteUpdatedAt = remoteUpdatedAtStr != null
+                ? DateTime.tryParse(remoteUpdatedAtStr)
+                : null;
+
+            final shouldApply = localUpdatedAt == null ||
+                (remoteUpdatedAt != null &&
+                    remoteUpdatedAt.isAfter(localUpdatedAt));
+
+            if (shouldApply && AppThemeController.shared.preset != preset) {
+              _isApplyingRemoteTheme = true;
+              try {
+                await AppThemeController.shared
+                    .setPreset(preset, updateTimestamp: false);
+                if (remoteUpdatedAtStr != null) {
+                  await _settingsRepository.saveString(
+                    'app_theme_updated_at',
+                    remoteUpdatedAtStr,
+                  );
+                }
+              } finally {
+                _isApplyingRemoteTheme = false;
+              }
+            }
           }
         }
       }
@@ -122,11 +174,7 @@ class CloudSyncService {
         for (final entry in readingProg.entries) {
           final parsed = ArticleReadingProgress.fromJson(entry.value);
           if (parsed != null) {
-            final existing = controller.progressForArticle(parsed.articleId);
-            if (existing == null ||
-                parsed.updatedAt.isAfter(existing.updatedAt)) {
-              // Yerel ilerlemeyi güncelle
-            }
+            await controller.mergeFromRemote(parsed);
           }
         }
       }
@@ -194,8 +242,12 @@ class CloudSyncService {
     }
 
     // 4) Tercihler (Tema vb.)
+    final themeUpdatedAt =
+        await _settingsRepository.getString('app_theme_updated_at') ??
+            DateTime.now().toUtc().toIso8601String();
     final prefsMap = <String, dynamic>{
       'theme': AppThemeController.shared.preset.storageKey,
+      'theme_updated_at': themeUpdatedAt,
     };
 
     return <String, dynamic>{

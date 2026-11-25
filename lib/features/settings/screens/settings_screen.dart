@@ -6,6 +6,7 @@ import '../../../core/localization/app_strings.dart';
 import '../../../core/settings/api_key_controller.dart';
 import '../../../core/settings/display_preferences_controller.dart';
 import '../../../core/settings/ipa_accent_controller.dart';
+import '../../../core/sync/cloud_sync_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_theme_backdrop.dart';
 import '../../../core/theme/app_theme_controller.dart';
@@ -48,9 +49,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     AppThemeController.shared.load();
     if (widget.authController.isAuthenticated) {
       widget.authController.refreshEntitlement();
-    }
-    if (widget.authController.isAuthenticated) {
-      widget.authController.refreshEntitlement();
+      CloudSyncService.shared.syncNow();
     }
   }
 

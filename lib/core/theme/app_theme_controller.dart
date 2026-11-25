@@ -14,6 +14,7 @@ class AppThemeController extends ChangeNotifier {
         _preset = initialPreset;
 
   static const String _settingsKey = 'app_theme_preset';
+  static const String _themeUpdatedAtKey = 'app_theme_updated_at';
   static const String _animationPausedKey = 'app_theme_animation_paused';
   static const String _ecoAnimationKey = 'app_theme_eco_animation';
 
@@ -67,7 +68,7 @@ class AppThemeController extends ChangeNotifier {
     }
   }
 
-  Future<void> setPreset(AppThemePreset next) async {
+  Future<void> setPreset(AppThemePreset next, {bool updateTimestamp = true}) async {
     if (_preset == next) return;
     _preset = next;
     _hasLoaded = true;
@@ -76,6 +77,12 @@ class AppThemeController extends ChangeNotifier {
       final repo = _resolveRepository();
       await repo.saveString(_settingsKey, next.storageKey);
       await repo.saveString('article_reader_tone', 'theme');
+      if (updateTimestamp) {
+        await repo.saveString(
+          _themeUpdatedAtKey,
+          DateTime.now().toUtc().toIso8601String(),
+        );
+      }
     } catch (_) {}
   }
 
