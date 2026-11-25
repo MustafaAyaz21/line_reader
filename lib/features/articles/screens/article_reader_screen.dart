@@ -187,22 +187,32 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
     _loadInitialReaderData();
   }
 
+  double _calculateEffectiveProgress(double scrollProgress) {
+    final audioFraction = _audioController.progressFraction;
+    if (audioFraction > 0) {
+      return (scrollProgress > audioFraction ? scrollProgress : audioFraction)
+          .clamp(0.0, 1.0);
+    }
+    return scrollProgress.clamp(0.0, 1.0);
+  }
+
   void _handleScrollChanged() {
     if (!_hasRestoredScrollPosition || !_scrollController.hasClients) return;
     final position = _scrollController.position;
     final maxExtent = position.maxScrollExtent;
     final clampedOffset =
         maxExtent > 0 ? position.pixels.clamp(0.0, maxExtent).toDouble() : 0.0;
-    final progress = maxExtent <= 0
+    final scrollProg = maxExtent <= 0
         ? 1.0
         : (clampedOffset / maxExtent).clamp(0.0, 1.0).toDouble();
 
-    _latestScrollProgress = progress;
+    final effectiveProgress = _calculateEffectiveProgress(scrollProg);
+    _latestScrollProgress = effectiveProgress;
     _latestScrollOffset = clampedOffset;
 
     _readingProgressController.recordProgress(
       article: widget.article,
-      progress: progress,
+      progress: effectiveProgress,
       scrollOffset: clampedOffset,
       audioPositionMs: _audioController.position.inMilliseconds,
       persist: false,
@@ -263,9 +273,11 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
     if (!mounted) return;
     final currentAudioMs = _audioController.position.inMilliseconds;
     if (currentAudioMs > 0 && _hasRestoredScrollPosition) {
+      final effectiveProgress = _calculateEffectiveProgress(_latestScrollProgress);
+      _latestScrollProgress = effectiveProgress;
       _readingProgressController.recordProgress(
         article: widget.article,
-        progress: _latestScrollProgress,
+        progress: effectiveProgress,
         scrollOffset: _latestScrollOffset,
         audioPositionMs: currentAudioMs,
         persist: false,
