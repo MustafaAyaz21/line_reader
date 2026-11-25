@@ -208,6 +208,32 @@ class _AudioPlayersPodcastPlayer implements ArticlePodcastPlayer {
   @override
   Future<void> setSourceUrl(String url) async {
     await _ensurePlayerConfigured();
+    if (kIsWeb) {
+      // Web tarayıcılarında (Chrome/Edge) uzak .m4a akışında seek() işlemi
+      // HTTP Range / moov atomu yüzünden sesi 0. saniyeye geri sarabiliyor.
+      // Ses dosyasını belleğe alıp BytesSource (in-memory Blob URL) ile
+      // yüklemek her cümleye anında ve kesin geçiş (seek) sağlar.
+      try {
+        final res = await http.get(Uri.parse(url)).timeout(
+          const Duration(seconds: 15),
+        );
+        if (res.statusCode >= 200 &&
+            res.statusCode < 300 &&
+            ArticleAudioController.isValidAudioBytes(
+              res.bodyBytes,
+              contentType: res.headers['content-type'],
+            )) {
+          final ct = (res.headers['content-type'] ?? '').toLowerCase();
+          final mime = ct.contains('mpeg') || url.toLowerCase().endsWith('.mp3')
+              ? 'audio/mpeg'
+              : 'audio/mp4';
+          await _player.setSource(BytesSource(res.bodyBytes, mimeType: mime));
+          return;
+        }
+      } catch (_) {
+        // Ağ/CORS hatasında doğrudan UrlSource yedeğine düş.
+      }
+    }
     await _player.setSource(UrlSource(url));
   }
 
