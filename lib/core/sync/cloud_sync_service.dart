@@ -8,8 +8,6 @@ import '../../features/articles/controllers/article_reading_progress_controller.
 import '../../features/articles/models/article_reading_progress.dart';
 import '../../features/auth/controllers/auth_controller.dart';
 import '../../features/words/data/word_repository.dart';
-import '../../features/words/models/saved_word.dart';
-import '../../features/words/models/word_list.dart';
 import '../config/api_config.dart';
 import '../database/app_database.dart';
 import '../settings/settings_repository.dart';
@@ -38,8 +36,11 @@ class CloudSyncService {
   final SettingsRepository _settingsRepository;
 
   bool _isSyncing = false;
+  bool _pendingSyncAfterCurrent = false;
   bool _isApplyingRemoteTheme = false;
-  bool _listenersAttached = false;
+  bool _themeListenerAttached = false;
+  String? _lastSyncedUid;
+  String? _preferredBaseUrl;
   Timer? _debounceTimer;
   VoidCallback? onSyncCompleted;
 
@@ -47,66 +48,164 @@ class CloudSyncService {
     required AuthController authController,
     VoidCallback? onSyncCompleted,
   }) {
-    _authController = authController;
+    if (_authController != authController) {
+      _authController?.removeListener(_onAuthChanged);
+      _authController = authController;
+      _authController?.addListener(_onAuthChanged);
+    }
     if (onSyncCompleted != null) {
       this.onSyncCompleted = onSyncCompleted;
     }
-    if (!_listenersAttached) {
-      _listenersAttached = true;
+    if (!_themeListenerAttached) {
+      _themeListenerAttached = true;
       AppThemeController.shared.addListener(_onThemeChanged);
+    }
+    // Eğer oturum configure anında zaten hazırsa hemen senkronize et.
+    _onAuthChanged();
+  }
+
+  void _onAuthChanged() {
+    final auth = _authController;
+    if (auth == null || !auth.isAuthenticated) {
+      _lastSyncedUid = null;
+      return;
+    }
+    final uid = auth.user?.uid;
+    if (uid != null && uid.isNotEmpty && uid != _lastSyncedUid) {
+      _lastSyncedUid = uid;
+      unawaited(syncNow());
     }
   }
 
   void _onThemeChanged() {
     if (_isApplyingRemoteTheme) return;
+    // Sistem tarafından zorlanan (updateTimestamp: false) fallback değişikliklerini
+    // buluta kullanıcı seçimi gibi göndermiyoruz.
+    if (AppThemeController.shared.themeUpdatedAtIso == null) return;
     scheduleSync();
   }
 
   /// Yerel veriler (tema, kelimeler, ilerleme) değiştiğinde buluta
   /// yükleme işlemini kısa bir gecikmeyle (debounce) güvenle tetikler.
-  void scheduleSync({Duration delay = const Duration(milliseconds: 1200)}) {
+  void scheduleSync({Duration delay = const Duration(milliseconds: 900)}) {
     final auth = _authController;
     if (auth == null || !auth.isAuthenticated) return;
     _debounceTimer?.cancel();
     _debounceTimer = Timer(delay, () {
-      syncNow();
+      unawaited(syncNow());
     });
   }
 
-  /// Kullanıcı oturum açtığında veya uygulamaya girdiğinde çağrılır.
-  /// 1) Sunucudan güncel verileri çeker ve yerel veritabanına ekler.
-  /// 2) Yerelde olup sunucuda olmayan yeni verileri sunucuya yükler.
+  List<String> _orderedBaseUrls() {
+    final urls = <String>[];
+    void addIfValid(String? raw) {
+      final cleaned = (raw ?? '').trim().replaceFirst(RegExp(r'/+$'), '');
+      if (cleaned.startsWith('http') && !urls.contains(cleaned)) {
+        urls.add(cleaned);
+      }
+    }
+
+    addIfValid(_preferredBaseUrl);
+    // 1) Aynı origin / Cloudflare Pages /api proxy (Web'de CORS sorunsuz, mobilde operatör engeli yok)
+    addIfValid(ApiConfig.browserAiFallbackEndpoint);
+    // 2) Doğrudan Cloudflare Worker adresi
+    addIfValid(ApiConfig.browserAiTranslateEndpoint);
+    // 3) Netlify proxy yedeği
+    addIfValid(ApiConfig.browserAiSecondaryFallbackEndpoint);
+    return urls;
+  }
+
+  Future<({String baseUrl, http.Response response})?> _requestWithFallback({
+    required String method,
+    required String token,
+    String? body,
+  }) async {
+    final urls = _orderedBaseUrls();
+    for (final base in urls) {
+      final uri = Uri.parse('$base/sync');
+      try {
+        final headers = <String, String>{
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+          if (body != null) 'Content-Type': 'application/json',
+        };
+        final res = method == 'GET'
+            ? await _httpClient
+                .get(uri, headers: headers)
+                .timeout(const Duration(seconds: 10))
+            : await _httpClient
+                .post(uri, headers: headers, body: body)
+                .timeout(const Duration(seconds: 10));
+
+        // 401 ise token süresi dolmuş olabilir — üst katmana bildir
+        if (res.statusCode == 401) {
+          return (baseUrl: base, response: res);
+        }
+
+        // 200 ve geçerli JSON ise bu uç nokta sağlıklıdır
+        if (res.statusCode == 200) {
+          final trimmed = res.body.trimLeft();
+          if (trimmed.startsWith('{')) {
+            _preferredBaseUrl = base;
+            return (baseUrl: base, response: res);
+          }
+        }
+        debugPrint(
+          '[CloudSyncService] $method $uri beklenmedik yanit: '
+          'status=${res.statusCode}',
+        );
+      } catch (err) {
+        debugPrint('[CloudSyncService] $method $uri erisim hatasi: $err');
+      }
+    }
+    return null;
+  }
+
+  /// Kullanıcı oturum açtığında, uygulamaya girdiğinde veya veri değiştiğinde çağrılır.
+  /// 1) Sunucudan güncel verileri çeker ve yerel veritabanına birleştirir.
+  /// 2) Yerel güncel durumu paketleyip sunucuya yükler.
   Future<bool> syncNow({bool force = false}) async {
     final auth = _authController;
-    if (auth == null || !auth.isAuthenticated || _isSyncing) {
+    if (auth == null || !auth.isAuthenticated) {
+      return false;
+    }
+    if (_isSyncing) {
+      _pendingSyncAfterCurrent = true;
       return false;
     }
 
     _isSyncing = true;
     try {
-      final token = await auth.getIdToken();
+      // Yerel tema ve ilerleme durumu yüklenmeden senkronizasyona başlama
+      await AppThemeController.shared.load();
+      await ArticleReadingProgressController.shared.load();
+
+      var token = await auth.getIdToken();
+      if (token == null || token.isEmpty) {
+        token = await auth.getIdToken(forceRefresh: true);
+      }
       if (token == null || token.isEmpty) return false;
 
-      final syncUri = Uri.parse('${ApiConfig.browserAiTranslateEndpoint}/sync');
-
       // 1) Önce sunucudaki mevcut bulut kaydını çek
-      final getRes = await _httpClient.get(
-        syncUri,
-        headers: <String, String>{
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        },
-      ).timeout(const Duration(seconds: 10));
+      var getResult = await _requestWithFallback(method: 'GET', token: token);
+      if (getResult != null && getResult.response.statusCode == 401) {
+        final refreshed = await auth.getIdToken(forceRefresh: true);
+        if (refreshed != null && refreshed.isNotEmpty) {
+          token = refreshed;
+          getResult = await _requestWithFallback(method: 'GET', token: token);
+        }
+      }
+      if (getResult == null || getResult.response.statusCode != 200) {
+        return false;
+      }
 
       Map<String, dynamic>? remoteData;
-      if (getRes.statusCode == 200) {
-        try {
-          final decoded = jsonDecode(getRes.body);
-          if (decoded is Map<String, dynamic> && decoded['ok'] == true) {
-            remoteData = decoded;
-          }
-        } catch (_) {}
-      }
+      try {
+        final decoded = jsonDecode(getResult.response.body);
+        if (decoded is Map<String, dynamic> && decoded['ok'] == true) {
+          remoteData = decoded;
+        }
+      } catch (_) {}
 
       // Sunucudan gelen verileri yerel depoya birleştir (merge)
       if (remoteData != null && remoteData['exists'] == true) {
@@ -115,22 +214,28 @@ class CloudSyncService {
 
       // 2) Yerel güncel durumu paketleyip sunucuya gönder
       final localPayload = await _buildLocalPayload();
-      final postRes = await _httpClient.post(
-        syncUri,
-        headers: <String, String>{
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
+      final postResult = await _requestWithFallback(
+        method: 'POST',
+        token: token,
         body: jsonEncode(localPayload),
-      ).timeout(const Duration(seconds: 10));
+      );
 
-      return postRes.statusCode == 200;
+      final success =
+          postResult != null && postResult.response.statusCode == 200;
+      debugPrint(
+        '[CloudSyncService] Sync tamamlandi: ok=$success '
+        '(endpoint=${postResult?.baseUrl ?? getResult.baseUrl})',
+      );
+      return success;
     } catch (err) {
       debugPrint('[CloudSyncService] Senkronizasyon hatasi: $err');
       return false;
     } finally {
       _isSyncing = false;
+      if (_pendingSyncAfterCurrent) {
+        _pendingSyncAfterCurrent = false;
+        unawaited(syncNow());
+      }
     }
   }
 
@@ -144,7 +249,7 @@ class CloudSyncService {
         if (themeKey != null && themeKey.isNotEmpty) {
           final preset = AppThemePreset.fromStorageKey(themeKey);
           if (preset != null) {
-            final localUpdatedAtStr =
+            final localUpdatedAtStr = AppThemeController.shared.themeUpdatedAtIso ??
                 await _settingsRepository.getString('app_theme_updated_at');
             final localUpdatedAt = localUpdatedAtStr != null
                 ? DateTime.tryParse(localUpdatedAtStr)
@@ -157,17 +262,15 @@ class CloudSyncService {
                 (remoteUpdatedAt != null &&
                     remoteUpdatedAt.isAfter(localUpdatedAt));
 
-            if (shouldApply && AppThemeController.shared.preset != preset) {
+            if (shouldApply) {
               _isApplyingRemoteTheme = true;
               try {
-                await AppThemeController.shared
-                    .setPreset(preset, updateTimestamp: false);
-                if (remoteUpdatedAtStr != null) {
-                  await _settingsRepository.saveString(
-                    'app_theme_updated_at',
-                    remoteUpdatedAtStr,
-                  );
-                }
+                await AppThemeController.shared.setPreset(
+                  preset,
+                  updateTimestamp: false,
+                  overrideTimestampIso:
+                      remoteUpdatedAtStr ?? DateTime.now().toUtc().toIso8601String(),
+                );
               } finally {
                 _isApplyingRemoteTheme = false;
               }
@@ -252,12 +355,13 @@ class CloudSyncService {
     }
 
     // 4) Tercihler (Tema vb.)
-    final themeUpdatedAt =
-        await _settingsRepository.getString('app_theme_updated_at') ??
-            DateTime.now().toUtc().toIso8601String();
+    // Yerel cihaz hiç tema seçmemişse sahte "şimdi" tarihi üretme;
+    // null bırak ki diğer cihazın gerçek tema seçimi ezilmesin.
+    final themeUpdatedAt = AppThemeController.shared.themeUpdatedAtIso ??
+        await _settingsRepository.getString('app_theme_updated_at');
     final prefsMap = <String, dynamic>{
       'theme': AppThemeController.shared.preset.storageKey,
-      'theme_updated_at': themeUpdatedAt,
+      if (themeUpdatedAt != null) 'theme_updated_at': themeUpdatedAt,
     };
 
     return <String, dynamic>{

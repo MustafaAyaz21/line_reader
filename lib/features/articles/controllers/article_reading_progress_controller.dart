@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/settings/settings_repository.dart';
+import '../../../core/sync/cloud_sync_service.dart';
 import '../models/article.dart';
 import '../models/article_reading_progress.dart';
 
@@ -167,6 +168,9 @@ class ArticleReadingProgressController extends ChangeNotifier {
 
     if (persist) {
       await _persistState();
+      CloudSyncService.shared.scheduleSync(
+        delay: const Duration(milliseconds: 2500),
+      );
     }
   }
 

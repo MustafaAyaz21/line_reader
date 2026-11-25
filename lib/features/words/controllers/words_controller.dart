@@ -85,6 +85,20 @@ class WordsController extends ChangeNotifier {
     await loadLists();
   }
 
+  /// Bulut senkronizasyonu sonrası hem tüm listeleri hem de önbellekteki
+  /// liste kelimelerini (ve varsayılan listeyi) SQLite'tan yeniden yükler.
+  Future<void> reloadAll() async {
+    final loaded = await loadLists();
+    final idsToReload = <int>{
+      ...?_wordsByList?.keys,
+      for (final item in loaded)
+        if (item.id != null) item.id!,
+    };
+    for (final listId in idsToReload) {
+      await loadWordsForList(listId);
+    }
+  }
+
   /// Belirli bir listeye ait kelimeleri SQLite'tan yükler.
   Future<List<SavedWord>> loadWordsForList(int listId) async {
     try {

@@ -23,11 +23,13 @@ class AppThemeController extends ChangeNotifier {
 
   final SettingsRepository? _repository;
   AppThemePreset _preset;
+  String? _themeUpdatedAtIso;
   bool _isAnimationPaused = false;
   bool _isEcoAnimation = false;
   bool _hasLoaded = false;
 
   AppThemePreset get preset => _preset;
+  String? get themeUpdatedAtIso => _themeUpdatedAtIso;
   bool get isAnimationPaused => _isAnimationPaused;
   bool get isEcoAnimation => _isEcoAnimation;
   bool get hasLoaded => _hasLoaded;
@@ -43,6 +45,7 @@ class AppThemeController extends ChangeNotifier {
       final repo = _resolveRepository();
       final raw = await repo.getString(_settingsKey);
       final parsed = AppThemePreset.fromStorageKey(raw);
+      _themeUpdatedAtIso = await repo.getString(_themeUpdatedAtKey);
       final rawPaused = await repo.getString(_animationPausedKey);
       final parsedPaused = rawPaused == '1' || rawPaused == 'true';
       final rawEco = await repo.getString(_ecoAnimationKey);
@@ -68,20 +71,29 @@ class AppThemeController extends ChangeNotifier {
     }
   }
 
-  Future<void> setPreset(AppThemePreset next, {bool updateTimestamp = true}) async {
-    if (_preset == next) return;
+  Future<void> setPreset(
+    AppThemePreset next, {
+    bool updateTimestamp = true,
+    String? overrideTimestampIso,
+  }) async {
+    if (_preset == next && overrideTimestampIso == null) return;
     _preset = next;
     _hasLoaded = true;
+    String? tsToSave;
+    if (overrideTimestampIso != null) {
+      _themeUpdatedAtIso = overrideTimestampIso;
+      tsToSave = overrideTimestampIso;
+    } else if (updateTimestamp) {
+      tsToSave = DateTime.now().toUtc().toIso8601String();
+      _themeUpdatedAtIso = tsToSave;
+    }
     notifyListeners();
     try {
       final repo = _resolveRepository();
       await repo.saveString(_settingsKey, next.storageKey);
       await repo.saveString('article_reader_tone', 'theme');
-      if (updateTimestamp) {
-        await repo.saveString(
-          _themeUpdatedAtKey,
-          DateTime.now().toUtc().toIso8601String(),
-        );
+      if (tsToSave != null) {
+        await repo.saveString(_themeUpdatedAtKey, tsToSave);
       }
     } catch (_) {}
   }
@@ -112,7 +124,7 @@ class AppThemeController extends ChangeNotifier {
   /// özel bir temaysa güvenli şekilde Varsayılan (Classic) temaya geri döner.
   void enforceSpecialThemeAccess({required bool hasSpecialThemes}) {
     if (!hasSpecialThemes && _preset.isSpecialTheme) {
-      setPreset(AppThemePreset.classic);
+      setPreset(AppThemePreset.classic, updateTimestamp: false);
     }
   }
 
@@ -128,15 +140,15 @@ class AppThemeController extends ChangeNotifier {
   }) {
     if (_preset == AppThemePreset.classic) return;
     if (!isAuthenticated) {
-      setPreset(AppThemePreset.classic);
+      setPreset(AppThemePreset.classic, updateTimestamp: false);
       return;
     }
     if (_preset.isSpecialTheme && !hasSpecialThemes) {
-      setPreset(AppThemePreset.classic);
+      setPreset(AppThemePreset.classic, updateTimestamp: false);
       return;
     }
     if (_preset.isAnimatedTheme && !_preset.isSpecialTheme && !isPremium) {
-      setPreset(AppThemePreset.classic);
+      setPreset(AppThemePreset.classic, updateTimestamp: false);
     }
   }
 
