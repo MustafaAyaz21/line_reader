@@ -1815,16 +1815,12 @@ function buildArticleGenerationPrompt(level, topic, targetWordCount = null) {
       ? Math.round(parsedTarget)
       : ({ A1: 180, A2: 230, B1: 300, B2: 350, C1: 380, C2: 400 }[level] || 320);
 
-  const minWords = Math.max(90, Math.round(effectiveWords * 0.9));
-  const maxWords = Math.round(effectiveWords * 1.12);
-  const paraCount =
-    effectiveWords < 200
-      ? "3 well-developed paragraphs"
-      : effectiveWords <= 420
-        ? "4 to 5 well-developed paragraphs"
-        : effectiveWords <= 700
-          ? "5 to 6 well-developed paragraphs"
-          : "6 to 8 well-developed paragraphs";
+  const minWords = Math.max(95, Math.round(effectiveWords * 0.95));
+  const maxWords = Math.round(effectiveWords * 1.18);
+  const targetParas = Math.max(3, Math.min(8, Math.round(effectiveWords / 72)));
+  const wordsPerPara = Math.round(effectiveWords / targetParas);
+  const sentencesPerPara = wordsPerPara >= 75 ? "4 to 5" : "3 to 4";
+  const paraCount = `EXACTLY ${targetParas} well-developed paragraphs (each paragraph MUST contain ${sentencesPerPara} full, detailed sentences — about ${wordsPerPara} words per paragraph)`;
 
   const levelStyle = {
     A1: "simple everyday vocabulary and short clear sentences",
@@ -1838,27 +1834,29 @@ function buildArticleGenerationPrompt(level, topic, targetWordCount = null) {
   return [
     `You are an expert English curriculum author creating a CEFR ${level} reading article for Turkish learners of English.`,
     topicInstruction,
-    `MANDATORY LENGTH & STYLE: Write approximately ${effectiveWords} words (STRICTLY between ${minWords} and ${maxWords} words — NEVER write fewer than ${minWords} words!) across ${paraCount} separated by \\n\\n, using ${levelStyle}.`,
+    `MANDATORY LENGTH & STRUCTURE: Write AT LEAST ${effectiveWords} words (strictly between ${minWords} and ${maxWords} words) across ${paraCount}, separated by \\n\\n, using ${levelStyle}.`,
     "Tone & Quality Requirements:",
     "- The opening sentence MUST be a compelling hook (a curious question, striking scientific phenomenon, or immersive story). Never start with dry textbook definitions.",
-    "- Keep the reader genuinely captivated and eager to read the next sentence.",
+    "- Develop each paragraph fully with concrete examples, vivid facts, and smooth transitions so the article naturally reaches the full target word count.",
     "- Avoid dry academic jargon unless explained in context.",
     "Return ONLY one valid JSON object (no markdown fences) with these EXACT keys:",
     "{",
     '  "title": "Engaging English title (4-9 words)",',
     '  "description": "Rich, engaging English summary for the article card (STRICTLY 2 complete sentences, 32 to 48 words — never a single short phrase)",',
     '  "category": "Single category word (e.g. Science, Psychology, Culture, Technology, History, Nature, Art, Health, Daily Life)",',
-    `  "content": "Full English article text of ${minWords}-${maxWords} words with ${paraCount} separated by \\n\\n",`,
+    `  "content": "Full English article text of ${minWords}-${maxWords} words with ${targetParas} full paragraphs separated by \\n\\n",`,
     '  "word_meanings": { "lowercase_word": "exact contextual Turkish meaning in this article (for verbs use -mak/-mek)" },',
+    `  "paragraph_translations": [${Array.from({ length: targetParas }, (_, i) => `"Natural fluent Turkish translation of paragraph ${i + 1}."`).join(", ")}],`,
     '  "sentence_translations": { "Exact English sentence from content": "Natural, fluent Turkish translation" },',
     '  "word_relations": { "lowercase_word": { "syn": ["1-3 exact contextual English synonyms"], "ant": ["1-2 exact contextual English antonyms"] } }',
     "}",
     "Rules:",
-    `1. CRITICAL: "content" MUST have at least ${minWords} words (target ${effectiveWords} words). Do NOT cut the article short!`,
+    `1. CRITICAL WORD COUNT: "content" MUST have ${targetParas} full paragraphs (${sentencesPerPara} sentences each) totaling AT LEAST ${minWords} words (target ${effectiveWords} words). Never write short 2-sentence paragraphs!`,
     '2. CRITICAL: "description" MUST be 2 full, compelling sentences (32-48 words).',
-    "3. Include 30 to 50 key content words from the article in word_meanings (lowercase base/appeared forms) with their EXACT contextual Turkish meaning in this article.",
-    "4. Include EVERY sentence from content in sentence_translations with exact punctuation.",
-    "5. Include 15 to 25 key content words in word_relations with ONLY synonyms and antonyms that match the EXACT sense used in this article's sentences.",
+    `3. CRITICAL: "paragraph_translations" MUST be an array of EXACTLY ${targetParas} fluent Turkish paragraph translations matching each paragraph of "content" in order.`,
+    "4. Include 30 to 45 key content words from the article in word_meanings (lowercase base/appeared forms) with their EXACT contextual Turkish meaning in this article.",
+    "5. Include EVERY sentence from content in sentence_translations with exact punctuation.",
+    "6. Include 15 to 25 key content words in word_relations with ONLY synonyms and antonyms that match the EXACT sense used in this article's sentences.",
   ].join("\n");
 }
 
@@ -1960,6 +1958,7 @@ function finalizeGeneratedArticle(parsed, level, providerName) {
     published_at: new Date().toISOString(),
     content,
     word_meanings: parsed.word_meanings && typeof parsed.word_meanings === "object" ? parsed.word_meanings : {},
+    paragraph_translations: Array.isArray(parsed.paragraph_translations) ? parsed.paragraph_translations.map((p) => String(p || "").trim()).filter(Boolean) : [],
     sentence_translations: parsed.sentence_translations && typeof parsed.sentence_translations === "object" ? parsed.sentence_translations : {},
     word_relations: parsed.word_relations && typeof parsed.word_relations === "object" ? parsed.word_relations : {},
     is_hidden: false,

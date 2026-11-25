@@ -596,7 +596,27 @@ Strict requirements:
 10. Output raw JSON only—no markdown fences, no commentary.
 "@
 
-    $requestObj = @{
+    $requestObjNoThink = @{
+        contents = @(
+            @{
+                role  = "user"
+                parts = @(
+                    @{ text = $prompt }
+                )
+            }
+        )
+        generationConfig = @{
+            temperature      = 0.85
+            maxOutputTokens  = 8192
+            responseMimeType = "application/json"
+            thinkingConfig   = @{
+                thinkingBudget = 0
+            }
+        }
+    }
+    $requestBodyNoThink = $requestObjNoThink | ConvertTo-Json -Depth 8 -Compress
+
+    $requestObjStandard = @{
         contents = @(
             @{
                 role  = "user"
@@ -611,65 +631,35 @@ Strict requirements:
             responseMimeType = "application/json"
         }
     }
-    $requestBody = $requestObj | ConvertTo-Json -Depth 8 -Compress
+    $requestBodyStandard = $requestObjStandard | ConvertTo-Json -Depth 8 -Compress
 
-    $discoveredFlashModels = @()
-    $discoveredProModels = @()
-    try {
-        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
-        $listUrl = "https://generativelanguage.googleapis.com/v1beta/models?key=$([System.Uri]::EscapeDataString($cfg.geminiApiKey))"
-        $listReq = [System.Net.HttpWebRequest]::Create($listUrl)
-        $listReq.Method = "GET"
-        $listReq.Timeout = 10000
-        $listRes = $listReq.GetResponse()
-        $listReader = New-Object System.IO.StreamReader($listRes.GetResponseStream(), [System.Text.Encoding]::UTF8)
-        try { $listText = $listReader.ReadToEnd() } finally { $listReader.Dispose(); $listRes.Close() }
-        $listJson = $listText | ConvertFrom-Json
-        if ($null -ne $listJson.models) {
-            foreach ($m in $listJson.models) {
-                $mName = ([string]$m.name) -replace '^models/', ''
-                $methods = @($m.supportedGenerationMethods)
-                if (($methods -contains "generateContent") -and ($mName -like "*gemini*") -and ($mName -notlike "*tts*") -and ($mName -notlike "*image*") -and ($mName -notlike "*omni*")) {
-                    if ($mName -like "*flash*") {
-                        $discoveredFlashModels += $mName
-                    } elseif ($mName -like "*pro*") {
-                        $discoveredProModels += $mName
-                    }
-                }
-            }
-        }
-    } catch {}
-
-    $flashCandidates = (@($cfg.geminiModel, "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-flash-latest") + $discoveredFlashModels | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique | Select-Object -First 5)
-    $proCandidates = (@("gemini-2.5-pro", "gemini-pro-latest") + $discoveredProModels | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique | Select-Object -First 2)
-    $modelsToTry = @($flashCandidates + $proCandidates) | Select-Object -Unique
+    # Ekstra /models ön sorgusu kaldırıldı: güncel aktif Gemini modelleri (2.0/2.5 404 döndürüyor)
+    $preferredModels = @("gemini-flash-latest", "gemini-3-flash-preview")
+    if (-not [string]::IsNullOrWhiteSpace($cfg.geminiModel) -and $cfg.geminiModel -notlike "*2.5*" -and $cfg.geminiModel -notlike "*2.0*") {
+        $preferredModels = @($cfg.geminiModel) + $preferredModels
+    }
+    $modelsToTry = @($preferredModels | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
     [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
 
     $lastErrorMsg = "Gemini API yanıt vermedi."
     $lastStatus = 502
     $hadTransientOverload = $false
 
-    # Geçici 503 yoğunluklarında önce diğer stabil modellere geç, hepsi yoğun ise 1 kısa bekleme sonrası tekrar dene.
-    for ($attemptPass = 1; $attemptPass -le 2; $attemptPass++) {
-        $passModels = if ($attemptPass -eq 1) {
-            $modelsToTry
-        } else {
-            if (-not $hadTransientOverload) { break }
-            Start-Sleep -Milliseconds 1500
-            @("gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash") + $discoveredFlashModels | Select-Object -Unique
-        }
+    # Geçici 503 yoğunluklarında hızlıca Cloudflare AI yedeğine düşmek için tek tur dene
+    for ($attemptPass = 1; $attemptPass -le 1; $attemptPass++) {
+        $passModels = $modelsToTry
 
         $abortAll = $false
         foreach ($modelName in $passModels) {
-            Write-Host "[Gemini] Deneniyor (tur $attemptPass): $modelName ..." -ForegroundColor DarkCyan
+            Write-Host "[Gemini] Deneniyor: $modelName ..." -ForegroundColor DarkCyan
             $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=$([System.Uri]::EscapeDataString($cfg.geminiApiKey))"
             $webReq = [System.Net.HttpWebRequest]::Create($endpoint)
             $webReq.Method = "POST"
-            $webReq.Timeout = 60000
+            $webReq.Timeout = 18000
             $webReq.Accept = "application/json"
             $webReq.ContentType = "application/json; charset=utf-8"
 
-            $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($requestBody)
+            $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($requestBodyStandard)
             $webReq.ContentLength = $bodyBytes.Length
             $reqStream = $webReq.GetRequestStream()
             try {
@@ -726,9 +716,9 @@ Strict requirements:
                 }
 
                 $actualWordCount = @($genContent -split '\s+' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count
-                $minAcceptableWords = [int][math]::Round($targetWords * 0.65)
+                $minAcceptableWords = [int][math]::Round($targetWords * 0.85)
                 if ($actualWordCount -lt $minAcceptableWords) {
-                    Write-Host "[Gemini] $modelName cok kisa makale uretti ($actualWordCount / $targetWords kelime); sonraki model deneniyor..." -ForegroundColor Yellow
+                    Write-Host "[Gemini] $modelName hedef kelime sayisinin altinda kaldi ($actualWordCount / $targetWords kelime); sonraki model deneniyor..." -ForegroundColor Yellow
                     $lastErrorMsg = "Makale hedef uzunluktan kısa geldi ($actualWordCount / $targetWords kelime)."
                     continue
                 }
