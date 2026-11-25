@@ -61,6 +61,15 @@ class FirebaseAuthBackend implements AuthBackend {
   @override
   bool get isConfigured => _isConfigured;
 
+  static const FirebaseOptions _webFirebaseOptions = FirebaseOptions(
+    apiKey: 'AIzaSyBrQ51YPgXYTYXb07TZoZoof8jDWwkznRc',
+    appId: '1:334618302580:android:cf037968b48d28cf839921',
+    messagingSenderId: '334618302580',
+    projectId: 'line-reader-e2e00',
+    authDomain: 'line-reader-e2e00.firebaseapp.com',
+    storageBucket: 'line-reader-e2e00.firebasestorage.app',
+  );
+
   @override
   Future<void> initialize() async {
     if (_initialized) return;
@@ -68,7 +77,11 @@ class FirebaseAuthBackend implements AuthBackend {
 
     try {
       if (Firebase.apps.isEmpty) {
-        await Firebase.initializeApp();
+        if (kIsWeb) {
+          await Firebase.initializeApp(options: _webFirebaseOptions);
+        } else {
+          await Firebase.initializeApp();
+        }
       }
       _isConfigured = Firebase.apps.isNotEmpty;
     } catch (error) {
@@ -130,6 +143,20 @@ class FirebaseAuthBackend implements AuthBackend {
     }
 
     try {
+      if (kIsWeb) {
+        final provider = GoogleAuthProvider()..addScope('email');
+        final userCredential =
+            await FirebaseAuth.instance.signInWithPopup(provider);
+        final user = userCredential.user;
+        if (user == null) {
+          return const AuthActionResult.failure(
+            errorCode: 'null_user',
+            message: 'Google girişi tamamlanamadı.',
+          );
+        }
+        return AuthActionResult.success(user: _mapFirebaseUser(user));
+      }
+
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
         return const AuthActionResult.cancelled();
@@ -412,6 +439,13 @@ class FirebaseAuthBackend implements AuthBackend {
         'İnternet bağlantısı yok. Lütfen bağlantınızı kontrol edin.',
       'account-exists-with-different-credential' =>
         'Bu e-posta başka bir giriş yöntemiyle kayıtlı.',
+      'popup-closed-by-user' ||
+      'cancelled-popup-request' =>
+        'Google giriş penceresi kapatıldı.',
+      'popup-blocked' =>
+        'Tarayıcı açılır pencereyi (pop-up) engelledi. Lütfen izin verip tekrar deneyin.',
+      'unauthorized-domain' =>
+        'Bu alan adı Firebase Yetkili Alan Adları listesinde henüz ekli değil.',
       _ => 'İşlem tamamlanamadı ($code).',
     };
   }
