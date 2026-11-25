@@ -1,139 +1,70 @@
 {
   "version": 1,
-  "updated_at": "2026-11-25T22:56:46.096Z",
+  "updated_at": "2026-11-25T22:57:11.588Z",
   "articles": [
     {
-      "id": "b1-the-paradox-of-choice",
+      "id": "b1-the-unlikely-architects-animals-that-build-compl",
       "level": "B1",
-      "title": "The Paradox of Choice",
-      "description": "Having too many options can make us less happy. This phenomenon affects modern humans deeply, impacting daily life and decision-making processes.",
-      "reading_time": "1 - 3 dk",
-      "reading_time_minutes": 2,
+      "title": "The Unlikely Architects: Animals That Build Complex Structures",
+      "description": "Animals exhibit remarkable engineering skills, creating homes that are essential for their survival. This article explores the sophisticated nests, dams, and colonies built by various species in nature.",
+      "reading_time": "2 - 4 dk",
+      "reading_time_minutes": 3,
       "language": "en",
-      "content": "What if having too many choices actually makes us less happy? This question has puzzled scientists and psychologists for years, as they try to understand the paradox of choice. \n\n The concept of the paradox of choice suggests that when we are faced with too many options, our brains can become overwhelmed, leading to a sense of anxiety and dissatisfaction. For instance, imagine walking into a store with hundreds of different types of coffee, trying to decide which one to buy. This can be a daunting task, and often, we end up feeling less satisfied with our choice, wondering if we made the right decision. \n\n This phenomenon is not limited to consumerism; it affects many aspects of our lives, from relationships to career choices. With the rise of social media, we are constantly bombarded with images of perfect lives, making us feel like we are not good enough. This can lead to a sense of unhappiness and discontent, as we feel like we are missing out on something better. \n\n So, what can we do to avoid the paradox of choice? One strategy is to limit our options, focusing on what is truly important to us. By doing so, we can reduce the feeling of overwhelm and make more informed decisions. Additionally, practicing mindfulness and being present in the moment can help us appreciate what we have, rather than constantly desiring something more. \n\n In conclusion, the paradox of choice is a complex issue that affects us all. By understanding its causes and effects, we can take steps to mitigate its impact and live more fulfilling lives. This requires a combination of self-awareness, mindfulness, and a willingness to make conscious choices, rather than simply following the crowd.",
-      "published_at": "2026-11-25T22:44:37.340Z",
-      "category": "Psychology",
+      "content": "We often think of architecture as a strictly human endeavor, requiring complex tools and blueprints. However, the natural world is full of incredible animal architects that construct elaborate homes for shelter, protection, and raising their young. These creatures build without formal education or modern technology, relying purely on instinct and inherited skills. Their constructions are often perfectly adapted to their environments and can be surprisingly complex.\n\nOne of the most famous examples of animal engineering is the beaver. These semiaquatic mammals are driven by the sound of running water to build dams. Using branches, rocks, mud, and logs, beavers can alter entire ecosystems. Their dams create deep ponds that protect them from predators and provide easy access to food during winter. Inside the dam, they build a lodge with an underwater entrance, a dry living area, and even ventilation shafts. This structure is a masterpiece of environmental engineering.\n\nIn the insect world, termites are master builders. While many people consider them pests, their mounds are architectural wonders. Some termite species in Africa and Australia build towers that can reach several meters in height. These structures are not just piles of dirt; they are sophisticated, climate-controlled cities. The mound features intricate systems of tunnels and chimneys that regulate temperature and provide fresh air to the colony deep underground, even when it is very hot or cold outside.\n\nBirds are also renowned for their diverse building techniques. The weaverbird, for instance, constructs incredibly detailed, hanging nests. Using their beaks and feet, males weave intricate spherical or retort-shaped nests from grass and thin strips of leaves. These nests often dangle precariously from the tips of branches, making them difficult for snakes and monkeys to reach. The male must create a perfect nest to attract a female. If she approves, she will line it with soft feathers.\n\nFurthermore, social insects like bees create highly organized cities called hives. Inside the hive, they build complex structures using beeswax, which they secrete from their own bodies. The hive is composed of perfectly hexagonal cells. Bees use these cells to store honey, pollen, and to raise their young. The hexagonal shape is mathematically efficient, using the least amount of wax to create the strongest structure with no wasted space. This showcases a form of natural geometry and cooperative labor.\n\nThese examples remind us that intelligence and engineering skills are not limited to humans. Animals possess remarkable abilities to shape their environments and create functional, beautiful homes. Their instinctive architecture is a vital part of their survival strategy and adds to the incredible complexity of the natural world. Observing these animal architects gives us a greater appreciation for the ingenuity found in nature.",
+      "published_at": "2026-11-25T22:53:57.426Z",
+      "category": "Nature",
       "author": "Line Reader",
       "word_meanings": {
-        "puzzle": "çözülmesi zor bir problemi çözmek",
-        "paradox": "çelişki",
-        "anxiety": "kaygı",
-        "dissatisfaction": "memnuniyetsizlik",
-        "daunting": "korkutucu",
-        "satisfaction": "memnuniyet",
-        "decision": "karar",
-        "phenomenon": "olay",
-        "consumerism": "tüketim kültürü",
-        "relationship": "ilişki",
-        "career": "kariyer",
-        "social media": "sosyal medya",
-        "image": "görüntü",
-        "perfect": "mükemmel",
-        "unhappiness": "mutsuzluk",
-        "discontent": "memnuniyetsizlik",
-        "strategy": "strateji",
-        "limit": "sınır",
-        "focus": "odaklanmak",
-        "mindfulness": "şimdiki ana dikkat etmek",
-        "present": "şimdiki",
-        "appreciate": "değer vermek",
-        "desire": "istemek",
-        "complex": "karmaşık",
-        "mitigate": "azaltmak",
-        "fulfilling": "dolaylı",
-        "self-awareness": "kendini tanımak",
-        "conscious": "bilinçli",
-        "combination": "birleşme"
+        "architecture": "mimari",
+        "endeavor": "çaba",
+        "blueprints": "planlar",
+        "elaborate": "özenle hazırlanmış",
+        "shelter": "barınak",
+        "rely on": "güvenmek",
+        "instinct": "içgüdü",
+        "inherited": "kalıtsal",
+        "adapted": "uyarlanmış",
+        "semiaquatic": "yarı sucul",
+        "ecosystems": "ekosistemler",
+        "lodge": "yuva",
+        "ventilation": "havalandırma",
+        "masterpiece": "şaheser",
+        "pests": "zararlı böcekler",
+        "mounds": "höyükler",
+        "architectural wonders": "mimari harikalar",
+        "towers": "kuleler",
+        "climate-controlled": "iklim kontrollü",
+        "intricate": "karmaşık",
+        "chimneys": "bacalar",
+        "renowned": "ünlü",
+        "techniques": "teknikler",
+        "construct": "inşa etmek",
+        "hanging": "asılı",
+        "spherical": "küresel",
+        "retort-shaped": "imbik şeklinde",
+        "dangle": "sallanmak",
+        "precariously": "tehlikeli bir şekilde",
+        "attract": "cezbetmek",
+        "line": "içini kaplamak",
+        "social insects": "sosyal böcekler",
+        "hives": "kovanlar",
+        "beeswax": "balmumu",
+        "secrete": "salgılamak",
+        "hexagonal cells": "altıgen hücreler",
+        "cooperative labor": "işbirlikçi emek",
+        "ingenuity": "ustalık"
       },
       "word_relations": {
-        "paradox": {
+        "architecture": {
           "syn": [
-            "contradiction",
-            "enigma"
-          ],
-          "ant": [
-            "clarity"
+            "design",
+            "construction"
           ]
         },
-        "anxiety": {
+        "endeavor": {
           "syn": [
-            "worry",
-            "fear"
-          ],
-          "ant": [
-            "calmness"
-          ]
-        },
-        "dissatisfaction": {
-          "syn": [
-            "unhappiness",
-            "discontent"
-          ],
-          "ant": [
-            "satisfaction"
-          ]
-        },
-        "strategy": {
-          "syn": [
-            "plan",
-            "tactic"
-          ],
-          "ant": [
-            "spontaneity"
-          ]
-        },
-        "limit": {
-          "syn": [
-            "boundary",
-            "restriction"
-          ],
-          "ant": [
-            "freedom"
-          ]
-        },
-        "focus": {
-          "syn": [
-            "concentration",
-            "attention"
-          ],
-          "ant": [
-            "distraction"
-          ]
-        },
-        "mindfulness": {
-          "syn": [
-            "awareness",
-            "presence"
-          ],
-          "ant": [
-            "mindlessness"
-          ]
-        },
-        "present": {
-          "syn": [
-            "current",
-            "immediate"
-          ],
-          "ant": [
-            "past"
-          ]
-        },
-        "appreciate": {
-          "syn": [
-            "value",
-            "cherish"
-          ],
-          "ant": [
-            "disregard"
-          ]
-        },
-        "desire": {
-          "syn": [
-            "want",
-            "longing"
-          ],
-          "ant": [
-            "indifference"
+            "attempt",
+            "effort"
           ]
         },
         "complex": {
@@ -142,72 +73,354 @@
             "intricate"
           ],
           "ant": [
-            "simple"
+            "simple",
+            "basic"
           ]
         },
-        "mitigate": {
+        "elaborate": {
           "syn": [
-            "reduce",
-            "alleviate"
+            "detailed",
+            "complex"
           ],
           "ant": [
-            "exacerbate"
+            "simple",
+            "plain"
           ]
         },
-        "fulfilling": {
+        "shelter": {
           "syn": [
-            "satisfying",
-            "rewarding"
+            "protection",
+            "refuge"
           ],
           "ant": [
-            "unfulfilling"
+            "exposure"
           ]
         },
-        "self-awareness": {
+        "instinct": {
           "syn": [
-            "introspection",
-            "self-knowledge"
+            "natural impulse",
+            "intuition"
           ],
           "ant": [
-            "self-ignorance"
+            "reason",
+            "logic"
           ]
         },
-        "conscious": {
+        "adapted": {
           "syn": [
-            "aware",
-            "intentional"
+            "adjusted",
+            "suited"
           ],
           "ant": [
-            "unconscious"
+            "unsuited"
           ]
         },
-        "combination": {
+        "ecosystems": {
           "syn": [
-            "union",
-            "integration"
+            "habitats",
+            "environments"
+          ]
+        },
+        "predators": {
+          "syn": [
+            "hunters",
+            "attackers"
           ],
           "ant": [
-            "separation"
+            "prey"
+          ]
+        },
+        "intricate": {
+          "syn": [
+            "complex",
+            "elaborate"
+          ],
+          "ant": [
+            "simple",
+            "plain"
+          ]
+        },
+        "renowned": {
+          "syn": [
+            "famous",
+            "celebrated"
+          ],
+          "ant": [
+            "unknown"
+          ]
+        },
+        "techniques": {
+          "syn": [
+            "methods",
+            "approaches"
+          ]
+        },
+        "construct": {
+          "syn": [
+            "build",
+            "create"
+          ],
+          "ant": [
+            "destroy",
+            "demolish"
+          ]
+        },
+        "attract": {
+          "syn": [
+            "draw",
+            "appeal to"
+          ],
+          "ant": [
+            "repel"
+          ]
+        },
+        "cooperative": {
+          "syn": [
+            "collaborative",
+            "joint"
+          ],
+          "ant": [
+            "individual"
+          ]
+        },
+        "ingenuity": {
+          "syn": [
+            "cleverness",
+            "inventiveness"
           ]
         }
       },
+      "paragraph_translations": [
+        "Genellikle mimariyi, karmaşık araçlar ve planlar gerektiren, tamamen insana özgü bir çaba olarak düşünürüz. Ancak doğal dünya, barınma, korunma ve yavrularını büyütme için ayrıntılı yuvalar inşa eden inanılmaz hayvan mimarlarla doludur. Bu yaratıklar, resmi bir eğitim veya modern teknoloji olmadan, tamamen içgüdülerine ve kalıtsal becerilerine güvenerek inşa ederler. Yapıları genellikle çevrelerine mükemmel bir şekilde uyarlanmıştır ve şaşırtıcı derecede karmaşık olabilir.",
+        "Hayvan mühendisliğinin en ünlü örneklerinden biri kunduzdur. Bu yarı sucul memeliler, akan suyun sesiyle baraj yapmaya yönelirler. Kunduzlar dallar, kayalar, çamur ve kütükler kullanarak tüm ekosistemleri değiştirebilirler. Barajları, onları avcılardan koruyan ve kışın yiyeceğe kolay erişim sağlayan derin göletler oluşturur. Barajın içinde, su altı girişi, kuru bir yaşam alanı ve hatta havalandırma bacaları olan bir yuva inşa ederler. Bu yapı, çevre mühendisliğinin bir şaheseridir.",
+        "Böcek dünyasında termitler usta inşaatçılardır. Birçok insan onları zararlı böcekler olarak görse de, höyükleri mimari harikalardır. Afrika ve Avustralya'daki bazı termit türleri, yüksekliği birkaç metreye ulaşabilen kuleler inşa ederler. Bu yapılar sadece kir yığınları değildir; karmaşık, iklim kontrollü şehirlerdir. Höyük, sıcaklık ve nemi düzenleyen ve dışarısı çok sıcak veya soğuk olsa bile yerin derinliklerindeki koloniye temiz hava sağlayan karmaşık tünel ve baca sistemlerine sahiptir.",
+        "Kuşlar da çeşitli inşaat teknikleriyle ünlüdür. Örneğin dokumacı kuşu, inanılmaz derecede detaylı, asılı yuvalar yapar. Erkekler, gagalarını ve ayaklarını kullanarak çim ve ince yaprak şeritlerinden karmaşık küresel veya imbik şeklinde yuvalar dokurlar. Bu yuvalar genellikle dalların uçlarında tehlikeli bir şekilde sallanır, bu da onları yılanlar ve maymunlar için ulaşılması zor hale getirir. Erkeğin bir dişiyi çekmek için mükemmel bir yuva yapması gerekir. Eğer dişi onaylarsa, yuvanın içini yumuşak tüylerle kaplayacaktır.",
+        "Ayrıca arılar gibi sosyal böcekler, kovan adı verilen son derece organize şehirler oluştururlar. Kovanın içinde, kendi vücutlarından salgıladıkları balmumunu kullanarak karmaşık yapılar inşa ederler. Kovan, mükemmel altıgen hücrelerden oluşur. Arılar bu hücreleri bal, polen depolamak ve yavrularını büyütmek için kullanırlar. Altıgen şekil matematiksel olarak verimlidir, boşa harcanan alan olmadan en güçlü yapıyı oluşturmak için en az miktarda balmumu kullanır. Bu, doğal geometri ve işbirlikçi emeğin bir biçimini sergiler.",
+        "Bu örnekler, zeka ve mühendislik becerilerinin sadece insanlarla sınırlı olmadığını bize hatırlatır. Hayvanlar, çevrelerini şekillendirmek ve işlevsel, güzel yuvalar yaratmak için olağanüstü yeteneklere sahiptir. İçgüdüsel mimarileri, hayatta kalma stratejilerinin hayati bir parçasıdır ve doğal dünyanın inanılmaz karmaşıklığına katkıda bulunur. Bu hayvan mimarlarını gözlemlemek, doğada bulunan ustalığa daha büyük bir takdir duymamızı sağlar."
+      ],
       "sentence_translations": {
-        "What if having too many choices actually makes us less happy?": "Eğer çok fazla seçeneğe sahip olmak bizi gerçekten daha mutsuz yapar ise?",
-        "This question has puzzled scientists and psychologists for years, as they try to understand the paradox of choice.": "Bu soru yıllardır bilim adamları ve psikologları şaşırtmış, seçim paradoksunu anlamaya çalışmışlardır.",
-        "The concept of the paradox of choice suggests that when we are faced with too many options, our brains can become overwhelmed, leading to a sense of anxiety and dissatisfaction.": "Seçim paradoksunun kavramı, çok fazla seçeneğe karşı karşıya kaldığımızda, beyinlerimiz aşırı yüklenerek kaygı ve memnuniyetsizlik hissi yaratabileceğini öne sürer.",
-        "For instance, imagine walking into a store with hundreds of different types of coffee, trying to decide which one to buy.": "Örneğin, yüzlerce farklı türde kahve bulunan bir mağazaya girip hangisini alacağınıza karar vermeye çalışın.",
-        "This can be a daunting task, and often, we end up feeling less satisfied with our choice, wondering if we made the right decision.": "Bu, korkutucu bir görev olabilir ve genellikle seçiminizden menos memnun kalır, doğru kararı verdiğimizden emin olamayız.",
-        "This phenomenon is not limited to consumerism; it affects many aspects of our lives, from relationships to career choices.": "Bu olay tüketim kültürü ile sınırlı değildir; ilişkilerden kariyer seçimlerine kadar hayatımızın birçok yönünü etkiler.",
-        "With the rise of social media, we are constantly bombarded with images of perfect lives, making us feel like we are not good enough.": "Sosyal medyanın yükselişi ile mükemmel hayatların görüntüleri ile sürekli bombardıman altında kalır, yeterli olmadığımızı hissederiz.",
-        "This can lead to a sense of unhappiness and discontent, as we feel like we are missing out on something better.": "Bu, daha iyi bir şeyden mahrum kaldığımızı hissettiğimiz için mutsuzluk ve memnuniyetsizlik hissi yaratabilir.",
-        "So, what can we do to avoid the paradox of choice?": "Öyleyse, seçim paradoksundan kaçınmak için ne yapabiliriz?",
-        "One strategy is to limit our options, focusing on what is truly important to us.": "Bir strateji, gerçekten önemli olan şeylere odaklanarak seçeneklerimizi sınırlamaktır.",
-        "By doing so, we can reduce the feeling of overwhelm and make more informed decisions.": "Böylece, aşırı yüklenme hissini azaltabilir ve daha bilinçli kararlar alabiliriz.",
-        "Additionally, practicing mindfulness and being present in the moment can help us appreciate what we have, rather than constantly desiring something more.": "Ayrıca, şimdiki ana dikkat etmek ve bilinçli olmak, sürekli daha fazlasını istemektense elimizdekileri takdir etmemize yardımcı olabilir.",
-        "In conclusion, the paradox of choice is a complex issue that affects us all.": "Sonuç olarak, seçim paradoksu hepimizi etkileyen karmaşık bir meseledir.",
-        "By understanding its causes and effects, we can take steps to mitigate its impact and live more fulfilling lives.": "Nedenlerini ve etkilerini anladığımızda, etkisini azaltmak ve daha dolu bir hayat yaşamak için adımlar atabiliriz.",
-        "This requires a combination of self-awareness, mindfulness, and a willingness to make conscious choices, rather than simply following the crowd.": "Bunun için kendimizi tanımak, şimdiki ana dikkat etmek ve bilinçli seçimler yapmak için bir birleşmeye ihtiyacımız vardır, sadece kalabalığa uymak yerine."
-      }
+        "We often think of architecture as a strictly human endeavor, requiring complex tools and blueprints.": "Genellikle mimariyi, karmaşık aletler ve planlar gerektiren, tamamen insana özgü bir çaba olarak düşünürüz.",
+        "However, the natural world is full of incredible animal architects that construct elaborate homes for shelter, protection, and raising their young.": "Ancak doğal dünya, barınma, korunma ve yavrularını büyütme için ayrıntılı yuvalar inşa eden inanılmaz hayvan mimarlarla doludur.",
+        "These creatures build without formal education or modern technology, relying purely on instinct and inherited skills.": "Bu yaratıklar, resmi bir eğitim veya modern teknoloji olmadan, tamamen içgüdülerine ve kalıtsal becerilerine güvenerek inşa ederler.",
+        "Their constructions are often perfectly adapted to their environments and can be surprisingly complex.": "Yapıları genellikle çevrelerine mükemmel bir şekilde uyarlanmıştır ve şaşırtıcı derecede karmaşık olabilir.",
+        "One of the most famous examples of animal engineering is the beaver.": "Hayvan mühendisliğinin en ünlü örneklerinden biri kunduzdur.",
+        "These semiaquatic mammals are driven by the sound of running water to build dams.": "Bu yarı sucul memeliler, akan suyun sesiyle baraj yapmaya yönelirler.",
+        "Using branches, rocks, mud, and logs, beavers can alter entire ecosystems.": "Kunduzlar dallar, kayalar, çamur ve kütükler kullanarak tüm ekosistemleri değiştirebilirler.",
+        "Their dams create deep ponds that protect them from predators and provide easy access to food during winter.": "Barajları, onları avcılardan koruyan ve kışın yiyeceğe kolay erişim sağlayan derin göletler oluşturur.",
+        "Inside the dam, they build a lodge with an underwater entrance, a dry living area, and even ventilation shafts.": "Barajın içinde, su altı girişi, kuru bir yaşam alanı ve hatta havalandırma bacaları olan bir yuva inşa ederler.",
+        "This structure is a masterpiece of environmental engineering.": "Bu yapı, çevre mühendisliğinin bir şaheseridir.",
+        "In the insect world, termites are master builders.": "Böcek dünyasında termitler usta inşaatçılardır.",
+        "While many people consider them pests, their mounds are architectural wonders.": "Birçok insan onları zararlı böcekler olarak görse de, höyükleri mimari harikalardır.",
+        "Some termite species in Africa and Australia build towers that can reach several meters in height.": "Afrika ve Avustralya'daki bazı termit türleri, yüksekliği birkaç metreye ulaşabilen kuleler inşa ederler.",
+        "These structures are not just piles of dirt; they are sophisticated, climate-controlled cities.": "Bu yapılar sadece kir yığınları değildir; karmaşık, iklim kontrollü şehirlerdir.",
+        "The mound features intricate systems of tunnels and chimneys that regulate temperature and provide fresh air to the colony deep underground, even when it is very hot or cold outside.": "Höyük, sıcaklığı düzenleyen ve dışarısı çok sıcak veya soğuk olsa bile yerin derinliklerindeki koloniye temiz hava sağlayan karmaşık tünel ve baca sistemlerine sahiptir.",
+        "Birds are also renowned for their diverse building techniques.": "Kuşlar da çeşitli inşaat teknikleriyle ünlüdür.",
+        "The weaverbird, for instance, constructs incredibly detailed, hanging nests.": "Örneğin dokumacı kuşu, inanılmaz derecede detaylı, asılı yuvalar yapar.",
+        "Using their beaks and feet, males weave intricate spherical or retort-shaped nests from grass and thin strips of leaves.": "Erkekler, gagalarını ve ayaklarını kullanarak çim ve ince yaprak şeritlerinden karmaşık küresel veya imbik şeklinde yuvalar dokurlar.",
+        "These nests often dangle precariously from the tips of branches, making them difficult for snakes and monkeys to reach.": "Bu yuvalar genellikle dalların uçlarında tehlikeli bir şekilde sallanır, bu da onları yılanlar ve maymunlar için ulaşılması zor hale getirir.",
+        "The male must create a perfect nest to attract a female.": "Erkeğin bir dişiyi çekmek için mükemmel bir yuva yapması gerekir.",
+        "If she approves, she will line it with soft feathers.": "Eğer dişi onaylarsa, yuvanın içini yumuşak tüylerle kaplayacaktır.",
+        "Furthermore, social insects like bees create highly organized cities called hives.": "Ayrıca arılar gibi sosyal böcekler, kovan adı verilen son derece organize şehirler oluştururlar.",
+        "Inside the hive, they build complex structures using beeswax, which they secrete from their own bodies.": "Kovanın içinde, kendi vücutlarından salgıladıkları balmumunu kullanarak karmaşık yapılar inşa ederler.",
+        "The hive is composed of perfectly hexagonal cells.": "Kovan, mükemmel altıgen hücrelerden oluşur.",
+        "Bees use these cells to store honey, pollen, and to raise their young.": "Arılar bu hücreleri bal, polen depolamak ve yavrularını büyütmek için kullanırlar.",
+        "The hexagonal shape is mathematically efficient, using the least amount of wax to create the strongest structure with no wasted space.": "Altıgen şekil matematiksel olarak verimlidir, boşa harcanan alan olmadan en güçlü yapıyı oluşturmak için en az miktarda balmumu kullanır.",
+        "This showcases a form of natural geometry and cooperative labor.": "Bu, doğal geometri ve işbirlikçi emeğin bir biçimini sergiler.",
+        "These examples remind us that intelligence and engineering skills are not limited to humans.": "Bu örnekler, zeka ve mühendislik becerilerinin sadece insanlarla sınırlı olmadığını bize hatırlatır.",
+        "Animals possess remarkable abilities to shape their environments and create functional, beautiful homes.": "Hayvanlar, çevrelerini şekillendirmek ve işlevsel, güzel yuvalar yaratmak için olağanüstü yeteneklere sahiptir.",
+        "Their instinctive architecture is a vital part of their survival strategy and adds to the incredible complexity of the natural world.": "İçgüdüsel mimarileri, hayatta kalma stratejilerinin hayati bir parçasıdır ve doğal dünyanın inanılmaz karmaşıklığına katkıda bulunur.",
+        "Observing these animal architects gives us a greater appreciation for the ingenuity found in nature.": "Bu hayvan mimarlarını gözlemlemek, doğada bulunan ustalığa daha büyük bir takdir duymamızı sağlar."
+      },
+      "audio_url": "https://line-reader.pages.dev/audio/b1-the-unlikely-architects-animals-that-build-compl.m4a",
+      "image_url": "https://getlinereader.com/images/b1-the-unlikely-architects-animals-that-build-compl.jpg",
+      "audio_segments": [
+        {
+          "p": 0,
+          "s": 0,
+          "start_ms": 0,
+          "end_ms": 6900
+        },
+        {
+          "p": 0,
+          "s": 1,
+          "start_ms": 7320,
+          "end_ms": 16700
+        },
+        {
+          "p": 0,
+          "s": 2,
+          "start_ms": 17160,
+          "end_ms": 24680
+        },
+        {
+          "p": 0,
+          "s": 3,
+          "start_ms": 25000,
+          "end_ms": 33680
+        },
+        {
+          "p": 1,
+          "s": 0,
+          "start_ms": 33740,
+          "end_ms": 37960
+        },
+        {
+          "p": 1,
+          "s": 1,
+          "start_ms": 38280,
+          "end_ms": 42100
+        },
+        {
+          "p": 1,
+          "s": 2,
+          "start_ms": 43340,
+          "end_ms": 49420
+        },
+        {
+          "p": 1,
+          "s": 3,
+          "start_ms": 49420,
+          "end_ms": 56080
+        },
+        {
+          "p": 1,
+          "s": 4,
+          "start_ms": 56080,
+          "end_ms": 63280
+        },
+        {
+          "p": 1,
+          "s": 5,
+          "start_ms": 63280,
+          "end_ms": 69220
+        },
+        {
+          "p": 2,
+          "s": 0,
+          "start_ms": 69220,
+          "end_ms": 72540
+        },
+        {
+          "p": 2,
+          "s": 1,
+          "start_ms": 72880,
+          "end_ms": 77520
+        },
+        {
+          "p": 2,
+          "s": 2,
+          "start_ms": 77660,
+          "end_ms": 83940
+        },
+        {
+          "p": 2,
+          "s": 3,
+          "start_ms": 83980,
+          "end_ms": 88380
+        },
+        {
+          "p": 2,
+          "s": 4,
+          "start_ms": 89620,
+          "end_ms": 99780
+        },
+        {
+          "p": 3,
+          "s": 0,
+          "start_ms": 102100,
+          "end_ms": 105340
+        },
+        {
+          "p": 3,
+          "s": 1,
+          "start_ms": 105500,
+          "end_ms": 109020
+        },
+        {
+          "p": 3,
+          "s": 2,
+          "start_ms": 110320,
+          "end_ms": 116660
+        },
+        {
+          "p": 3,
+          "s": 3,
+          "start_ms": 117780,
+          "end_ms": 124400
+        },
+        {
+          "p": 3,
+          "s": 4,
+          "start_ms": 124400,
+          "end_ms": 127760
+        },
+        {
+          "p": 3,
+          "s": 5,
+          "start_ms": 127820,
+          "end_ms": 132980
+        },
+        {
+          "p": 4,
+          "s": 0,
+          "start_ms": 133100,
+          "end_ms": 138440
+        },
+        {
+          "p": 4,
+          "s": 1,
+          "start_ms": 138680,
+          "end_ms": 144060
+        },
+        {
+          "p": 4,
+          "s": 2,
+          "start_ms": 144280,
+          "end_ms": 147580
+        },
+        {
+          "p": 4,
+          "s": 3,
+          "start_ms": 147600,
+          "end_ms": 151740
+        },
+        {
+          "p": 4,
+          "s": 4,
+          "start_ms": 151740,
+          "end_ms": 159200
+        },
+        {
+          "p": 4,
+          "s": 5,
+          "start_ms": 159280,
+          "end_ms": 165800
+        },
+        {
+          "p": 5,
+          "s": 0,
+          "start_ms": 165800,
+          "end_ms": 171400
+        },
+        {
+          "p": 5,
+          "s": 1,
+          "start_ms": 171460,
+          "end_ms": 177780
+        },
+        {
+          "p": 5,
+          "s": 2,
+          "start_ms": 177780,
+          "end_ms": 185240
+        },
+        {
+          "p": 5,
+          "s": 3,
+          "start_ms": 185280,
+          "end_ms": 190440
+        }
+      ]
     }
   ]
 }
