@@ -13,12 +13,12 @@ abstract final class ApiConfig {
     defaultValue: '',
   );
 
-  /// Tarayıcı bağlamsal AI çevirisi için Cloudflare Workers AI uç noktası.
+  /// Tarayıcı bağlamsal AI çevirisi ve bulut senkronizasyonu için Cloudflare Workers uç noktası.
   /// Yalnızca kayıtlı Firebase kullanıcılarının imzalı ID Token'ı ile yanıt verir;
   /// APK içinde hiçbir gizli anahtar tutulmaz.
   static const String browserAiTranslateEndpoint = String.fromEnvironment(
     'AI_TRANSLATE_ENDPOINT',
-    defaultValue: 'https://api.getlinereader.com',
+    defaultValue: 'https://linereader-ai.xreasayaz21.workers.dev',
   );
 
   /// Mobil operatörlerin kesmesi durumunda otomatik devreye giren birincil Cloudflare apex yedeği.
@@ -62,7 +62,7 @@ abstract final class ApiConfig {
 
   /// Kelime arama ekranı için D1 önbellekli doğal örnek cümle uç noktası (8–22 kelime).
   static const String wordExamplesWorkerUrl =
-      'https://api.getlinereader.com/examples';
+      'https://linereader-ai.xreasayaz21.workers.dev/examples';
 
   /// Yedek ücretsiz insan çevirili cümle korpusu (Tatoeba).
   static const String tatoebaSearchBaseUrl =
@@ -71,7 +71,7 @@ abstract final class ApiConfig {
   /// Makaleler için birincil uzak JSON veri kaynağı (Cloudflare Worker + D1:
   /// yayınlaya basıldığı anda 1 saniye altında güncellenir).
   static const String articlesJsonUrl =
-      'https://api.getlinereader.com/articles.json';
+      'https://linereader-ai.xreasayaz21.workers.dev/articles.json';
 
   /// Birincil Worker henüz boş veya erişilemezse devreye giren Cloudflare Pages CDN yedeği.
   static const String articlesFallbackJsonUrl =

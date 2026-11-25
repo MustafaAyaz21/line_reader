@@ -41,9 +41,16 @@ class CloudSyncService {
   bool _isApplyingRemoteTheme = false;
   bool _listenersAttached = false;
   Timer? _debounceTimer;
+  VoidCallback? onSyncCompleted;
 
-  void configure({required AuthController authController}) {
+  void configure({
+    required AuthController authController,
+    VoidCallback? onSyncCompleted,
+  }) {
     _authController = authController;
+    if (onSyncCompleted != null) {
+      this.onSyncCompleted = onSyncCompleted;
+    }
     if (!_listenersAttached) {
       _listenersAttached = true;
       AppThemeController.shared.addListener(_onThemeChanged);
@@ -93,10 +100,12 @@ class CloudSyncService {
 
       Map<String, dynamic>? remoteData;
       if (getRes.statusCode == 200) {
-        final decoded = jsonDecode(getRes.body);
-        if (decoded is Map<String, dynamic> && decoded['ok'] == true) {
-          remoteData = decoded;
-        }
+        try {
+          final decoded = jsonDecode(getRes.body);
+          if (decoded is Map<String, dynamic> && decoded['ok'] == true) {
+            remoteData = decoded;
+          }
+        } catch (_) {}
       }
 
       // Sunucudan gelen verileri yerel depoya birleştir (merge)
@@ -199,6 +208,7 @@ class CloudSyncService {
           }
         }
       }
+      onSyncCompleted?.call();
     } catch (e) {
       debugPrint('[CloudSyncService] Remote merge hatasi: $e');
     }

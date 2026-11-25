@@ -95,7 +95,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
       _refreshArticlesSilently(force: true);
       if (_authController != null) {
-        CloudSyncService.shared.configure(authController: _authController!);
+        CloudSyncService.shared.configure(
+          authController: _authController!,
+          onSyncCompleted: () {
+            if (mounted) {
+              _wordsController?.loadLists();
+            }
+          },
+        );
         if (_authController!.isAuthenticated) {
           CloudSyncService.shared.syncNow();
         }
@@ -114,7 +121,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
       if (_authController?.isAuthenticated == true) {
         _authController!.refreshEntitlement();
-        CloudSyncService.shared.syncNow();
+        CloudSyncService.shared.syncNow().then((_) {
+          if (mounted) {
+            _wordsController?.loadLists();
+          }
+        });
       }
       _refreshArticlesSilently();
       _authController?.refreshEntitlement();
