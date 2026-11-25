@@ -1,7 +1,7 @@
 {
-    "latest_version":  "0.1.42",
-    "version_code":  43,
+    "latest_version":  "0.1.43",
+    "version_code":  44,
     "min_version_code":  0,
-    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.42/app-release.apk",
-    "release_notes":  "E-posta OTP doğrulamasında 6 haneli kutu tasarımı, Google ve e-posta giriş ayrımı, oturum güvenliği ve Web kararlılık güncellemeleri."
+    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.43/app-release.apk",
+    "release_notes":  "İki aşamalı otomatik makale yayın planlayıcısı (A1-C2 tüm seviyeler), tek tıkla kaynaktan çekme & Podcast AI canlı adım takibi ve PC makale stüdyosu güncellemeleri."
 }
