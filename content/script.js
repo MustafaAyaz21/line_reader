@@ -74,6 +74,7 @@ const i18n = {
     heroDesc:
       "Line Reader, okuduğun her satırda bilmediğin kelimelere tek dokunuşla bağlam odaklı Türkçe anlam, IPA telaffuz ve sesli okuma sunar. Makale okurken ya da web'de gezinirken kelime hazineni zahmetsizce büyüt.",
     heroDownloadLabel: "Android APK İndir",
+    heroWebAppBtn: "Web'de Aç",
     heroExploreBtn: "Özellikleri Keşfet",
     stat1: "Seviyeli Makaleler",
     stat2Strong: "AI + Çevrimdışı",
@@ -126,6 +127,7 @@ const i18n = {
     step3Desc: "Takıldığın kelimeye dokun, bağlam anlamını ve telaffuzunu gör, listene kaydet.",
     ctaTitle: "Line Reader'ı hemen dene",
     ctaDesc: "Tamamen ücretsiz olarak indir, İngilizce okuma alışkanlığını bugün başlat.",
+    ctaWebAppBtn: "Tarayıcıda Aç (Web)",
     note1: "Android 7.0+ uyumlu",
     note2: "Doğrudan GitHub Releases üzerinden güvenli indirme",
     note3: "Uygulama içi otomatik sürüm bildirimi",
@@ -142,6 +144,7 @@ const i18n = {
     heroDesc:
       "Line Reader gives you instant context-aware word meanings, IPA pronunciation, and natural voice playback with a single tap. Grow your vocabulary effortlessly while reading articles or browsing the web.",
     heroDownloadLabel: "Download Android APK",
+    heroWebAppBtn: "Open Web App",
     heroExploreBtn: "Explore Features",
     stat1: "Leveled Articles",
     stat2Strong: "AI + Offline",
@@ -194,6 +197,7 @@ const i18n = {
     step3Desc: "Tap any unfamiliar word to see its contextual meaning, pronunciation, and save it.",
     ctaTitle: "Try Line Reader today",
     ctaDesc: "Download completely free and start building your daily English reading habit.",
+    ctaWebAppBtn: "Open in Browser (Web)",
     note1: "Android 7.0+ compatible",
     note2: "Secure direct download via GitHub Releases",
     note3: "Automatic in-app update notifications",

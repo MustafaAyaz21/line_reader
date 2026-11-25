@@ -18,17 +18,16 @@ abstract final class ApiConfig {
   /// APK içinde hiçbir gizli anahtar tutulmaz.
   static const String browserAiTranslateEndpoint = String.fromEnvironment(
     'AI_TRANSLATE_ENDPOINT',
-    defaultValue: 'https://linereader-ai.xreasayaz21.workers.dev',
+    defaultValue: 'https://api.getlinereader.com',
   );
 
-  /// Mobil operatörlerin `*.workers.dev` / `*.pages.dev` alan adlarını kesmesi
-  /// durumunda otomatik devreye giren birincil Netlify proxy yedeği.
+  /// Mobil operatörlerin kesmesi durumunda otomatik devreye giren birincil Cloudflare apex yedeği.
   static const String browserAiFallbackEndpoint =
-      'https://linereaderr.netlify.app/api';
+      'https://getlinereader.com/api';
 
-  /// İkincil Cloudflare Pages proxy yedeği.
+  /// İkincil Netlify proxy yedeği.
   static const String browserAiSecondaryFallbackEndpoint =
-      'https://line-reader.pages.dev/api';
+      'https://linereaderr.netlify.app/api';
 
   /// Varsayılan güncel Gemini modeli.
   static const String geminiModel = 'gemini-3.0-flash';
@@ -63,7 +62,7 @@ abstract final class ApiConfig {
 
   /// Kelime arama ekranı için D1 önbellekli doğal örnek cümle uç noktası (8–22 kelime).
   static const String wordExamplesWorkerUrl =
-      'https://linereader-ai.xreasayaz21.workers.dev/examples';
+      'https://api.getlinereader.com/examples';
 
   /// Yedek ücretsiz insan çevirili cümle korpusu (Tatoeba).
   static const String tatoebaSearchBaseUrl =
@@ -72,11 +71,11 @@ abstract final class ApiConfig {
   /// Makaleler için birincil uzak JSON veri kaynağı (Cloudflare Worker + D1:
   /// yayınlaya basıldığı anda 1 saniye altında güncellenir).
   static const String articlesJsonUrl =
-      'https://linereader-ai.xreasayaz21.workers.dev/articles.json';
+      'https://api.getlinereader.com/articles.json';
 
   /// Birincil Worker henüz boş veya erişilemezse devreye giren Cloudflare Pages CDN yedeği.
   static const String articlesFallbackJsonUrl =
-      'https://line-reader.pages.dev/articles.json';
+      'https://getlinereader.com/articles.json';
 
   /// İkincil CDN de geçici olarak erişilemezse devreye giren GitHub raw yedeği.
   static const String articlesGithubFallbackJsonUrl =
