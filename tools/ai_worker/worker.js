@@ -92,6 +92,14 @@ export default {
       return handleBrowserAiTranslate(request, env, verifiedUser);
     }
 
+    if (method === "GET" && path === "/sync") {
+      return handleUserCloudSyncGet(request, env, verifiedUser);
+    }
+
+    if (method === "POST" && path === "/sync") {
+      return handleUserCloudSyncPost(request, env, verifiedUser);
+    }
+
     // 4) Mobil Geliştirici Paneli uç noktaları (Firebase ID Token + D1 source='admin' zorunlu)
     if (path.startsWith("/dev/")) {
       return handleDeveloperPanelRequest(request, env, verifiedUser, path, method);
@@ -301,6 +309,17 @@ async function ensureSchema(db) {
         auth_provider TEXT,
         first_seen_at TEXT NOT NULL,
         last_seen_at TEXT NOT NULL
+      )
+    `),
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS user_cloud_sync (
+        uid TEXT PRIMARY KEY,
+        email TEXT,
+        saved_words_json TEXT NOT NULL DEFAULT '[]',
+        word_lists_json TEXT NOT NULL DEFAULT '[]',
+        reading_progress_json TEXT NOT NULL DEFAULT '{}',
+        preferences_json TEXT NOT NULL DEFAULT '{}',
+        updated_at TEXT NOT NULL
       )
     `),
   ]);
@@ -628,6 +647,92 @@ async function handleRedeemCode(request, env, user) {
     is_unlimited: true,
     code: rawCode,
     message: "Kod onaylandı! Sınırsız çeviri, reklamsız kullanım ve Tarayıcı AI aktif.",
+  });
+}
+
+/* ---------------- Kullanıcı Bulut Senkronizasyonu (D1 Tabanlı) ---------------- */
+
+async function handleUserCloudSyncGet(request, env, user) {
+  if (!env || !env.DB) {
+    return jsonResponse({ ok: false, error: "db_not_configured" }, 503);
+  }
+  await ensureSchema(env.DB);
+  const uid = String(user.uid || "").trim();
+  if (!uid) {
+    return jsonResponse({ ok: false, error: "invalid_user" }, 400);
+  }
+
+  const row = await env.DB
+    .prepare("SELECT saved_words_json, word_lists_json, reading_progress_json, preferences_json, updated_at FROM user_cloud_sync WHERE uid = ? LIMIT 1")
+    .bind(uid)
+    .first();
+
+  if (!row) {
+    return jsonResponse({
+      ok: true,
+      exists: false,
+      saved_words: [],
+      word_lists: [],
+      reading_progress: {},
+      preferences: {},
+      updated_at: null,
+    });
+  }
+
+  return jsonResponse({
+    ok: true,
+    exists: true,
+    saved_words: JSON.parse(row.saved_words_json || "[]"),
+    word_lists: JSON.parse(row.word_lists_json || "[]"),
+    reading_progress: JSON.parse(row.reading_progress_json || "{}"),
+    preferences: JSON.parse(row.preferences_json || "{}"),
+    updated_at: row.updated_at,
+  });
+}
+
+async function handleUserCloudSyncPost(request, env, user) {
+  if (!env || !env.DB) {
+    return jsonResponse({ ok: false, error: "db_not_configured" }, 503);
+  }
+  await ensureSchema(env.DB);
+  const uid = String(user.uid || "").trim();
+  const email = String(user.email || "").trim().toLowerCase();
+  if (!uid) {
+    return jsonResponse({ ok: false, error: "invalid_user" }, 400);
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch (_) {
+    return jsonResponse({ ok: false, error: "invalid_json" }, 400);
+  }
+
+  const nowIso = new Date().toISOString();
+  const wordsJson = JSON.stringify(body?.saved_words || []);
+  const listsJson = JSON.stringify(body?.word_lists || []);
+  const progressJson = JSON.stringify(body?.reading_progress || {});
+  const prefsJson = JSON.stringify(body?.preferences || {});
+
+  await env.DB
+    .prepare(`
+      INSERT INTO user_cloud_sync (uid, email, saved_words_json, word_lists_json, reading_progress_json, preferences_json, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(uid) DO UPDATE SET
+        email = excluded.email,
+        saved_words_json = excluded.saved_words_json,
+        word_lists_json = excluded.word_lists_json,
+        reading_progress_json = excluded.reading_progress_json,
+        preferences_json = excluded.preferences_json,
+        updated_at = excluded.updated_at
+    `)
+    .bind(uid, email, wordsJson, listsJson, progressJson, prefsJson, nowIso)
+    .run();
+
+  return jsonResponse({
+    ok: true,
+    updated_at: nowIso,
+    message: "Veriler bulutla senkronize edildi.",
   });
 }
 

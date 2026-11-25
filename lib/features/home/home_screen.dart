@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/sync/cloud_sync_service.dart';
+
 import '../../core/config/api_config.dart';
 import '../../core/database/app_database.dart';
 import '../../core/localization/app_locale.dart';
@@ -92,6 +94,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _checkForAppUpdateSilently(force: true);
       }
       _refreshArticlesSilently(force: true);
+      if (_authController != null) {
+        CloudSyncService.shared.configure(authController: _authController!);
+        if (_authController!.isAuthenticated) {
+          CloudSyncService.shared.syncNow();
+        }
+      }
       if (!kIsWeb) {
         _handleExternalProcessTextReady();
       }
@@ -106,6 +114,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
       if (_authController?.isAuthenticated == true) {
         _authController!.refreshEntitlement();
+        CloudSyncService.shared.syncNow();
       }
       _refreshArticlesSilently();
       _authController?.refreshEntitlement();
