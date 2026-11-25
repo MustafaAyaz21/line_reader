@@ -602,7 +602,8 @@ async function sha256Hex(value) {
 
 function buildLineReaderOtpEmailHtml({ code, displayName, isEnglish }) {
   const safeName = String(displayName || "").trim().replace(/[<>&"']/g, "");
-  const spacedCode = String(code).split("").join(" ");
+  const rawCode = String(code).trim();
+  const digits = rawCode.split("");
   const title = isEnglish ? "Verify Your Email" : "E-postanızı Doğrulayın";
   const greeting = safeName
     ? (isEnglish ? `Hello ${safeName},` : `Merhaba ${safeName},`)
@@ -619,6 +620,14 @@ function buildLineReaderOtpEmailHtml({ code, displayName, isEnglish }) {
   const footerNote = isEnglish
     ? "If you did not request this account, you can safely ignore this email."
     : "Bu hesabı siz oluşturmadıysanız bu e-postayı güvenle silebilirsiniz.";
+
+  const digitBoxesHtml = digits.map((d) => `
+    <td align="center" valign="middle" style="padding:0 3px;">
+      <div style="width:36px;height:48px;line-height:48px;font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,Courier,monospace;font-size:26px;font-weight:800;color:#1E1B18;background-color:#FFFFFF;border:1.5px solid #D6CBB9;border-radius:10px;text-align:center;">
+        ${d}
+      </div>
+    </td>
+  `).join("");
 
   return `<!DOCTYPE html>
 <html lang="${isEnglish ? "en" : "tr"}">
@@ -645,10 +654,17 @@ function buildLineReaderOtpEmailHtml({ code, displayName, isEnglish }) {
               <h1 style="margin:0 0 12px 0;font-size:20px;font-weight:800;color:#1E1B18;">${title}</h1>
               <p style="margin:0 0 10px 0;font-size:15px;line-height:1.6;color:#3D3731;font-weight:600;">${greeting}</p>
               <p style="margin:0 0 26px 0;font-size:14px;line-height:1.65;color:#5E554D;">${bodyCopy}</p>
-              <div style="background-color:#FAF7F2;border:1.5px dashed #D6CBB9;border-radius:18px;padding:24px 16px;text-align:center;margin-bottom:22px;">
-                <div style="font-size:11px;text-transform:uppercase;letter-spacing:1.6px;color:#8C7F70;font-weight:700;margin-bottom:10px;">${isEnglish ? "VERIFICATION CODE" : "DOĞRULAMA KODU"}</div>
-                <div style="font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;font-size:34px;font-weight:800;letter-spacing:8px;color:#1E1B18;">${spacedCode}</div>
+              
+              <!-- Tek satırda hizalı 6 kutucuklu OTP konteyneri -->
+              <div style="background-color:#FAF7F2;border:1.5px dashed #D6CBB9;border-radius:18px;padding:22px 12px;text-align:center;margin-bottom:22px;">
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:1.6px;color:#8C7F70;font-weight:700;margin-bottom:14px;">${isEnglish ? "VERIFICATION CODE" : "DOĞRULAMA KODU"}</div>
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:0 auto;display:inline-table;white-space:nowrap;">
+                  <tr>
+                    ${digitBoxesHtml}
+                  </tr>
+                </table>
               </div>
+
               <p style="margin:0;font-size:12.5px;line-height:1.5;color:#786F66;text-align:center;">⏱️ ${validity}</p>
             </td>
           </tr>

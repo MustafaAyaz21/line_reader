@@ -43,6 +43,10 @@ abstract class AuthBackend {
   /// Kayıtlı kullanıcı için kısa ömürlü imzalı Firebase ID Token döndürür.
   Future<String?> getIdToken({bool forceRefresh = false});
 
+  /// E-posta adresinin hangi sağlayıcılarla kayıtlı olduğunu sorgular.
+  Future<List<String>> fetchSignInMethodsForEmail(String email) async =>
+      const <String>[];
+
   Future<void> signOut();
 }
 
@@ -410,6 +414,19 @@ class FirebaseAuthBackend implements AuthBackend {
   }
 
   @override
+  Future<List<String>> fetchSignInMethodsForEmail(String email) async {
+    if (!_isConfigured) return const <String>[];
+    try {
+      final methods = await FirebaseAuth.instance
+          .fetchSignInMethodsForEmail(email.trim().toLowerCase());
+      return methods;
+    } catch (error) {
+      debugPrint('[FirebaseAuthBackend] fetchSignInMethodsForEmail hatasi: $error');
+      return const <String>[];
+    }
+  }
+
+  @override
   Future<void> signOut() async {
     if (!_isConfigured) return;
     try {
@@ -435,7 +452,7 @@ class FirebaseAuthBackend implements AuthBackend {
       'network-request-failed' =>
         'İnternet bağlantısı yok. Lütfen bağlantınızı kontrol edin.',
       'account-exists-with-different-credential' =>
-        'Bu e-posta başka bir giriş yöntemiyle kayıtlı.',
+        'Bu e-posta adresi e-posta ve şifre ile kayıtlıdır. Lütfen e-posta ve şifrenizle giriş yapın.',
       'popup-closed-by-user' ||
       'cancelled-popup-request' =>
         'Google giriş penceresi kapatıldı.',

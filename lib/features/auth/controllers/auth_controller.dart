@@ -156,11 +156,21 @@ class AuthController extends ChangeNotifier {
       final current = _backend.currentUser;
       if (current != null) {
         _user = current;
-        _status = AuthSessionStatus.authenticated;
-        _isUnlimited = cachedEnt.isUnlimited;
-        _hasSpecialThemes = cachedEnt.hasSpecialThemes;
-        _entitlementCodeUsed = cachedEnt.codeUsed;
-        _entitlementRole = cachedEnt.role;
+        if (current.emailVerified || _d1EmailVerified) {
+          _status = AuthSessionStatus.authenticated;
+          _isUnlimited = cachedEnt.isUnlimited;
+          _hasSpecialThemes = cachedEnt.hasSpecialThemes;
+          _entitlementCodeUsed = cachedEnt.codeUsed;
+          _entitlementRole = cachedEnt.role;
+        } else {
+          // E-posta henüz doğrulanmamışsa authenticated yapma, OTP ekranında tut
+          _status = AuthSessionStatus.unauthenticated;
+          _isOtpVerificationMode = true;
+          _isUnlimited = false;
+          _hasSpecialThemes = false;
+          _entitlementCodeUsed = null;
+          _entitlementRole = null;
+        }
       } else {
         final guestEnabled = await _localStore.isGuestModeEnabled();
         _user = null;
@@ -178,9 +188,16 @@ class AuthController extends ChangeNotifier {
       _authSub = _backend.authStateChanges.listen((nextUser) {
         if (nextUser != null) {
           _user = nextUser;
-          _status = AuthSessionStatus.authenticated;
-          _safeNotify();
-          refreshEntitlement();
+          if (nextUser.emailVerified || _d1EmailVerified) {
+            _status = AuthSessionStatus.authenticated;
+            _safeNotify();
+            refreshEntitlement();
+          } else {
+            // E-posta doğrulanana kadar oturum durumunu beklet
+            _status = AuthSessionStatus.unauthenticated;
+            _isOtpVerificationMode = true;
+            _safeNotify();
+          }
         } else if (_status == AuthSessionStatus.authenticated) {
           _user = null;
           _isUnlimited = false;
@@ -401,16 +418,34 @@ class AuthController extends ChangeNotifier {
     _safeNotify();
 
     try {
+      final cleanEmail = email.trim().toLowerCase();
+      // Önce bu e-postanın Google ile kayıtlı olup olmadığını denetle
+      try {
+        final methods = await _backend.fetchSignInMethodsForEmail(cleanEmail);
+        if (methods.contains('google.com') && !methods.contains('password')) {
+          return const AuthActionResult.failure(
+            errorCode: 'account_exists_with_google',
+            message:
+                'Bu e-posta adresi Google ile kayıtlıdır. Lütfen "Google ile Giriş Yap" butonunu kullanın.',
+          );
+        }
+      } catch (_) {}
+
       final result = await _backend.signInWithEmail(
-        email: email,
+        email: cleanEmail,
         password: password,
       );
       if (result.isSuccess && result.user != null) {
         _user = result.user;
-        _status = AuthSessionStatus.authenticated;
-        _sessionLookupCount = 0;
-        await _localStore.setGuestModeEnabled(false);
-        await _syncEntitlementAfterSignIn();
+        if (result.user!.emailVerified || _d1EmailVerified) {
+          _status = AuthSessionStatus.authenticated;
+          _sessionLookupCount = 0;
+          await _localStore.setGuestModeEnabled(false);
+          await _syncEntitlementAfterSignIn();
+        } else {
+          _status = AuthSessionStatus.unauthenticated;
+          _isOtpVerificationMode = true;
+        }
       }
       return result;
     } finally {
@@ -439,8 +474,21 @@ class AuthController extends ChangeNotifier {
     _safeNotify();
 
     try {
+      final cleanEmail = email.trim().toLowerCase();
+      // Google ile kayıtlı bir hesap varsa şifreyle yeniden kaydolmayı engelle
+      try {
+        final methods = await _backend.fetchSignInMethodsForEmail(cleanEmail);
+        if (methods.contains('google.com')) {
+          return const AuthActionResult.failure(
+            errorCode: 'account_exists_with_google',
+            message:
+                'Bu e-posta adresi zaten Google ile kayıtlıdır. Lütfen "Google ile Giriş Yap" butonunu kullanın.',
+          );
+        }
+      } catch (_) {}
+
       final result = await _backend.signUpWithEmail(
-        email: email,
+        email: cleanEmail,
         password: password,
         displayName: displayName,
       );
