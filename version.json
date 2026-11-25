@@ -1,7 +1,7 @@
 {
-    "latest_version":  "0.1.47",
-    "version_code":  48,
+    "latest_version":  "0.1.48",
+    "version_code":  49,
     "min_version_code":  0,
-    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.47/app-release.apk",
-    "release_notes":  "v0.1.47: Yeni modern LR çizimli yenileme/yükleme animasyonu, web ses cümle atlama (CORS/Blob) düzeltmesi ve tüm temalarda tam kontrast uyumu."
+    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.48/app-release.apk",
+    "release_notes":  "v0.1.48: Kararlılık ve güncelleme testi sürümü."
 }
