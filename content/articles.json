@@ -1,7 +1,388 @@
 {
   "version": 1,
-  "updated_at": "2026-11-25T22:57:11.588Z",
+  "updated_at": "2026-11-25T23:05:35.934Z",
   "articles": [
+    {
+      "id": "b1-the-mystery-of-the-walking-rocks",
+      "level": "B1",
+      "title": "The Mystery of the Walking Rocks",
+      "description": "In Death Valley, California, heavy stones move across a flat, dry lake bed, leaving long trails behind them. Scientists were puzzled by this phenomenon for decades until they finally discovered the surprising cause.",
+      "reading_time": "2 - 4 dk",
+      "reading_time_minutes": 3,
+      "language": "en",
+      "content": "Deep in the heart of Death Valley National Park, California, lies a mysterious place called Racetrack Playa. It is a perfectly flat, dry lake bed, almost completely empty of life. However, this quiet place holds one of nature's most puzzling secrets. Scattered across the cracked mud surface are hundreds of rocks, some weighing as much as a human. These rocks are not stationary; they move, leaving long, deep trails etched into the ground behind them. For many years, nobody ever saw them move, leading to many wild theories.\n\nThe trails clearly show that the rocks slide for distances of up to 200 meters. Some paths are straight, while others curve or even make sharp turns. Because the movement was never witnessed by human eyes, people suggested many explanations. Some believed magnetic forces from deep within the Earth were pulling the stones. Others, more creatively, proposed that nighttime visitors or even mischievous aliens were moving the heavy rocks as a prank. The mystery deepened because the conditions in Death Valley are extremely harsh, making continuous scientific observation difficult.\n\nFinally, a team of scientists, including Ralph Lorenz and Richard Norris, decided to solve the puzzle using modern technology. In 2011, they set up a time-lapse camera and placed GPS trackers on several specially prepared, instrumented rocks. They had to wait patiently for the right conditions. Racetrack Playa is usually bone-dry, but in the winter of 2013, it filled with a thin layer of rainwater. This water did not soak into the hard clay ground immediately.\n\nOn a cold December night, the scientists got their answer. The shallow water froze, creating a thin layer of \"windowpane ice\" only a few millimeters thick. This ice sheet was not strong enough to freeze the rocks into the ground. Instead, as the sun rose the next morning, the ice began to break into large floating panels. Driven by a light but steady breeze, these massive ice sheets acted like sails, pushing the rocks across the slippery, wet mud surface.\n\nThe movement was slow—only a few meters per minute—and silent, which is why it was never noticed before. The ice panels were strong enough to push the rocks but fragile enough to break or move around them, creating the mysterious curved trails. The puzzle was finally solved. It was not aliens, ghosts, or magnetism; it was a rare combination of water, ice, wind, and perfect timing that makes the rocks of Racetrack Playa appear to walk.",
+      "published_at": "2026-11-25T23:02:07.965Z",
+      "category": "Nature",
+      "author": "Line Reader",
+      "word_meanings": {
+        "mystery": "sır",
+        "walking rocks": "yürüyen kayalar",
+        "flat": "düz",
+        "dry lake bed": "kuru göl yatağı",
+        "puzzled": "şaşkın",
+        "phenomenon": "olay",
+        "discovered": "keşfetti",
+        "surprising": "şaşırtıcı",
+        "uninhabited": "ıssız",
+        "stationary": "hareketsiz",
+        "etched": "kazınmış",
+        "witnessed": "tanık olundu",
+        "magnetic forces": "manyetik güçler",
+        "proposed": "öne sürdü",
+        "harsh": "zorlu",
+        "solve": "çözmek",
+        "time-lapse camera": "hızlandırılmış çekim kamerası",
+        "trackers": "takip cihazları",
+        "patiently": "sabırla",
+        "soaked": "emdi",
+        "shallow": "sığ",
+        "froze": "dondu",
+        "millimeters": "milimetre",
+        "breeze": "esinti",
+        "massive": "devasa",
+        "slippery": "kaygan",
+        "fragile": "kırılgan",
+        "combination": "kombinasyon"
+      },
+      "word_relations": {
+        "mystery": {
+          "syn": [
+            "puzzle",
+            "secret"
+          ]
+        },
+        "flat": {
+          "syn": [
+            "level",
+            "even"
+          ],
+          "ant": [
+            "uneven",
+            "hilly"
+          ]
+        },
+        "puzzled": {
+          "syn": [
+            "confused",
+            "mystified"
+          ],
+          "ant": [
+            "clear",
+            "certain"
+          ]
+        },
+        "discovered": {
+          "syn": [
+            "found",
+            "uncovered"
+          ],
+          "ant": [
+            "hidden",
+            "lost"
+          ]
+        },
+        "surprising": {
+          "syn": [
+            "unexpected",
+            "astonishing"
+          ],
+          "ant": [
+            "predictable",
+            "expected"
+          ]
+        },
+        "uninhabited": {
+          "syn": [
+            "empty",
+            "deserted"
+          ],
+          "ant": [
+            "occupied",
+            "populated"
+          ]
+        },
+        "stationary": {
+          "syn": [
+            "still",
+            "fixed"
+          ],
+          "ant": [
+            "moving",
+            "active"
+          ]
+        },
+        "harsh": {
+          "syn": [
+            "severe",
+            "tough"
+          ],
+          "ant": [
+            "mild",
+            "gentle"
+          ]
+        },
+        "solve": {
+          "syn": [
+            "resolve",
+            "figure out"
+          ],
+          "ant": [
+            "complicate"
+          ]
+        },
+        "patiently": {
+          "syn": [
+            "calmly",
+            "steadfastly"
+          ],
+          "ant": [
+            "impatiently"
+          ]
+        },
+        "shallow": {
+          "syn": [
+            "not deep"
+          ],
+          "ant": [
+            "deep"
+          ]
+        },
+        "massive": {
+          "syn": [
+            "huge",
+            "giant"
+          ],
+          "ant": [
+            "tiny",
+            "small"
+          ]
+        },
+        "slippery": {
+          "syn": [
+            "slick",
+            "greasy"
+          ],
+          "ant": [
+            "rough",
+            "grippable"
+          ]
+        },
+        "fragile": {
+          "syn": [
+            "delicate",
+            "brittle"
+          ],
+          "ant": [
+            "strong",
+            "tough"
+          ]
+        },
+        "combination": {
+          "syn": [
+            "mixture",
+            "blend"
+          ],
+          "ant": [
+            "separation"
+          ]
+        }
+      },
+      "paragraph_translations": [
+        "Kaliforniya'daki Death Valley Ulusal Parkı'nın kalbinin derinliklerinde, Racetrack Playa adında gizemli bir yer yatar. Tamamen düz, kuru bir göl yatağıdır ve neredeyse tamamen yaşamdan yoksundur. Ancak bu sessiz yer, doğanın en şaşırtıcı sırlarından birini barındırır. Çatlamış çamur yüzeyine dağılmış, bazıları bir insan ağırlığında olan yüzlerce kaya vardır. Bu kayalar hareketsiz değildir; hareket ederler ve arkalarında zemine kazınmış uzun, derin izler bırakırlar. Uzun yıllar boyunca kimse onları hareket ederken görmemiştir, bu da birçok çılgın teoriye yol açmıştır.",
+        "İzlerin, kayaların 200 metreye kadar olan mesafelerde kaydığını açıkça göstermektedir. Bazı yollar düzken, diğerleri kıvrılır veya hatta keskin dönüşler yapar. Hareket insan gözüyle hiç tanık olunmadığı için, insanlar birçok açıklama öne sürdü. Bazıları, Dünya'nın derinliklerinden gelen manyetik güçlerin taşları çektiğine inanıyordu. Diğerleri ise daha yaratıcı bir şekilde, gece ziyaretçilerinin ve hatta yaramaz uzaylıların ağır kayaları bir şaka olarak hareket ettirdiğini öne sürdüler. Death Valley'deki koşullar son derece zorlu olduğundan, sürekli bilimsel gözlemi zorlaştırdığı için gizem derinleşti.",
+        "Sonunda, Ralph Lorenz ve Richard Norris de dahil olmak üzere bir bilim insanı ekibi, modern teknolojiyi kullanarak bulmacayı çözmeye karar verdiler. 2011 yılında, hızlandırılmış bir kamera kurdular ve özel olarak hazırlanmış, cihazlandırılmış birkaç kayaya GPS takip cihazları yerleştirdiler. Doğru koşullar için sabırla beklemek zorunda kaldılar. Racetrack Playa genellikle kemik kurudur, ancak 2013 kışında ince bir yağmur suyu tabakasıyla doldu. Bu su, sert kil zemine hemen emilmedi.",
+        "Soğuk bir Aralık gecesinde, bilim insanları cevaplarını aldılar. Sığ su dondu ve sadece birkaç milimetre kalınlığında ince bir \"pencere camı buzu\" tabakası oluşturdu. Bu buz tabakası, kayaları zemine donduracak kadar güçlü değildi. Bunun yerine, ertesi sabah güneş doğarken buz, yüzen büyük panellere ayrılmaya başladı. Hafif ama sürekli bir esintiyle sürülen bu devasa buz tabakaları, kaygan, ıslak çamur yüzeyi boyunca kayaları iterek yelken gibi davrandılar.",
+        "Hareket yavaştı -dakikada sadece birkaç metre- ve sessizdi, bu yüzden daha önce hiç fark edilmedi. Buz panelleri, kayaları itecek kadar güçlüydü, ancak onları kıracak veya etraflarında hareket edecek kadar kırılgandı, bu da gizemli kavisli izleri oluşturdu. Bulmaca nihayet çözüldü. Uzaylılar, hayaletler veya manyetizma değildi; Racetrack Playa'nın kayalarının yürümesini sağlayan su, buz, rüzgar ve mükemmel zamanlamanın nadir bir kombinasyonuydu."
+      ],
+      "sentence_translations": {
+        "Deep in the heart of Death Valley National Park, California, lies a mysterious place called Racetrack Playa.": "Kaliforniya'daki Death Valley Ulusal Parkı'nın kalbinin derinliklerinde, Racetrack Playa adında gizemli bir yer yatar.",
+        "It is a perfectly flat, dry lake bed, almost completely empty of life.": "Tamamen düz, kuru bir göl yatağıdır ve neredeyse tamamen yaşamdan yoksundur.",
+        "However, this quiet place holds one of nature's most puzzling secrets.": "Ancak bu sessiz yer, doğanın en şaşırtıcı sırlarından birini barındırır.",
+        "Scattered across the cracked mud surface are hundreds of rocks, some weighing as much as a human.": "Çatlamış çamur yüzeyine dağılmış, bazıları bir insan ağırlığında olan yüzlerce kaya vardır.",
+        "These rocks are not stationary; they move, leaving long, deep trails etched into the ground behind them.": "Bu kayalar hareketsiz değildir; hareket ederler ve arkalarında zemine kazınmış uzun, derin izler bırakırlar.",
+        "For many years, nobody ever saw them move, leading to many wild theories.": "Uzun yıllar boyunca kimse onları hareket ederken görmemiştir, bu da birçok çılgın teoriye yol açmıştır.",
+        "The trails clearly show that the rocks slide for distances of up to 200 meters.": "İzlerin, kayaların 200 metreye kadar olan mesafelerde kaydığını açıkça göstermektedir.",
+        "Some paths are straight, while others curve or even make sharp turns.": "Bazıları düzken, diğerleri kıvrılır veya hatta keskin dönüşler yapar.",
+        "Because the movement was never witnessed by human eyes, people suggested many explanations.": "Hareket insan gözüyle hiç tanık olunmadığı için, insanlar birçok açıklama öne sürdü.",
+        "Some believed magnetic forces from deep within the Earth were pulling the stones.": "Bazıları, Dünya'nın derinliklerinden gelen manyetik güçlerin taşları çektiğine inanıyordu.",
+        "Others, more creatively, proposed that nighttime visitors or even mischievous aliens were moving the heavy rocks as a prank.": "Diğerleri ise daha yaratıcı bir şekilde, gece ziyaretçilerinin ve hatta yaramaz uzaylıların ağır kayaları bir şaka olarak hareket ettirdiğini öne sürdüler.",
+        "The mystery deepened because the conditions in Death Valley are extremely harsh, making continuous scientific observation difficult.": "Death Valley'deki koşullar son derece zorlu olduğundan, sürekli bilimsel gözlemi zorlaştırdığı için gizem derinleşti.",
+        "Finally, a team of scientists, including Ralph Lorenz and Richard Norris, decided to solve the puzzle using modern technology.": "Sonunda, Ralph Lorenz ve Richard Norris de dahil olmak üzere bir bilim insanı ekibi, modern teknolojiyi kullanarak bulmacayı çözmeye karar verdiler.",
+        "In 2011, they set up a time-lapse camera and placed GPS trackers on several specially prepared, instrumented rocks.": "2011 yılında, hızlandırılmış bir kamera kurdular ve özel olarak hazırlanmış, cihazlandırılmış birkaç kayaya GPS takip cihazları yerleştirdiler.",
+        "They had to wait patiently for the right conditions.": "Doğru koşullar için sabırla beklemek zorunda kaldılar.",
+        "Racetrack Playa is usually bone-dry, but in the winter of 2013, it filled with a thin layer of rainwater.": "Racetrack Playa genellikle kemik kurudur, ancak 2013 kışında ince bir yağmur suyu tabakasıyla doldu.",
+        "This water did not soak into the hard clay ground immediately.": "Bu su, sert kil zemine hemen emilmedi.",
+        "On a cold December night, the scientists got their answer.": "Soğuk bir Aralık gecesinde, bilim insanları cevaplarını aldılar.",
+        "The shallow water froze, creating a thin layer of \"windowpane ice\" only a few millimeters thick.": "Sığ su dondu ve sadece birkaç milimetre kalınlığında ince bir \"pencere camı buzu\" tabakası oluşturdu.",
+        "This ice sheet was not strong enough to freeze the rocks into the ground.": "Bu buz tabakası, kayaları zemine donduracak kadar güçlü değildi.",
+        "Instead, as the sun rose the next morning, the ice began to break into large floating panels.": "Bunun yerine, ertesi sabah güneş doğarken buz, yüzen büyük panellere ayrılmaya başladı.",
+        "Driven by a light but steady breeze, these massive ice sheets acted like sails, pushing the rocks across the slippery, wet mud surface.": "Hafif ama sürekli bir esintiyle sürülen bu devasa buz tabakaları, kaygan, ıslak çamur yüzeyi boyunca kayaları iterek yelken gibi davrandılar.",
+        "The movement was slow—only a few meters per minute—and silent, which is why it was never noticed before.": "Hareket yavaştı -dakikada sadece birkaç metre- ve sessizdi, bu yüzden daha önce hiç fark edilmedi.",
+        "The ice panels were strong enough to push the rocks but fragile enough to break or move around them, creating the mysterious curved trails.": "Buz panelleri, kayaları itecek kadar güçlüydü, ancak onları kıracak veya etraflarında hareket edecek kadar kırılgandı, bu da gizemli kavisli izleri oluşturdu.",
+        "The puzzle was finally solved.": "Bulmaca nihayet çözüldü.",
+        "It was not aliens, ghosts, or magnetism; it was a rare combination of water, ice, wind, and perfect timing that makes the rocks of Racetrack Playa appear to walk.": "Uzaylılar, hayaletler veya magnetism değildi; Racetrack Playa'nın kayalarının yürümesini sağlayan su, buz, rüzgar ve mükemmel zamanlamanın nadir bir kombinasyonuydu."
+      },
+      "audio_url": "https://line-reader.pages.dev/audio/b1-the-mystery-of-the-walking-rocks.m4a",
+      "image_url": "https://getlinereader.com/images/b1-the-mystery-of-the-walking-rocks.png",
+      "audio_segments": [
+        {
+          "p": 0,
+          "s": 0,
+          "start_ms": 0,
+          "end_ms": 8520
+        },
+        {
+          "p": 0,
+          "s": 1,
+          "start_ms": 8560,
+          "end_ms": 14140
+        },
+        {
+          "p": 0,
+          "s": 2,
+          "start_ms": 14240,
+          "end_ms": 19660
+        },
+        {
+          "p": 0,
+          "s": 3,
+          "start_ms": 19860,
+          "end_ms": 26180
+        },
+        {
+          "p": 0,
+          "s": 4,
+          "start_ms": 26400,
+          "end_ms": 33360
+        },
+        {
+          "p": 0,
+          "s": 5,
+          "start_ms": 33420,
+          "end_ms": 38760
+        },
+        {
+          "p": 1,
+          "s": 0,
+          "start_ms": 38800,
+          "end_ms": 44080
+        },
+        {
+          "p": 1,
+          "s": 1,
+          "start_ms": 44080,
+          "end_ms": 48940
+        },
+        {
+          "p": 1,
+          "s": 2,
+          "start_ms": 49100,
+          "end_ms": 54660
+        },
+        {
+          "p": 1,
+          "s": 3,
+          "start_ms": 54740,
+          "end_ms": 59040
+        },
+        {
+          "p": 1,
+          "s": 4,
+          "start_ms": 59220,
+          "end_ms": 66660
+        },
+        {
+          "p": 1,
+          "s": 5,
+          "start_ms": 66900,
+          "end_ms": 74340
+        },
+        {
+          "p": 2,
+          "s": 0,
+          "start_ms": 74560,
+          "end_ms": 82760
+        },
+        {
+          "p": 2,
+          "s": 1,
+          "start_ms": 82760,
+          "end_ms": 89600
+        },
+        {
+          "p": 2,
+          "s": 2,
+          "start_ms": 90440,
+          "end_ms": 93280
+        },
+        {
+          "p": 2,
+          "s": 3,
+          "start_ms": 93280,
+          "end_ms": 98960
+        },
+        {
+          "p": 2,
+          "s": 4,
+          "start_ms": 100140,
+          "end_ms": 103800
+        },
+        {
+          "p": 3,
+          "s": 0,
+          "start_ms": 103800,
+          "end_ms": 107400
+        },
+        {
+          "p": 3,
+          "s": 1,
+          "start_ms": 107560,
+          "end_ms": 112640
+        },
+        {
+          "p": 3,
+          "s": 2,
+          "start_ms": 113720,
+          "end_ms": 117060
+        },
+        {
+          "p": 3,
+          "s": 3,
+          "start_ms": 117360,
+          "end_ms": 122920
+        },
+        {
+          "p": 3,
+          "s": 4,
+          "start_ms": 123140,
+          "end_ms": 131080
+        },
+        {
+          "p": 4,
+          "s": 0,
+          "start_ms": 131080,
+          "end_ms": 136020
+        },
+        {
+          "p": 4,
+          "s": 1,
+          "start_ms": 137300,
+          "end_ms": 144620
+        },
+        {
+          "p": 4,
+          "s": 2,
+          "start_ms": 144760,
+          "end_ms": 146520
+        },
+        {
+          "p": 4,
+          "s": 3,
+          "start_ms": 146560,
+          "end_ms": 156400
+        }
+      ]
+    },
     {
       "id": "b1-the-unlikely-architects-animals-that-build-compl",
       "level": "B1",
