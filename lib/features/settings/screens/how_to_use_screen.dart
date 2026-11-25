@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/localization/app_strings.dart';
@@ -73,34 +74,35 @@ class HowToUseScreen extends StatelessWidget {
           'Reading while listening boosts both pronunciation and listening comprehension.',
         ),
       ),
-      _GuideItem(
-        icon: Icons.manage_search_rounded,
-        iconBg: colorScheme.tertiaryContainer,
-        iconColor: colorScheme.onTertiaryContainer,
-        title: s.t('"Line\'da Bak" (Diğer Uygulamalarda)', '"Quick Lookup" Everywhere'),
-        summary: s.t(
-          'WhatsApp, Instagram, Chrome veya PDF\'ten çıkmadan kelime çevir.',
-          'Translate words inside any app without switching screens.',
+      if (!kIsWeb)
+        _GuideItem(
+          icon: Icons.manage_search_rounded,
+          iconBg: colorScheme.tertiaryContainer,
+          iconColor: colorScheme.onTertiaryContainer,
+          title: s.t('"Line\'da Bak" (Diğer Uygulamalarda)', '"Quick Lookup" Everywhere'),
+          summary: s.t(
+            'WhatsApp, Instagram, Chrome veya PDF\'ten çıkmadan kelime çevir.',
+            'Translate words inside any app without switching screens.',
+          ),
+          steps: <String>[
+            s.t(
+              'Telefonundaki herhangi bir uygulamada İngilizce bir kelimeye veya cümleye basılı tutup seç.',
+              'Long-press and select any English word or sentence in any app on your phone.',
+            ),
+            s.t(
+              'Açılan menüden "Line\'da Bak" seçeneğine dokun (gerekirse üç nokta menüsünden bul).',
+              'Choose "Line\'da Bak" from the floating text menu (or under the three-dots menu).',
+            ),
+            s.t(
+              'Ekranın üzerinde açılan mini kartta anlamını anında gör ve tek dokunuşla kendi kelime listene kaydet.',
+              'Read the meaning in the floating mini card and save it straight to your word list.',
+            ),
+          ],
+          tip: s.t(
+            'Ayarlar → "Line\'da Bak" bölümünden mini kartta IPA, eş/zıt anlam, ses veya kaydet çubuğunun görünüp görünmeyeceğini özelleştirebilirsin.',
+            'Customize what appears in the mini card under Settings → Quick Lookup.',
+          ),
         ),
-        steps: <String>[
-          s.t(
-            'Telefonundaki herhangi bir uygulamada İngilizce bir kelimeye veya cümleye basılı tutup seç.',
-            'Long-press and select any English word or sentence in any app on your phone.',
-          ),
-          s.t(
-            'Açılan menüden "Line\'da Bak" seçeneğine dokun (gerekirse üç nokta menüsünden bul).',
-            'Choose "Line\'da Bak" from the floating text menu (or under the three-dots menu).',
-          ),
-          s.t(
-            'Ekranın üzerinde açılan mini kartta anlamını anında gör ve tek dokunuşla kendi kelime listene kaydet.',
-            'Read the meaning in the floating mini card and save it straight to your word list.',
-          ),
-        ],
-        tip: s.t(
-          'Ayarlar → "Line\'da Bak" bölümünden mini kartta IPA, eş/zıt anlam, ses veya kaydet çubuğunun görünüp görünmeyeceğini özelleştirebilirsin.',
-          'Customize what appears in the mini card under Settings → Quick Lookup.',
-        ),
-      ),
       _GuideItem(
         icon: Icons.public_rounded,
         iconBg: colorScheme.primaryContainer.withAlpha(210),
@@ -164,7 +166,9 @@ class HowToUseScreen extends StatelessWidget {
         ),
         steps: <String>[
           s.t(
-            'Ayarlar → "Görünüm ve Temalar"dan uygulama dilini (Türkçe/English) ve 5 temadan dilediğini seç.',
+            kIsWeb
+              ? 'Ayarlar → "Görünüm ve Temalar"dan web dilini (Türkçe/English) ve 5 temadan dilediğini seç.'
+              : 'Ayarlar → "Görünüm ve Temalar"dan uygulama dilini (Türkçe/English) ve 5 temadan dilediğini seç.',
             'Change interface language and pick from 5 themes in Settings → Appearance & Themes.',
           ),
           s.t(

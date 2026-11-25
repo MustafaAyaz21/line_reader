@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/localization/app_locale.dart';
@@ -139,7 +140,7 @@ class MainMenuScreen extends StatelessWidget {
             icon: const Icon(Icons.help_outline_rounded),
             tooltip: s.t('Nasıl Kullanılır?', 'How to Use'),
           ),
-          if (updateController != null)
+          if (!kIsWeb && updateController != null)
             UpdateActionButton(controller: updateController!),
           if (localeController != null && authController != null)
             SettingsActionButton(

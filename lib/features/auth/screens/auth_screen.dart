@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/localization/app_strings.dart';
@@ -722,7 +723,9 @@ class _AuthScreenState extends State<AuthScreen> with WidgetsBindingObserver {
                               const SizedBox(height: 8),
                               Text(
                                 s.t(
-                                  '$email adresine doğrulama bağlantısı gönderdik. Maildeki "E-postayı Doğrula" bağlantısına tıkladığınızda uygulamaya otomatik dönüp giriş yapacaksınız.',
+                                  kIsWeb
+                                      ? '$email adresine doğrulama bağlantısı gönderdik. Maildeki "E-postayı Doğrula" bağlantısına tıkladığınızda web sitesine otomatik dönüp giriş yapacaksınız.'
+                                      : '$email adresine doğrulama bağlantısı gönderdik. Maildeki "E-postayı Doğrula" bağlantısına tıkladığınızda uygulamaya otomatik dönüp giriş yapacaksınız.',
                                   'We sent a verification link to $email. Tap the link in your email to return and sign in automatically.',
                                 ),
                                 textAlign: TextAlign.center,

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/config/api_config.dart';
@@ -75,24 +76,34 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _ensureInitialized();
     IpaAccentController.shared.load();
     DisplayPreferencesController.shared.load();
-    AppUpdateService.cleanupDownloadedUpdateApk();
+    if (!kIsWeb) {
+      AppUpdateService.cleanupDownloadedUpdateApk();
+    }
     ArticleReadingProgressController.shared.load();
-    ProcessTextChannel.ensureInitialized();
-    ProcessTextChannel.pendingTextNotifier
-        .addListener(_handleExternalProcessTextReady);
-    _authController?.addListener(_handleExternalProcessTextReady);
-    _updateController?.addListener(_handleExternalProcessTextReady);
+    if (!kIsWeb) {
+      ProcessTextChannel.ensureInitialized();
+      ProcessTextChannel.pendingTextNotifier
+          .addListener(_handleExternalProcessTextReady);
+      _authController?.addListener(_handleExternalProcessTextReady);
+      _updateController?.addListener(_handleExternalProcessTextReady);
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkForAppUpdateSilently(force: true);
+      if (!kIsWeb) {
+        _checkForAppUpdateSilently(force: true);
+      }
       _refreshArticlesSilently(force: true);
-      _handleExternalProcessTextReady();
+      if (!kIsWeb) {
+        _handleExternalProcessTextReady();
+      }
     });
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _checkForAppUpdateSilently();
+      if (!kIsWeb) {
+        _checkForAppUpdateSilently();
+      }
       if (_authController?.isAuthenticated == true) {
         _authController!.refreshEntitlement();
       }
@@ -380,7 +391,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         updateController,
       ]),
       builder: (context, _) {
-        if (updateController.requiresMandatoryUpdate) {
+        if (!kIsWeb && updateController.requiresMandatoryUpdate) {
           return AppUpdateScreen(
             controller: updateController,
             isMandatory: true,

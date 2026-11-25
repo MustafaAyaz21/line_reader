@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/localization/app_locale.dart';
@@ -269,7 +270,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       _buildLanguageCard(th, cs, ls),
                       const SizedBox(height: 22),
                       _SectionTitle(
-                        label: ls.t('Uygulama Teması', 'App Theme'),
+                        label: kIsWeb
+                            ? ls.t('Web Teması', 'Web Theme')
+                            : ls.t('Uygulama Teması', 'App Theme'),
                       ),
                       const SizedBox(height: 8),
                       _buildThemeSelectorCard(ctx, th, cs, ls),
@@ -293,23 +296,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       _buildFeaturesBody(th, cs, ls),
                 ),
               ),
-              _SettingsCategoryCard(
-                key: const ValueKey<String>('settings_cat_quick_lookup'),
-                expandFill: true,
-                icon: Icons.manage_search_rounded,
-                iconBg: colorScheme.primaryContainer.withAlpha(200),
-                iconColor: colorScheme.primary,
-                title: s.t("Line'da Bak", 'Quick Lookup'),
-                subtitle:
-                    'IPA: ${prefs.overlayIpaMode.label(isEnglish: isEn)} • ${s.t('Mini kart', 'Mini card')}',
-                onTap: () => _openSubPage(
-                  context: context,
-                  titleBuilder: (ls) =>
-                      ls.t("Line'da Bak Ayarları", 'Quick Lookup Settings'),
-                  bodyBuilder: (ctx, th, cs, ls) =>
-                      _buildQuickLookupBody(th, cs, ls),
+              if (!kIsWeb)
+                _SettingsCategoryCard(
+                  key: const ValueKey<String>('settings_cat_quick_lookup'),
+                  expandFill: true,
+                  icon: Icons.manage_search_rounded,
+                  iconBg: colorScheme.primaryContainer.withAlpha(200),
+                  iconColor: colorScheme.primary,
+                  title: s.t("Line'da Bak", 'Quick Lookup'),
+                  subtitle:
+                      'IPA: ${prefs.overlayIpaMode.label(isEnglish: isEn)} • ${s.t('Mini kart', 'Mini card')}',
+                  onTap: () => _openSubPage(
+                    context: context,
+                    titleBuilder: (ls) =>
+                        ls.t("Line'da Bak Ayarları", 'Quick Lookup Settings'),
+                    bodyBuilder: (ctx, th, cs, ls) =>
+                        _buildQuickLookupBody(th, cs, ls),
+                  ),
                 ),
-              ),
               _SettingsCategoryCard(
                 key: const ValueKey<String>('settings_cat_how_to_use'),
                 expandFill: true,
@@ -389,7 +393,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    s.t('Uygulama Arayüz Dili', 'App Interface Language'),
+                    kIsWeb
+                        ? s.t('Web Arayüz Dili', 'Web Interface Language')
+                        : s.t('Uygulama Arayüz Dili', 'App Interface Language'),
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
@@ -417,10 +423,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 10),
             Text(
-              s.t(
-                'Yalnızca uygulama arayüzü değişir; kelime çevirileri Türkçe, makaleler orijinal dilinde kalır.',
-                'Only the app interface changes; word translations remain in Turkish and articles stay in their original language.',
-              ),
+              kIsWeb
+                  ? s.t(
+                      'Yalnızca web arayüzü değişir; kelime çevirileri Türkçe, makaleler orijinal dilinde kalır.',
+                      'Only the web interface changes; word translations remain in Turkish and articles stay in their original language.',
+                    )
+                  : s.t(
+                      'Yalnızca uygulama arayüzü değişir; kelime çevirileri Türkçe, makaleler orijinal dilinde kalır.',
+                      'Only the app interface changes; word translations remain in Turkish and articles stay in their original language.',
+                    ),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
                 height: 1.4,
@@ -455,7 +466,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
                 Text(
-                  s.t('Uygulama İçi IPA Modu', 'In-App IPA Display'),
+                  kIsWeb
+                      ? s.t('Web İçi IPA Modu', 'In-Web IPA Display')
+                      : s.t('Uygulama İçi IPA Modu', 'In-App IPA Display'),
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
@@ -749,10 +762,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
             bodyBuilder: (ctx, th, cs, ls) => _buildThemeCategoryPage(
               context: ctx,
               presets: AppThemePreset.animatedPresets,
-              description: ls.t(
-                'Göz yormayan, sakin vektör animasyonlu temalar. Uygulama küçültülünce otomatik duraklayıp pil tasarrufu sağlar.',
-                'Calm, eye-friendly vector animated themes. Auto-pauses when minimized to save battery.',
-              ),
+              description: kIsWeb
+                  ? ls.t(
+                      'Göz yormayan, sakin vektör animasyonlu temalar. Sekme arka plana alınınca otomatik duraklayıp güç tasarrufu sağlar.',
+                      'Calm, eye-friendly vector animated themes. Auto-pauses in background tabs to save battery.',
+                    )
+                  : ls.t(
+                      'Göz yormayan, sakin vektör animasyonlu temalar. Uygulama küçültülünce otomatik duraklayıp pil tasarrufu sağlar.',
+                      'Calm, eye-friendly vector animated themes. Auto-pauses when minimized to save battery.',
+                    ),
               showAnimationControls: true,
               requiresPremium: true,
               theme: th,
@@ -1017,10 +1035,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ),
                       subtitle: Text(
-                        s.t(
-                          'Arka plan animasyonunu sabitler (uygulama küçültülünce otomatik durur).',
-                          'Freezes background motion (auto-pauses when minimized).',
-                        ),
+                        kIsWeb
+                            ? s.t(
+                                'Arka plan animasyonunu sabitler (sekme arka plana alınınca otomatik durur).',
+                                'Freezes background motion (auto-pauses in background tabs).',
+                              )
+                            : s.t(
+                                'Arka plan animasyonunu sabitler (uygulama küçültülünce otomatik durur).',
+                                'Freezes background motion (auto-pauses when minimized).',
+                              ),
                         style: theme.textTheme.bodySmall?.copyWith(
                           fontSize: 11.5,
                           color: colorScheme.onSurfaceVariant,

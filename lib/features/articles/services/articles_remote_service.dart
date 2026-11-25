@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../core/config/api_config.dart';
@@ -126,7 +127,7 @@ class ArticlesRemoteService {
         : parsedUri;
 
     final headers = <String, String>{
-      ..._baseHeaders,
+      if (kIsWeb) 'Accept': 'application/json' else ..._baseHeaders,
       if (etag != null && etag.trim().isNotEmpty) 'If-None-Match': etag.trim(),
     };
 

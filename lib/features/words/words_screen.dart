@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/localization/app_locale.dart';
@@ -1241,7 +1242,7 @@ class _WordsScreenState extends State<WordsScreen> {
       appBar: AppBar(
         title: Text(s.myWordsTitle),
         actions: [
-          if (widget.updateController != null)
+          if (!kIsWeb && widget.updateController != null)
             UpdateActionButton(controller: widget.updateController!),
           if (widget.apiKeyController != null &&
               widget.localeController != null &&
