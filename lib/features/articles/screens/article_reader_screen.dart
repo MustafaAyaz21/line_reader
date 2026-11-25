@@ -167,16 +167,21 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
       (_) => GlobalKey(),
       growable: false,
     );
+    _readingProgressController =
+        widget.readingProgressController ??
+        ArticleReadingProgressController.shared;
+    final savedProgress =
+        _readingProgressController.progressForArticle(widget.article.id);
+    final initialAudioMs = savedProgress?.audioPositionMs ?? 0;
+
     _ownsAudioController = widget.audioController == null;
     _audioController = widget.audioController ??
         ArticleAudioController(
           article: widget.article,
           paragraphs: _paragraphs,
+          initialPositionMs: initialAudioMs,
         );
     _audioController.addListener(_handleAudioStateChanged);
-    _readingProgressController =
-        widget.readingProgressController ??
-        ArticleReadingProgressController.shared;
     _scrollController.addListener(_handleScrollChanged);
 
     _loadInitialReaderData();
@@ -199,6 +204,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
       article: widget.article,
       progress: progress,
       scrollOffset: clampedOffset,
+      audioPositionMs: _audioController.position.inMilliseconds,
       persist: false,
     );
 
@@ -208,6 +214,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
         article: widget.article,
         progress: _latestScrollProgress,
         scrollOffset: _latestScrollOffset,
+        audioPositionMs: _audioController.position.inMilliseconds,
         persist: true,
       );
     });
@@ -254,6 +261,17 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
 
   void _handleAudioStateChanged() {
     if (!mounted) return;
+    final currentAudioMs = _audioController.position.inMilliseconds;
+    if (currentAudioMs > 0 && _hasRestoredScrollPosition) {
+      _readingProgressController.recordProgress(
+        article: widget.article,
+        progress: _latestScrollProgress,
+        scrollOffset: _latestScrollOffset,
+        audioPositionMs: currentAudioMs,
+        persist: false,
+      );
+    }
+
     if (_audioController.isVisible && _audioController.isPlaying) {
       final targetParagraph = _audioController.currentParagraphIndex;
       if (targetParagraph != _lastAutoScrolledParagraph &&
@@ -285,6 +303,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
         article: widget.article,
         progress: _latestScrollProgress,
         scrollOffset: _latestScrollOffset,
+        audioPositionMs: _audioController.position.inMilliseconds,
         persist: true,
       );
     }

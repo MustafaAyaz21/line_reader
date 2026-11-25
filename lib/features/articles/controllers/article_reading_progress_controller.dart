@@ -127,6 +127,7 @@ class ArticleReadingProgressController extends ChangeNotifier {
     required Article article,
     required double progress,
     double scrollOffset = 0,
+    int? audioPositionMs,
     bool persist = true,
   }) async {
     final id = article.id.trim();
@@ -135,12 +136,16 @@ class ArticleReadingProgressController extends ChangeNotifier {
     final clamped = progress.clamp(0.0, 1.0).toDouble();
     final safeOffset = scrollOffset < 0 ? 0.0 : scrollOffset;
     final existing = _itemsById[id];
+    final safeAudioPos = (audioPositionMs != null && audioPositionMs >= 0)
+        ? audioPositionMs
+        : (existing?.audioPositionMs ?? 0);
     final updated = ArticleReadingProgress(
       articleId: id,
       articleTitle: article.title.trim(),
       articleLevel: article.level.trim().toUpperCase(),
       progress: clamped,
       scrollOffset: safeOffset,
+      audioPositionMs: safeAudioPos,
       updatedAt: _nowProvider().toUtc(),
     );
 
@@ -148,6 +153,7 @@ class ArticleReadingProgressController extends ChangeNotifier {
         _dismissedArticleId != null ||
         existing == null ||
         existing.progressPercent != updated.progressPercent ||
+        existing.audioPositionMs != updated.audioPositionMs ||
         existing.articleTitle != updated.articleTitle;
 
     _itemsById[id] = updated;

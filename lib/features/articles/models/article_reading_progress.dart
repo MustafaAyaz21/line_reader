@@ -6,6 +6,7 @@ class ArticleReadingProgress {
     required this.articleLevel,
     required this.progress,
     this.scrollOffset = 0,
+    this.audioPositionMs = 0,
     required this.updatedAt,
   });
 
@@ -18,6 +19,9 @@ class ArticleReadingProgress {
 
   /// Son kaydedilen kaydırma ofseti (piksel cinsinden yedek değer).
   final double scrollOffset;
+
+  /// Son kaydedilen ses/podcast çalma konumu (milisaniye cinsinden).
+  final int audioPositionMs;
 
   final DateTime updatedAt;
 
@@ -32,6 +36,7 @@ class ArticleReadingProgress {
     String? articleLevel,
     double? progress,
     double? scrollOffset,
+    int? audioPositionMs,
     DateTime? updatedAt,
   }) {
     return ArticleReadingProgress(
@@ -42,6 +47,9 @@ class ArticleReadingProgress {
       scrollOffset: (scrollOffset ?? this.scrollOffset) < 0
           ? 0
           : (scrollOffset ?? this.scrollOffset),
+      audioPositionMs: (audioPositionMs ?? this.audioPositionMs) < 0
+          ? 0
+          : (audioPositionMs ?? this.audioPositionMs),
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
@@ -53,6 +61,7 @@ class ArticleReadingProgress {
       'articleLevel': articleLevel,
       'progress': clampedProgress,
       'scrollOffset': scrollOffset < 0 ? 0.0 : scrollOffset,
+      'audioPositionMs': audioPositionMs < 0 ? 0 : audioPositionMs,
       'updatedAt': updatedAt.toUtc().millisecondsSinceEpoch,
     };
   }
@@ -72,6 +81,10 @@ class ArticleReadingProgress {
     final parsedOffset = rawOffset is num
         ? rawOffset.toDouble()
         : double.tryParse(rawOffset?.toString() ?? '') ?? 0.0;
+    final rawAudioPos = raw['audioPositionMs'];
+    final parsedAudioPos = rawAudioPos is int
+        ? rawAudioPos
+        : int.tryParse(rawAudioPos?.toString() ?? '') ?? 0;
     final rawUpdated = raw['updatedAt'];
     final updatedMs = rawUpdated is int
         ? rawUpdated
@@ -83,6 +96,7 @@ class ArticleReadingProgress {
       articleLevel: articleLevel,
       progress: parsedProgress.clamp(0.0, 1.0).toDouble(),
       scrollOffset: parsedOffset < 0 ? 0.0 : parsedOffset,
+      audioPositionMs: parsedAudioPos < 0 ? 0 : parsedAudioPos,
       updatedAt: updatedMs != null
           ? DateTime.fromMillisecondsSinceEpoch(updatedMs, isUtc: true)
           : DateTime.now().toUtc(),

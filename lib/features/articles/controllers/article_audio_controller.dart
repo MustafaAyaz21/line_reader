@@ -257,6 +257,7 @@ class ArticleAudioController extends ChangeNotifier {
   ArticleAudioController({
     required this.article,
     required this.paragraphs,
+    int initialPositionMs = 0,
     ArticleTtsEngine? ttsEngine,
     ArticlePodcastPlayer? podcastPlayer,
     http.Client? httpClient,
@@ -270,6 +271,11 @@ class ArticleAudioController extends ChangeNotifier {
     _mode = article.hasPodcastAudio
         ? ArticleAudioMode.podcastAudio
         : ArticleAudioMode.deviceTts;
+    if (initialPositionMs > 0) {
+      _position = Duration(milliseconds: initialPositionMs);
+      positionNotifier.value = _position;
+      _currentSentenceIndex = _sentenceIndexForPosition(_position);
+    }
     _attachPodcastListeners();
   }
 
