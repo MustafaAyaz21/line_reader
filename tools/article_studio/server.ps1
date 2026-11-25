@@ -1594,6 +1594,21 @@ try {
                 $fwd = Forward-WorkerAdminRequest -RemotePath "/admin/users" -HttpMethod $method -BodyText $body
                 Send-Response -Response $res -StatusCode $fwd.StatusCode -Body $fwd.Body -ContentType "application/json; charset=utf-8"
             }
+            elseif ($path -eq "/api/admin/schedule" -and ($method -in @("GET", "POST"))) {
+                $body = if ($method -eq "GET") { "" } else { Read-RequestBody $req }
+                $fwd = Forward-WorkerAdminRequest -RemotePath "/admin/schedule" -HttpMethod $method -BodyText $body
+                Send-Response -Response $res -StatusCode $fwd.StatusCode -Body $fwd.Body -ContentType "application/json; charset=utf-8"
+            }
+            elseif ($path -eq "/api/admin/schedule/run-now" -and $method -eq "POST") {
+                $body = Read-RequestBody $req
+                $fwd = Forward-WorkerAdminRequest -RemotePath "/admin/schedule/run-now" -HttpMethod $method -BodyText $body
+                Send-Response -Response $res -StatusCode $fwd.StatusCode -Body $fwd.Body -ContentType "application/json; charset=utf-8"
+            }
+            elseif ($path -eq "/api/admin/quick-publish" -and $method -eq "POST") {
+                $body = Read-RequestBody $req
+                $fwd = Forward-WorkerAdminRequest -RemotePath "/admin/quick-publish" -HttpMethod $method -BodyText $body
+                Send-Response -Response $res -StatusCode $fwd.StatusCode -Body $fwd.Body -ContentType "application/json; charset=utf-8"
+            }
             elseif ($method -eq "GET" -and $path -eq "/api/ai/config") {
                 $cfg = Get-AdminConfig
                 Send-JsonObject -Response $res -StatusCode 200 -Payload @{

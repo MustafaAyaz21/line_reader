@@ -1140,6 +1140,9 @@
 
     <div class="topbar-spacer"></div>
 
+    <button class="btn btn-sm" id="scheduleModalBtn" title="Otomatik Günlük Yayın Planlayıcı (A1-C2 İki Aşamalı)">
+      📅 Günlük Yayın Planı
+    </button>
     <button class="btn" id="saveDraftBtn" title="Yalnızca bilgisayardaki dosyaya kaydeder (Ctrl+S)">
       Taslak Kaydet
     </button>
@@ -1216,6 +1219,9 @@
           />
           <button type="button" class="btn btn-ai" id="aiGenerateBtn" title="Seçili seviyede ~350 kelimelik İngilizce makale + kelime anlamlarını otomatik üretir">
             ✨ Gemini ile Oluştur
+          </button>
+          <button type="button" class="btn btn-warning" id="quickPublishBtn" style="font-weight:700;" title="Seçili seviyede merak uyandıran makaleyi bulur, CEFR analizini yapar, Podcast AI sesini oluşturur ve anında canlıya alır">
+            ⚡ Tek Tıkla Yayınla
           </button>
           <label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer;user-select:none;" title="Makale üretildiğinde insan sesli Podcast AI sesini de otomatik oluşturur">
             <input type="checkbox" id="aiAutoPodcastCheck" checked />
@@ -1368,6 +1374,66 @@
       </div>
     </div>
   </section>
+
+  <!-- Otomatik Günlük Yayın Planlayıcı Modalı -->
+  <div id="scheduleModal" class="modal-backdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:9999;place-items:center;padding:20px;">
+    <div class="modal-dialog" style="background:var(--surface);border:1px solid var(--border-strong);border-radius:16px;max-width:540px;width:100%;padding:22px;box-shadow:var(--shadow);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <h3 style="margin:0;display:flex;align-items:center;gap:8px;">
+          📅 Otomatik Günlük Yayın Planlayıcı
+        </h3>
+        <button type="button" id="closeScheduleModalBtn" class="btn btn-sm" style="padding:4px 8px;">✕</button>
+      </div>
+      <p style="margin:0 0 16px 0;font-size:13px;color:var(--text-muted);line-height:1.45;">
+        A1'den C2'ye 6 seviyenin tamamı için önceden hazırlanan, 0 gecikmeli iki aşamalı otomatik yayınlama sistemi.
+      </p>
+
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;padding:12px;border-radius:10px;background:var(--surface-alt);border:1px solid var(--border);">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer;">
+          <input type="checkbox" id="schedEnableCheck" checked style="width:16px;height:16px;" />
+          Otomatik Günlük Yayınlama Aktif
+        </label>
+      </div>
+
+      <div style="margin-bottom:16px;">
+        <label style="display:block;font-size:12px;font-weight:700;margin-bottom:6px;">Yayın Saati (Türkiye Saati / UTC+3):</label>
+        <select id="schedHourSelect" class="ai-select" style="width:100%;font-size:14px;font-weight:700;">
+          <option value="6">06:00 (Sabah)</option>
+          <option value="7">07:00</option>
+          <option value="8">08:00</option>
+          <option value="9" selected>09:00 (Önerilen)</option>
+          <option value="10">10:00</option>
+          <option value="11">11:00</option>
+          <option value="12">12:00 (Öğle)</option>
+          <option value="14">14:00</option>
+          <option value="16">16:00</option>
+          <option value="18">18:00 (Akşam)</option>
+          <option value="20">20:00</option>
+          <option value="21">21:00</option>
+        </select>
+      </div>
+
+      <div style="padding:12px;border-radius:10px;background:rgba(59,130,246,0.12);border:1px solid rgba(59,130,246,0.3);margin-bottom:18px;">
+        <div style="font-size:12px;font-weight:700;color:#93c5fd;margin-bottom:4px;">⚡ İki Aşamalı Kusursuz Çalışma Prensibi:</div>
+        <div id="schedInfoText" style="font-size:12px;color:var(--text);line-height:1.5;">
+          1. Hazırlık (Saat 08:15): Sistem A1, A2, B1, B2, C1, C2 seviyeleri için 6 makale + Podcast AI seslerini hazırlar ve gizli yükler.<br/>
+          2. Canlıya Alma (Saat 09:00): Hedef saatte 0 saniye gecikmeyle tüm makaleler tek saniyede yayına açılır.
+        </div>
+        <div id="schedLastRunText" style="margin-top:6px;font-size:11px;font-weight:600;color:#60a5fa;">
+          Durum kontrol ediliyor...
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button type="button" class="btn" id="schedRunNowBtn" title="6 seviyeyi şimdi üretir ve canlıya alır">
+          ▶ Şimdi Test Et (6 Seviye)
+        </button>
+        <button type="button" class="btn btn-primary" id="saveScheduleBtn">
+          Planı Kaydet
+        </button>
+      </div>
+    </div>
+  </div>
 
   <div id="toast" class="toast"></div>
   <input type="file" id="hiddenFileInput" accept=".txt,.md,text/plain" style="display:none;" />
@@ -3670,6 +3736,253 @@
         showToast(err.message, "error");
       }
     });
+
+    // ⚡ Tek Tıkla Kaynaktan Çek & Canlı Yayınla (PC Paneli)
+    function setupQuickPublish() {
+      const qpBtn = document.getElementById("quickPublishBtn");
+      if (!qpBtn) return;
+
+      qpBtn.addEventListener("click", async () => {
+        if (state.busy || isGeneratingArticle) return;
+        const chosenLevel = (aiEl.levelSelect?.value || "B1").trim().toUpperCase();
+        const customTopic = (aiEl.topicInput?.value || "").trim();
+
+        const progressBox = document.getElementById("aiGenProgressBox");
+        const stageEl = document.getElementById("aiGenStageLabel");
+        const timingEl = document.getElementById("aiGenTimingLabel");
+        const fillEl = document.getElementById("aiGenProgressFill");
+
+        qpBtn.disabled = true;
+        state.busy = true;
+        updateStatusPill();
+
+        if (progressBox) progressBox.style.display = "block";
+        if (stageEl) stageEl.textContent = "🔍 1/4: İlgi çekici kaynaklar ve konular taranıyor...";
+        if (timingEl) timingEl.textContent = "0 sn • Canlı yayın hazırlanıyor";
+        if (fillEl) fillEl.style.width = "15%";
+
+        let elapsed = 0;
+        const timer = setInterval(() => {
+          elapsed++;
+          if (elapsed === 3 && stageEl) {
+            stageEl.textContent = "📄 2/4: Makale bulundu, CEFR kelime & cümle analizleri yapılıyor...";
+            if (fillEl) fillEl.style.width = "40%";
+          } else if (elapsed === 8 && stageEl) {
+            stageEl.textContent = "🎙️ 3/4: Podcast AI stüdyo sesi üretiliyor ve senkron yapılıyor...";
+            if (fillEl) fillEl.style.width = "75%";
+          } else if (elapsed === 15 && stageEl) {
+            stageEl.textContent = "🚀 4/4: Cloudflare D1 ve GitHub akışına anında yükleniyor...";
+            if (fillEl) fillEl.style.width = "90%";
+          }
+          if (timingEl) timingEl.textContent = `${elapsed} sn geçti • İşleniyor...`;
+        }, 1000);
+
+        try {
+          // 1. Önce Cloudflare Worker admin uç noktasına dene
+          let res = await fetch("/api/admin/quick-publish", {
+            method: "POST",
+            headers: { "Content-Type": "application/json; charset=utf-8" },
+            body: JSON.stringify({
+              level: chosenLevel,
+              topic: customTopic,
+              voice: "Kore"
+            })
+          });
+
+          // Eğer worker admin secret yapılandırılmamışsa yerel motorla üretip yayınla
+          if (!res.ok) {
+            if (stageEl) stageEl.textContent = "📄 Yerel motorla makale üretiliyor...";
+            const genRes = await fetch("/api/ai/generate-article", {
+              method: "POST",
+              headers: { "Content-Type": "application/json; charset=utf-8" },
+              body: JSON.stringify({ level: chosenLevel, topic: customTopic, existingTitles: [] })
+            });
+            const genData = await genRes.json();
+            if (!genRes.ok || !genData.ok || !genData.article) {
+              throw new Error(genData.message || "Makale üretilemedi.");
+            }
+
+            const genArt = genData.article;
+            const contentText = (genArt.content || "").replace(/\r\n/g, "\n").trim();
+            const fresh = {
+              id: uniqueIdFor(genArt.title || "article", chosenLevel),
+              level: chosenLevel,
+              title: (genArt.title || "").trim(),
+              description: (genArt.description || "").trim(),
+              reading_time: estimateReadingTime(contentText),
+              category: (genArt.category || "General").trim(),
+              author: "Line Reader",
+              language: "en",
+              content: contentText,
+              word_meanings_text: formatWordMeaningsMap(genArt.word_meanings || {}),
+              word_relations_text: formatWordRelationsMap(genArt.word_relations || {}),
+              sentence_translations_text: formatSentenceTranslationsMap(genArt.sentence_translations || {}),
+              audio_url: "",
+              audio_segments: [],
+              published_at: new Date().toISOString()
+            };
+
+            // Podcast sesi
+            if (stageEl) stageEl.textContent = "🎙️ Podcast AI sesi üretiliyor...";
+            try {
+              const audRes = await fetch("/api/ai/generate-audio", {
+                method: "POST",
+                headers: { "Content-Type": "application/json; charset=utf-8" },
+                body: JSON.stringify({
+                  id: fresh.id,
+                  title: fresh.title,
+                  content: fresh.content,
+                  voiceName: "Kore"
+                })
+              });
+              const audData = await audRes.json();
+              if (audData.ok && audData.audio_url) {
+                fresh.audio_url = audData.audio_url;
+                if (audData.audio_segments) fresh.audio_segments = audData.audio_segments;
+              }
+            } catch (_) {}
+
+            state.articles.unshift(fresh);
+            state.selectedIndex = 0;
+            state.dirty = true;
+
+            // GitHub & D1'e Kaydet ve Yayınla
+            if (stageEl) stageEl.textContent = "🚀 Canlıya yayınlanıyor...";
+            await publishLive();
+            res = { ok: true, json: async () => ({ ok: true, message: `"${fresh.title}" başarıyla yayınlandı!` }) };
+          }
+
+          clearInterval(timer);
+          const data = await res.json();
+          if (fillEl) fillEl.style.width = "100%";
+          if (stageEl) stageEl.textContent = "✅ Başarıyla Yayınlandı!";
+          if (timingEl) timingEl.textContent = `Toplam ${elapsed} saniyede canlıya alındı!`;
+
+          showToast(data.message || "Makale başarıyla yayınlandı!", "success");
+          setTimeout(() => {
+            if (progressBox) progressBox.style.display = "none";
+          }, 3500);
+
+          await loadInitial();
+        } catch (err) {
+          clearInterval(timer);
+          if (stageEl) stageEl.textContent = "❌ İşlem Başarısız";
+          showToast(err.message || "Yayınlama başarısız oldu.", "error");
+        } finally {
+          qpBtn.disabled = false;
+          state.busy = false;
+          updateStatusPill();
+        }
+      });
+    }
+
+    // 📅 Otomatik Günlük Yayın Planlayıcı Modalı (PC Paneli)
+    function setupScheduleModal() {
+      const modalBtn = document.getElementById("scheduleModalBtn");
+      const modal = document.getElementById("scheduleModal");
+      const closeBtn = document.getElementById("closeScheduleModalBtn");
+      const saveBtn = document.getElementById("saveScheduleBtn");
+      const runNowBtn = document.getElementById("schedRunNowBtn");
+      const enableCheck = document.getElementById("schedEnableCheck");
+      const hourSelect = document.getElementById("schedHourSelect");
+      const infoText = document.getElementById("schedInfoText");
+      const lastRunText = document.getElementById("schedLastRunText");
+
+      if (!modalBtn || !modal) return;
+
+      async function openModal() {
+        modal.style.display = "grid";
+        if (lastRunText) lastRunText.textContent = "Cloudflare Worker'dan plan kontrol ediliyor...";
+
+        try {
+          const res = await fetch("/api/admin/schedule");
+          const data = await res.json();
+          if (res.ok && data.ok && data.config) {
+            const cfg = data.config;
+            if (enableCheck) enableCheck.checked = Boolean(cfg.is_enabled);
+            if (hourSelect) hourSelect.value = String(cfg.publish_hour || 9);
+            const pubH = Number(cfg.publish_hour || 9);
+            const preH = (pubH - 1 + 24) % 24;
+
+            if (infoText) {
+              infoText.innerHTML = `1. Hazırlık (Saat ${String(preH).padStart(2, "0")}:15): Sistem A1-C2 tüm 6 seviye için makale + Podcast AI seslerini hazırlar ve gizli yükler.<br/>` +
+                `2. Canlıya Alma (Saat ${String(pubH).padStart(2, "0")}:00): Hedef saatte 0 saniye gecikmeyle tüm makaleler tek saniyede yayına açılır.`;
+            }
+            if (lastRunText) {
+              lastRunText.textContent = `Sunucu Saati (TR): ${data.server_time_tr || "-"} | Son Hazırlık: ${cfg.last_prepared_date || "-"} | Son Yayın: ${cfg.last_published_date || "-"}`;
+            }
+          }
+        } catch (_) {
+          if (lastRunText) lastRunText.textContent = "Planlayıcı durumuna ulaşılamadı (Yönetici şifrenizi kontrol edin).";
+        }
+      }
+
+      function closeModal() {
+        modal.style.display = "none";
+      }
+
+      modalBtn.addEventListener("click", openModal);
+      closeBtn?.addEventListener("click", closeModal);
+      modal.addEventListener("click", (e) => {
+        if (e.target === modal) closeModal();
+      });
+
+      hourSelect?.addEventListener("change", () => {
+        const pubH = parseInt(hourSelect.value, 10) || 9;
+        const preH = (pubH - 1 + 24) % 24;
+        if (infoText) {
+          infoText.innerHTML = `1. Hazırlık (Saat ${String(preH).padStart(2, "0")}:15): Sistem A1-C2 tüm 6 seviye için makale + Podcast AI seslerini hazırlar ve gizli yükler.<br/>` +
+            `2. Canlıya Alma (Saat ${String(pubH).padStart(2, "0")}:00): Hedef saatte 0 saniye gecikmeyle tüm makaleler tek saniyede yayına açılır.`;
+        }
+      });
+
+      saveBtn?.addEventListener("click", async () => {
+        saveBtn.disabled = true;
+        try {
+          const res = await fetch("/api/admin/schedule", {
+            method: "POST",
+            headers: { "Content-Type": "application/json; charset=utf-8" },
+            body: JSON.stringify({
+              is_enabled: Boolean(enableCheck?.checked),
+              publish_hour: parseInt(hourSelect?.value || "9", 10),
+              timezone_offset: 3
+            })
+          });
+          const data = await res.json();
+          showToast(data.message || "Yayın planı kaydedildi.", res.ok ? "success" : "error");
+          if (res.ok) closeModal();
+        } catch (err) {
+          showToast(err.message, "error");
+        } finally {
+          saveBtn.disabled = false;
+        }
+      });
+
+      runNowBtn?.addEventListener("click", async () => {
+        if (!confirm("A1'den C2'ye 6 seviyenin tamamı için makale ve Podcast AI sesleri üretilip canlıya alınacak. Başlatılsın mı?")) return;
+        runNowBtn.disabled = true;
+        runNowBtn.textContent = "⏳ Üretiliyor...";
+        try {
+          const res = await fetch("/api/admin/schedule/run-now", {
+            method: "POST",
+            headers: { "Content-Type": "application/json; charset=utf-8" },
+            body: JSON.stringify({ mode: "full_pipeline" })
+          });
+          const data = await res.json();
+          showToast(data.message || "Test çalışması tamamlandı!", res.ok ? "success" : "error");
+          closeModal();
+          await loadInitial();
+        } catch (err) {
+          showToast(err.message, "error");
+        } finally {
+          runNowBtn.disabled = false;
+          runNowBtn.textContent = "▶ Şimdi Test Et (6 Seviye)";
+        }
+      });
+    }
+
+    setupQuickPublish();
+    setupScheduleModal();
 
     loadInitial();
     loadAiConfig();

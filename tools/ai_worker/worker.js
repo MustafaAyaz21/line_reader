@@ -2550,6 +2550,154 @@ async function handleAdminRequest(request, env, path, method) {
     });
   }
 
+  // Otomatik Günlük Yayın Planlayıcı (PC Paneli -> Cloudflare D1)
+  if (path === "/admin/schedule") {
+    if (method === "GET") {
+      let cfg = await env.DB
+        .prepare("SELECT is_enabled, publish_hour, timezone_offset, last_prepared_date, last_published_date, updated_at FROM publish_schedule_config WHERE id = 1 LIMIT 1")
+        .first();
+      if (!cfg) {
+        cfg = {
+          is_enabled: 1,
+          publish_hour: 9,
+          timezone_offset: 3,
+          last_prepared_date: null,
+          last_published_date: null,
+          updated_at: new Date().toISOString(),
+        };
+      }
+      const tzOffset = Number(cfg.timezone_offset ?? 3);
+      const localNow = new Date(Date.now() + tzOffset * 3600 * 1000);
+      const serverTimeTr = `${String(localNow.getUTCHours()).padStart(2, "0")}:${String(localNow.getUTCMinutes()).padStart(2, "0")}`;
+      const pubHour = Number(cfg.publish_hour ?? 9);
+      const preHour = (pubHour - 1 + 24) % 24;
+
+      return jsonResponse({
+        ok: true,
+        config: {
+          is_enabled: Boolean(cfg.is_enabled),
+          publish_hour: pubHour,
+          timezone_offset: tzOffset,
+          last_prepared_date: cfg.last_prepared_date || null,
+          last_published_date: cfg.last_published_date || null,
+          updated_at: cfg.updated_at || null,
+        },
+        server_time_tr: serverTimeTr,
+        schedule_summary: `Her gün saat ${String(pubHour).padStart(2, "0")}:00'da yayınlanır (${String(preHour).padStart(2, "0")}:15'te A1-C2 tüm 6 seviye önceden hazırlanıp gizlenir).`,
+      });
+    }
+
+    if (method === "POST") {
+      const body = await safeReadJson(request);
+      const isEnabled = body?.is_enabled !== false ? 1 : 0;
+      let pubHour = parseInt(body?.publish_hour ?? 9, 10);
+      if (isNaN(pubHour) || pubHour < 0 || pubHour > 23) pubHour = 9;
+      let tzOffset = parseInt(body?.timezone_offset ?? 3, 10);
+      if (isNaN(tzOffset) || tzOffset < -12 || tzOffset > 14) tzOffset = 3;
+
+      await env.DB
+        .prepare(`
+          INSERT INTO publish_schedule_config (id, is_enabled, publish_hour, timezone_offset, updated_at)
+          VALUES (1, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            is_enabled = excluded.is_enabled,
+            publish_hour = excluded.publish_hour,
+            timezone_offset = excluded.timezone_offset,
+            updated_at = excluded.updated_at
+        `)
+        .bind(isEnabled, pubHour, tzOffset, new Date().toISOString())
+        .run();
+
+      const preHour = (pubHour - 1 + 24) % 24;
+      return jsonResponse({
+        ok: true,
+        message: isEnabled
+          ? `Otomatik yayın saati ${String(pubHour).padStart(2, "0")}:00 olarak ayarlandı (Hazırlık: ${String(preHour).padStart(2, "0")}:15).`
+          : "Otomatik günlük yayınlama devre dışı bırakıldı.",
+      });
+    }
+  }
+
+  // Planlayıcıyı Manuel Tetikleme (PC Paneli)
+  if (path === "/admin/schedule/run-now" && method === "POST") {
+    const body = await safeReadJson(request);
+    const mode = String(body?.mode || "full_pipeline").trim();
+    const result = await handleScheduledPublishRun(env, "admin_manual", mode);
+    return jsonResponse({
+      ok: true,
+      result,
+      message: `Planlayıcı test çalışması tamamlandı (Mod: ${mode}).`,
+    });
+  }
+
+  // Tek Tıkla Kaynaktan Çek, Analiz Et, Seslendir & Yayınla (PC Paneli)
+  if (path === "/admin/quick-publish" && method === "POST") {
+    const startTime = Date.now();
+    const body = await safeReadJson(request);
+    const rawLevel = String(body?.level || "B1").trim().toUpperCase();
+    const level = ["A1", "A2", "B1", "B2", "C1", "C2"].includes(rawLevel) ? rawLevel : "B1";
+    let topic = String(body?.topic || "").trim();
+    if (!topic) {
+      topic = pickEngagingTopic(level);
+    }
+    const voice = String(body?.voice || "Kore").trim() || "Kore";
+
+    const t0 = Date.now();
+    const article = await generateArticleResilient(env, level, topic);
+    const tArticle = Date.now() - t0;
+
+    let tAudio = 0;
+    let audioGenerated = false;
+    if (env.GEMINI_API_KEY && env.GITHUB_TOKEN) {
+      const tAudioStart = Date.now();
+      try {
+        const audioRes = await generatePodcastAudioWithGemini(
+          env,
+          article.id,
+          article.title,
+          article.content,
+          voice
+        );
+        article.audio_url = audioRes.audio_url;
+        article.audio_voice = audioRes.audio_voice;
+        article.audio_duration_sec = audioRes.audio_duration_sec;
+        if (audioRes.audio_segments) {
+          article.audio_segments = audioRes.audio_segments;
+        }
+        audioGenerated = true;
+      } catch (_) {}
+      tAudio = Date.now() - tAudioStart;
+    }
+
+    const tPubStart = Date.now();
+    const list = await loadArticlesList(env);
+    const existingIdx = list.findIndex((a) => String(a?.id || "") === article.id);
+    if (existingIdx >= 0) {
+      list[existingIdx] = article;
+    } else {
+      list.unshift(article);
+    }
+    const syncInfo = await saveArticlesList(env, list, `Quick publish article ${article.id} from PC studio`);
+    const tPub = Date.now() - tPubStart;
+    const totalMs = Date.now() - startTime;
+    const totalSec = (totalMs / 1000).toFixed(1);
+
+    return jsonResponse({
+      ok: true,
+      article,
+      audio_generated: audioGenerated,
+      github_synced: syncInfo.githubSynced,
+      timing: {
+        total_ms: totalMs,
+        total_sec: totalSec,
+        article_ms: tArticle,
+        audio_ms: tAudio,
+        publish_ms: tPub,
+      },
+      message: `"${article.title}" (${article.level}) başarıyla oluşturuldu, ${audioGenerated ? "seslendirildi ve " : ""}yayına alındı! (${totalSec} sn)`,
+    });
+  }
+
   // Kod yönetimi
   if (path === "/admin/codes") {
     if (method === "GET") {
