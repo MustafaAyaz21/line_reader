@@ -1,2 +1,9 @@
 /articles.json
   Cache-Control: no-cache, no-store, must-revalidate
+
+/audio/*
+  Access-Control-Allow-Origin: *
+  Accept-Ranges: bytes
+
+/images/*
+  Access-Control-Allow-Origin: *

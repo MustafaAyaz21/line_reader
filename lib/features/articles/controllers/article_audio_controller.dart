@@ -209,29 +209,40 @@ class _AudioPlayersPodcastPlayer implements ArticlePodcastPlayer {
   Future<void> setSourceUrl(String url) async {
     await _ensurePlayerConfigured();
     if (kIsWeb) {
-      // Web tarayıcılarında (Chrome/Edge) uzak .m4a akışında seek() işlemi
-      // HTTP Range / moov atomu yüzünden sesi 0. saniyeye geri sarabiliyor.
-      // Ses dosyasını belleğe alıp BytesSource (in-memory Blob URL) ile
-      // yüklemek her cümleye anında ve kesin geçiş (seek) sağlar.
-      try {
-        final res = await http.get(Uri.parse(url)).timeout(
-          const Duration(seconds: 15),
-        );
-        if (res.statusCode >= 200 &&
-            res.statusCode < 300 &&
-            ArticleAudioController.isValidAudioBytes(
-              res.bodyBytes,
-              contentType: res.headers['content-type'],
-            )) {
-          final ct = (res.headers['content-type'] ?? '').toLowerCase();
-          final mime = ct.contains('mpeg') || url.toLowerCase().endsWith('.mp3')
-              ? 'audio/mpeg'
-              : 'audio/mp4';
-          await _player.setSource(BytesSource(res.bodyBytes, mimeType: mime));
-          return;
+      // Web'de (getlinereader.com -> line-reader.pages.dev) çapraz alan adı
+      // CORS engeline takılmamak için önce aynı origin (/audio/<dosya>) adresini
+      // dene, sonra orijinal URL'yi dene ve belleğe BytesSource olarak yükle.
+      final fetchUrls = <String>[];
+      final audioIdx = url.indexOf('/audio/');
+      if (audioIdx != -1) {
+        final relAudioPath = url.substring(audioIdx);
+        final sameOriginUrl = Uri.base.resolve(relAudioPath).toString();
+        if (sameOriginUrl != url) {
+          fetchUrls.add(sameOriginUrl);
         }
-      } catch (_) {
-        // Ağ/CORS hatasında doğrudan UrlSource yedeğine düş.
+      }
+      fetchUrls.add(url);
+
+      for (final candidate in fetchUrls) {
+        try {
+          final res = await http.get(Uri.parse(candidate)).timeout(
+            const Duration(seconds: 15),
+          );
+          if (res.statusCode >= 200 &&
+              res.statusCode < 300 &&
+              ArticleAudioController.isValidAudioBytes(
+                res.bodyBytes,
+                contentType: res.headers['content-type'],
+              )) {
+            final ct = (res.headers['content-type'] ?? '').toLowerCase();
+            final mime =
+                ct.contains('mpeg') || candidate.toLowerCase().endsWith('.mp3')
+                    ? 'audio/mpeg'
+                    : 'audio/mp4';
+            await _player.setSource(BytesSource(res.bodyBytes, mimeType: mime));
+            return;
+          }
+        } catch (_) {}
       }
     }
     await _player.setSource(UrlSource(url));
