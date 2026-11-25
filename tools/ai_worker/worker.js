@@ -51,6 +51,7 @@ export default {
         ai_bound: Boolean(env && env.AI),
         db_bound: Boolean(env && env.DB),
         admin_configured: Boolean(env && env.ADMIN_SECRET),
+        otp_configured: Boolean(env && env.RESEND_API_KEY),
       });
     }
 
