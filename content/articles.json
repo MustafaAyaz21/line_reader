@@ -1,7 +1,448 @@
 {
   "version": 1,
-  "updated_at": "2026-11-25T23:06:53.759Z",
+  "updated_at": "2026-11-25T23:09:57.662Z",
   "articles": [
+    {
+      "id": "a2-the-amazing-story-of-the-first-humans",
+      "level": "A2",
+      "title": "The Amazing Story of the First Humans",
+      "description": "Scientists study ancient bones and tools to understand early human history. These discoveries help us learn how our ancestors lived, survived, and traveled around the ancient world long ago.",
+      "reading_time": "2 - 4 dk",
+      "reading_time_minutes": 3,
+      "language": "en",
+      "content": "Millions of years ago, the Earth was very different. The environment was wild, and many large animals lived here. In this world, the first humans began their long journey. Scientists believe the earliest human ancestors lived in Africa. These early people were not like us in every way; they were shorter and their brains were smaller. However, they had one very important skill: they could walk on two legs. This ability was crucial because it helped them travel long distances and see over tall grass.\n\nLife for the first humans was difficult and dangerous. They did not have strong claws or sharp teeth like other animals. They needed to be smart to survive. They worked together in small groups and learned how to make simple tools. Their first tools were made of stone and wood. They used these tools to cut meat, dig for roots, and protect themselves from predators. Making tools was a huge step in human development. It showed that early humans could think about the future and solve problems.\n\nOne of the biggest discoveries in human history was fire. Learning how to control fire changed everything for early humans. Fire gave them warmth during cold nights and protected them from wild animals. Most importantly, they learned how to cook their food. Cooked meat was easier to eat and gave them more energy. This extra energy helped their brains grow larger over a very long time. Fire also became a center for their social life, where they could gather, rest, and share stories.\n\nAfter many thousands of years, these early humans started to move. They walked out of Africa and traveled to new places in Europe and Asia. This was an incredible journey. They had to adapt to new environments, different climates, and new challenges. Later, they traveled to the Americas and Australia. Wherever they went, they learned to survive. They settled in new lands and started small communities.\n\nThese first humans were the beginning of our story. They were brave, intelligent, and curious. They learned to adapt to the world around them, and their discoveries shaped the future of humanity. Today, we continue to learn about them through archaeology and science. When we study our ancient past, we understand more about who we are and where we come from.",
+      "published_at": "2026-11-25T23:08:22.421Z",
+      "category": "History",
+      "author": "Line Reader",
+      "word_meanings": {
+        "environment": "çevre",
+        "ancestors": "atalar",
+        "journey": "yolculuk",
+        "crucial": "çok önemli",
+        "distances": "mesafeler",
+        "survive": "hayatta kalmak",
+        "simple": "basit",
+        "tools": "aletler",
+        "predators": "yırtıcı hayvanlar",
+        "development": "gelişim",
+        "solve problems": "sorunları çözmek",
+        "control": "kontrol etmek",
+        "warmth": "sıcaklık",
+        "gather": "toplanmak",
+        "adapt": "uyum sağlamak",
+        "curious": "meraklı",
+        "humanity": "insanlık",
+        "archaeology": "arkeoloji"
+      },
+      "word_relations": {
+        "environment": {
+          "syn": [
+            "surroundings"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "ancestors": {
+          "syn": [
+            "forefathers"
+          ],
+          "ant": [
+            "descendants"
+          ]
+        },
+        "journey": {
+          "syn": [
+            "trip",
+            "voyage"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "crucial": {
+          "syn": [
+            "vital",
+            "important"
+          ],
+          "ant": [
+            "unimportant"
+          ]
+        },
+        "distances": {
+          "syn": [
+            "spaces"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "survive": {
+          "syn": [
+            "exist"
+          ],
+          "ant": [
+            "die"
+          ]
+        },
+        "simple": {
+          "syn": [
+            "basic",
+            "easy"
+          ],
+          "ant": [
+            "complex",
+            "difficult"
+          ]
+        },
+        "tools": {
+          "syn": [
+            "instruments",
+            "devices"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "predators": {
+          "syn": [
+            "hunters",
+            "attackers"
+          ],
+          "ant": [
+            "prey"
+          ]
+        },
+        "development": {
+          "syn": [
+            "growth",
+            "progress"
+          ],
+          "ant": [
+            "decline"
+          ]
+        },
+        "solve problems": {
+          "syn": [
+            "resolve issues"
+          ],
+          "ant": [
+            "create problems"
+          ]
+        },
+        "control": {
+          "syn": [
+            "manage",
+            "command"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "warmth": {
+          "syn": [
+            "heat"
+          ],
+          "ant": [
+            "cold"
+          ]
+        },
+        "gather": {
+          "syn": [
+            "assemble",
+            "meet"
+          ],
+          "ant": [
+            "scatter"
+          ]
+        },
+        "adapt": {
+          "syn": [
+            "adjust",
+            "change"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "curious": {
+          "syn": [
+            "inquisitive",
+            "interested"
+          ],
+          "ant": [
+            "uninterested"
+          ]
+        },
+        "humanity": {
+          "syn": [
+            "humankind"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "archaeology": {
+          "syn": [
+            "study of ancient history"
+          ],
+          "ant": [
+            "-"
+          ]
+        }
+      },
+      "paragraph_translations": [
+        "Milyonlarca yıl önce Dünya çok farklıydı. Çevre vahşiydi ve birçok büyük hayvan burada yaşıyordu. Bu dünyada ilk insanlar uzun yolculuklarına başladılar. Bilim insanları en eski insan atalarının Afrika'da yaşadığına inanıyor. Bu ilk insanlar her konuda bizim gibi değillerdi; daha kısaydılar ve beyinleri daha küçüktü. Ancak çok önemli bir becerileri vardı: iki ayak üzerinde yürüyebiliyorlardı. Bu yetenek çok önemliydi çünkü uzun mesafeler kat etmelerine ve uzun otların üzerinden görmelerine yardımcı oluyordu.",
+        "İlk insanlar için hayat zor ve tehlikeliydi. Diğer hayvanlar gibi güçlü pençeleri veya keskin dişleri yoktu. Hayatta kalmak için zeki olmaları gerekiyordu. Küçük gruplar halinde birlikte çalıştılar ve basit aletler yapmayı öğrendiler. İlk aletleri tahta ve taştan yapılmıştı. Bu aletleri et kesmek, kök kazmak ve kendilerini yırtıcı hayvanlardan korumak için kullandılar. Alet yapmak insan gelişiminde çok büyük bir adımdı. Bu, ilk insanların geleceği düşünebildiklerini ve sorunları çözebildiklerini gösteriyordu.",
+        "İnsanlık tarihindeki en büyük keşiflerden biri ateşti. Ateşi kontrol etmeyi öğrenmek ilk insanlar için her şeyi değiştirdi. Ateş onlara soğuk gecelerde sıcaklık verdi ve vahşi hayvanlardan korudu. En önemlisi, yemeklerini pişirmeyi öğrendiler. Pişmiş eti yemek daha kolaydı ve onlara daha fazla enerji verdi. Bu ekstra enerji, beyinlerinin çok uzun bir süre boyunca daha fazla büyümesine yardımcı oldu. Ateş ayrıca toplanabilecekleri, dinlenebilecekleri ve hikayeler anlatabilecekleri sosyal yaşamlarının bir merkezi haline geldi.",
+        "Binlerce yıl sonra bu ilk insanlar hareket etmeye başladılar. Afrika'dan yürüyerek çıktılar ve Avrupa ile Asya'daki yeni yerlere seyahat ettiler. Bu inanılmaz bir yolculuktu. Yeni ortamlara, farklı iklimlere ve yeni zorluklara uyum sağlamak zorundaydılar. Daha sonra Amerika ve Avustralya'ya seyahat ettiler. Gittikleri her yerde hayatta kalmayı öğrendiler. Yeni topraklara yerleştiler ve küçük topluluklar kurdular.",
+        "Bu ilk insanlar hikayemizin başlangıcıydı. Cesur, zeki ve meraklıydılar. Çevrelerindeki dünyaya uyum sağlamayı öğrendiler ve keşifleri insanlığın geleceğini şekillendirdi. Bugün arkeoloji ve bilim aracılığıyla onlar hakkında bilgi edinmeye devam ediyoruz. Kadim geçmişimizi incelediğimizde, kim olduğumuz ve nereden geldiğimiz hakkında daha fazla şey anlıyoruz."
+      ],
+      "sentence_translations": {
+        "Millions of years ago, the Earth was very different.": "Milyonlarca yıl önce Dünya çok farklıydı.",
+        "The environment was wild, and many large animals lived here.": "Çevre vahşiydi ve birçok büyük hayvan burada yaşıyordu.",
+        "In this world, the first humans began their long journey.": "Bu dünyada ilk insanlar uzun yolculuklarına başladılar.",
+        "Scientists believe the earliest human ancestors lived in Africa.": "Bilim insanları en eski insan atalarının Afrika'da yaşadığına inanıyor.",
+        "These early people were not like us in every way; they were shorter and their brains were smaller.": "Bu ilk insanlar her konuda bizim gibi değillerdi; daha kısaydılar ve beyinleri daha küçüktü.",
+        "However, they had one very important skill: they could walk on two legs.": "Ancak çok önemli bir becerileri vardı: iki ayak üzerinde yürüyebiliyorlardı.",
+        "This ability was crucial because it helped them travel long distances and see over tall grass.": "Bu yetenek çok önemliydi çünkü uzun mesafeler kat etmelerine ve uzun otların üzerinden görmelerine yardımcı oluyordu.",
+        "Life for the first humans was difficult and dangerous.": "İlk insanlar için hayat zor ve tehlikeliydi.",
+        "They did not have strong claws or sharp teeth like other animals.": "Diğer hayvanlar gibi güçlü pençeleri veya keskin dişleri yoktu.",
+        "They needed to be smart to survive.": "Hayatta kalmak için zeki olmaları gerekiyordu.",
+        "They worked together in small groups and learned how to make simple tools.": "Küçük gruplar halinde birlikte çalıştılar ve basit aletler yapmayı öğrendiler.",
+        "Their first tools were made of stone and wood.": "İlk aletleri tahta ve taştan yapılmıştı.",
+        "They used these tools to cut meat, dig for roots, and protect themselves from predators.": "Bu aletleri et kesmek, kök kazmak ve kendilerini yırtıcı hayvanlardan korumak için kullandılar.",
+        "Making tools was a huge step in human development.": "Alet yapmak insan gelişiminde çok büyük bir adımdı.",
+        "It showed that early humans could think about the future and solve problems.": "Bu, ilk insanların geleceği düşünebildiklerini ve sorunları çözebildiklerini gösteriyordu.",
+        "One of the biggest discoveries in human history was fire.": "İnsanlık tarihindeki en büyük keşiflerden biri ateşti.",
+        "Learning how to control fire changed everything for early humans.": "Ateşi kontrol etmeyi öğrenmek ilk insanlar için her şeyi değiştirdi.",
+        "Fire gave them warmth during cold nights and protected them from wild animals.": "Ateş onlara soğuk gecelerde sıcaklık verdi ve vahşi hayvanlardan korudu.",
+        "Most importantly, they learned how to cook their food.": "En önemlisi, yemeklerini pişirmeyi öğrendiler.",
+        "Cooked meat was easier to eat and gave them more energy.": "Pişmiş eti yemek daha kolaydı ve onlara daha fazla enerji verdi.",
+        "This extra energy helped their brains grow larger over a very long time.": "Bu ekstra enerji, beyinlerinin çok uzun bir süre boyunca daha fazla büyümesine yardımcı oldu.",
+        "Fire also became a center for their social life, where they could gather, rest, and share stories.": "Ateş ayrıca toplanabilecekleri, dinlenebilecekleri ve hikayeler anlatabilecekleri sosyal yaşamlarının bir merkezi haline geldi.",
+        "After many thousands of years, these early humans started to move.": "Binlerce yıl sonra bu ilk insanlar hareket etmeye başladılar.",
+        "They walked out of Africa and traveled to new places in Europe and Asia.": "Afrika'dan yürüyerek çıktılar ve Avrupa ile Asya'daki yeni yerlere seyahat ettiler.",
+        "This was an incredible journey.": "Bu inanılmaz bir yolculuktu.",
+        "They had to adapt to new environments, different climates, and new challenges.": "Yeni ortamlara, farklı iklimlere ve yeni zorluklara uyum sağlamak zorundaydılar.",
+        "Later, they traveled to the Americas and Australia.": "Daha sonra Amerika ve Avustralya'ya seyahat ettiler.",
+        "Wherever they went, they learned to survive.": "Gittikleri her yerde hayatta kalmayı öğrendiler.",
+        "They settled in new lands and started small communities.": "Yeni topraklara yerleştiler ve küçük topluluklar kurdular.",
+        "These first humans were the beginning of our story.": "Bu ilk insanlar hikayemizin başlangıcıydı.",
+        "They were brave, intelligent, and curious.": "Cesur, zeki ve meraklıydılar.",
+        "They learned to adapt to the world around them, and their discoveries shaped the future of humanity.": "Çevrelerindeki dünyaya uyum sağlamayı öğrendiler ve keşifleri insanlığın geleceğini şekillendirdi.",
+        "Today, we continue to learn about them through archaeology and science.": "Bugün arkeoloji ve bilim aracılığıyla onlar hakkında bilgi edinmeye devam ediyoruz.",
+        "When we study our ancient past, we understand more about who we are and where we come from.": "Kadim geçmişimizi incelediğimizde, kim olduğumuz ve nereden geldiğimiz hakkında daha fazla şey anlıyoruz."
+      },
+      "audio_url": "https://line-reader.pages.dev/audio/a2-the-amazing-story-of-the-first-humans.m4a",
+      "image_url": "https://getlinereader.com/images/a2-the-amazing-story-of-the-first-humans.png",
+      "audio_segments": [
+        {
+          "p": 0,
+          "s": 0,
+          "start_ms": 0,
+          "end_ms": 3780
+        },
+        {
+          "p": 0,
+          "s": 1,
+          "start_ms": 3780,
+          "end_ms": 7960
+        },
+        {
+          "p": 0,
+          "s": 2,
+          "start_ms": 8100,
+          "end_ms": 12020
+        },
+        {
+          "p": 0,
+          "s": 3,
+          "start_ms": 12320,
+          "end_ms": 16140
+        },
+        {
+          "p": 0,
+          "s": 4,
+          "start_ms": 16340,
+          "end_ms": 21680
+        },
+        {
+          "p": 0,
+          "s": 5,
+          "start_ms": 22000,
+          "end_ms": 27040
+        },
+        {
+          "p": 0,
+          "s": 6,
+          "start_ms": 27040,
+          "end_ms": 33460
+        },
+        {
+          "p": 1,
+          "s": 0,
+          "start_ms": 33580,
+          "end_ms": 37020
+        },
+        {
+          "p": 1,
+          "s": 1,
+          "start_ms": 37020,
+          "end_ms": 40900
+        },
+        {
+          "p": 1,
+          "s": 2,
+          "start_ms": 40900,
+          "end_ms": 43380
+        },
+        {
+          "p": 1,
+          "s": 3,
+          "start_ms": 43380,
+          "end_ms": 47800
+        },
+        {
+          "p": 1,
+          "s": 4,
+          "start_ms": 47800,
+          "end_ms": 50460
+        },
+        {
+          "p": 1,
+          "s": 5,
+          "start_ms": 50460,
+          "end_ms": 55580
+        },
+        {
+          "p": 1,
+          "s": 6,
+          "start_ms": 55580,
+          "end_ms": 59000
+        },
+        {
+          "p": 1,
+          "s": 7,
+          "start_ms": 59000,
+          "end_ms": 63260
+        },
+        {
+          "p": 2,
+          "s": 0,
+          "start_ms": 63520,
+          "end_ms": 67360
+        },
+        {
+          "p": 2,
+          "s": 1,
+          "start_ms": 67600,
+          "end_ms": 71440
+        },
+        {
+          "p": 2,
+          "s": 2,
+          "start_ms": 71760,
+          "end_ms": 76240
+        },
+        {
+          "p": 2,
+          "s": 3,
+          "start_ms": 76380,
+          "end_ms": 79600
+        },
+        {
+          "p": 2,
+          "s": 4,
+          "start_ms": 79660,
+          "end_ms": 83160
+        },
+        {
+          "p": 2,
+          "s": 5,
+          "start_ms": 83160,
+          "end_ms": 87660
+        },
+        {
+          "p": 2,
+          "s": 6,
+          "start_ms": 87660,
+          "end_ms": 93400
+        },
+        {
+          "p": 3,
+          "s": 0,
+          "start_ms": 93400,
+          "end_ms": 98140
+        },
+        {
+          "p": 3,
+          "s": 1,
+          "start_ms": 98280,
+          "end_ms": 102420
+        },
+        {
+          "p": 3,
+          "s": 2,
+          "start_ms": 102420,
+          "end_ms": 104500
+        },
+        {
+          "p": 3,
+          "s": 3,
+          "start_ms": 104500,
+          "end_ms": 108980
+        },
+        {
+          "p": 3,
+          "s": 4,
+          "start_ms": 108980,
+          "end_ms": 112100
+        },
+        {
+          "p": 3,
+          "s": 5,
+          "start_ms": 112100,
+          "end_ms": 114660
+        },
+        {
+          "p": 3,
+          "s": 6,
+          "start_ms": 114660,
+          "end_ms": 118000
+        },
+        {
+          "p": 4,
+          "s": 0,
+          "start_ms": 118000,
+          "end_ms": 121140
+        },
+        {
+          "p": 4,
+          "s": 1,
+          "start_ms": 121140,
+          "end_ms": 124080
+        },
+        {
+          "p": 4,
+          "s": 2,
+          "start_ms": 124080,
+          "end_ms": 129480
+        },
+        {
+          "p": 4,
+          "s": 3,
+          "start_ms": 129480,
+          "end_ms": 133460
+        },
+        {
+          "p": 4,
+          "s": 4,
+          "start_ms": 133460,
+          "end_ms": 138800
+        }
+      ]
+    },
     {
       "id": "b1-the-mystery-of-the-walking-rocks",
       "level": "B1",
