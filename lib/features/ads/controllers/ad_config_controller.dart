@@ -10,7 +10,7 @@ class AdConfigController extends ChangeNotifier {
   String _headline = 'Line Reader • Beta Sürümü';
   String _body =
       'Uygulama şu an beta aşamasındadır, geri bildirimleriniz bizim için çok değerlidir. Umut (Alevi) kardeşimize selamlar.';
-  String _actionText = 'Geri Bildirim';
+  String _actionText = '';
   bool _isEnabled = true;
 
   String get headline => _headline;

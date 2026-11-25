@@ -48,6 +48,9 @@ class AnimatedThemePainter extends CustomPainter {
       case AppThemePreset.sakuraGarden:
         _paintSakuraGarden(canvas, rect, size);
         return;
+      case AppThemePreset.aleviPower:
+        _paintAleviPower(canvas, rect, size);
+        return;
       default:
         return;
     }
@@ -1027,6 +1030,483 @@ class AnimatedThemePainter extends CustomPainter {
   double _hash(int seed) {
     final x = math.sin(seed * 12.9898 + 78.233) * 43758.5453;
     return x - x.floorToDouble();
+  }
+
+  // ---------------------------------------------------------------------------
+  // 6. ALEVİ POWER (Özel Tema 2 — Zülfikar, Mandala, Galaksiler & Bulutlar)
+  // ---------------------------------------------------------------------------
+  void _paintAleviPower(Canvas canvas, Rect rect, Size size) {
+    final t = progress;
+    const tau = math.pi * 2;
+    final w = size.width;
+    final h = size.height;
+    final baseDim = math.min(w, h);
+    final unit = isPreview ? baseDim / 360.0 : (baseDim / 420.0).clamp(0.75, 1.45);
+    const inkColor = Color(0xFF0B1021);
+
+    // 1) Derin Gece Lacivert -> Mor Gökyüzü
+    final skyPaint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: <Color>[
+          Color(0xFF12216B),
+          Color(0xFF1D338F),
+          Color(0xFF3B2884),
+          Color(0xFF58228B),
+        ],
+        stops: <double>[0.0, 0.45, 0.78, 1.0],
+      ).createShader(rect);
+    canvas.drawRect(rect, skyPaint);
+
+    // Uzak koyu bulut katmanları
+    final backCloudPaint = Paint()..color = const Color(0x730D1648);
+    canvas.drawCircle(Offset(w * 0.20, h * 0.22), w * 0.28, backCloudPaint);
+    canvas.drawCircle(Offset(w * 0.80, h * 0.30), w * 0.32, backCloudPaint);
+    canvas.drawCircle(Offset(w * 0.30, h * 0.76), w * 0.36, backCloudPaint);
+
+    // 2) Yıldız noktaları (Eco modda daha az)
+    final dotCount = isPreview ? 18 : (isEcoMode ? 24 : 52);
+    final dotPaint = Paint();
+    for (var i = 0; i < dotCount; i++) {
+      final dx = _hash(i * 11 + 3) * w;
+      final dy = _hash(i * 17 + 9) * h;
+      final dr = (i % 3 == 0 ? 2.4 : 1.4) * unit;
+      final twinkle = 0.45 + 0.55 * math.sin(t * tau * 2 + i * 0.7).abs();
+      dotPaint.color = Colors.white.withAlpha((twinkle * 255).round().clamp(0, 255));
+      canvas.drawCircle(Offset(dx, dy), dr, dotPaint);
+    }
+
+    // 3) 3 Adet Dönen Spiral Galaksi
+    _drawAleviGalaxy(canvas, Offset(w * 0.80, h * 0.10), 54 * unit, 25 * unit, -0.25 + t * tau, unit);
+    _drawAleviGalaxy(canvas, Offset(w * 0.18, h * 0.72), 52 * unit, 24 * unit, 0.35 - t * tau, unit);
+    _drawAleviGalaxy(canvas, Offset(w * 0.80, h * 0.80), 46 * unit, 21 * unit, -0.35 + t * tau, unit);
+
+    // 4) Merkezi Güneş Patlaması & Mandala
+    final center = Offset(w * 0.50, h * 0.47);
+    _drawAleviSunburstAndMandala(canvas, center, unit, t, tau, inkColor);
+
+    // 5) Kenar Bulutları (dikişsiz süzülen)
+    final driftA = math.sin(t * tau) * 6 * unit;
+    final driftB = math.cos(t * tau) * 5 * unit;
+    _drawAleviCloud(canvas, Offset(-6 * unit + driftA, h * 0.25), 0.92 * unit, false, inkColor);
+    _drawAleviCloud(canvas, Offset(w + 10 * unit - driftA, h * 0.26), 0.88 * unit, true, inkColor);
+    _drawAleviCloud(canvas, Offset(-16 * unit + driftB, h * 0.56), 0.84 * unit, false, inkColor);
+    _drawAleviCloud(canvas, Offset(w + 8 * unit - driftB, h * 0.54), 0.92 * unit, true, inkColor);
+
+    // 6) Alt Mor Bulutlar + Ön Beyaz Bulutlar
+    final purpleCloudPaint = Paint()..color = const Color(0xFF4C1D95);
+    canvas.drawCircle(Offset(w * 0.16, h - 55 * unit), 105 * unit, purpleCloudPaint);
+    canvas.drawCircle(Offset(w * 0.84, h - 50 * unit), 115 * unit, purpleCloudPaint);
+    _drawAleviCloud(canvas, Offset(w * 0.14 + driftA * 0.6, h - 18 * unit), 1.22 * unit, false, inkColor);
+    _drawAleviCloud(canvas, Offset(w * 0.86 - driftA * 0.6, h - 14 * unit), 1.26 * unit, true, inkColor);
+
+    // 7) Sarı Çizgi Film Yıldızları
+    _drawAleviStar(canvas, Offset(w * 0.30, h * 0.06), 12 * unit, -0.15 + math.sin(t * tau) * 0.06, 1.0, inkColor);
+    _drawAleviStar(canvas, Offset(w * 0.19, h * 0.12), 23 * unit, 0.18 + math.cos(t * tau) * 0.06, 1.0 + math.sin(t * tau * 2) * 0.04, inkColor);
+    _drawAleviStar(canvas, Offset(w * 0.09, h * 0.36), 13 * unit, -0.2, 1.0, inkColor);
+    _drawAleviStar(canvas, Offset(w * 0.90, h * 0.37), 18 * unit, 0.2, 1.0 + math.cos(t * tau * 2) * 0.05, inkColor);
+    _drawAleviStar(canvas, Offset(w * 0.18, h * 0.87), 20 * unit, -0.15, 1.0 + math.sin(t * tau * 2) * 0.04, inkColor);
+
+    // 8) Zülfikar Kılıcı (Hafifçe Süzülen & Parlayan)
+    final swordFloat = math.sin(t * tau * 2) * 6 * unit;
+    _drawAleviZulfikar(canvas, Offset(center.dx, center.dy + swordFloat), unit, t, inkColor);
+
+    // 9) Kılıç Etrafındaki Parlayan 4 Köşeli Kıvılcımlar
+    _drawAleviSparkle(canvas, Offset(w * 0.48, h * 0.24), 11 * unit, const Color(0xFFFEF08A), t * tau * 3, inkColor);
+    _drawAleviSparkle(canvas, Offset(w * 0.56, h * 0.14), 8.5 * unit, const Color(0xFFFDE047), t * tau * 2 + 1.0, inkColor);
+    _drawAleviSparkle(canvas, Offset(w * 0.41, h * 0.63), 10 * unit, const Color(0xFFF472B6), t * tau * 3 + 2.0, inkColor);
+    _drawAleviSparkle(canvas, Offset(w * 0.65, h * 0.72), 9.5 * unit, const Color(0xFF38BDF8), t * tau * 2 + 3.0, inkColor);
+    _drawAleviSparkle(canvas, Offset(w * 0.50, h * 0.76), 9.5 * unit, const Color(0xFFFDE047), t * tau * 3 + 4.0, inkColor);
+  }
+
+  static void _drawAleviGalaxy(
+    Canvas canvas,
+    Offset center,
+    double rx,
+    double ry,
+    double angle,
+    double unit,
+  ) {
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(angle);
+
+    final rect = Rect.fromCenter(center: Offset.zero, width: rx * 2, height: ry * 2);
+    final corePaint = Paint()
+      ..shader = const RadialGradient(
+        colors: <Color>[
+          Color(0xF2FFFAE6),
+          Color(0xA6C4B5FD),
+          Color(0x40818CF8),
+          Color(0x006366F1),
+        ],
+        stops: <double>[0.0, 0.28, 0.65, 1.0],
+      ).createShader(rect);
+    canvas.drawOval(rect, corePaint);
+
+    final armPaint = Paint()
+      ..color = const Color(0x8CE0E7FF)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.8 * unit
+      ..strokeCap = StrokeCap.round;
+
+    for (var arm = 0; arm < 2; arm++) {
+      final path = Path();
+      for (var step = 0; step <= 24; step++) {
+        final a = step * 0.15;
+        final rad = a * (rx * 0.26);
+        final ang = a + arm * math.pi;
+        final px = math.cos(ang) * rad;
+        final py = math.sin(ang) * rad * (ry / rx);
+        if (step == 0) {
+          path.moveTo(px, py);
+        } else {
+          path.lineTo(px, py);
+        }
+      }
+      canvas.drawPath(path, armPaint);
+    }
+    canvas.restore();
+  }
+
+  static void _drawAleviStar(
+    Canvas canvas,
+    Offset center,
+    double outerR,
+    double angle,
+    double scalePulse,
+    Color inkColor,
+  ) {
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(angle);
+    canvas.scale(scalePulse, scalePulse);
+
+    final innerR = outerR * 0.48;
+    final path = Path();
+    for (var i = 0; i < 10; i++) {
+      final r = i.isEven ? outerR : innerR;
+      final a = (i * math.pi) / 5 - math.pi / 2;
+      final px = math.cos(a) * r;
+      final py = math.sin(a) * r;
+      if (i == 0) {
+        path.moveTo(px, py);
+      } else {
+        path.lineTo(px, py);
+      }
+    }
+    path.close();
+
+    final rect = Rect.fromCircle(center: Offset.zero, radius: outerR);
+    final fillPaint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: <Color>[Color(0xFFFEF08A), Color(0xFFF59E0B)],
+      ).createShader(rect);
+    canvas.drawPath(path, fillPaint);
+
+    final strokePaint = Paint()
+      ..color = inkColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = (outerR * 0.14).clamp(1.6, 3.2)
+      ..strokeJoin = StrokeJoin.round;
+    canvas.drawPath(path, strokePaint);
+    canvas.restore();
+  }
+
+  static void _drawAleviSparkle(
+    Canvas canvas,
+    Offset center,
+    double size,
+    Color color,
+    double phase,
+    Color inkColor,
+  ) {
+    final s = size * (0.75 + 0.35 * math.sin(phase));
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    final path = Path()
+      ..moveTo(0, -s)
+      ..quadraticBezierTo(0, 0, s, 0)
+      ..quadraticBezierTo(0, 0, 0, s)
+      ..quadraticBezierTo(0, 0, -s, 0)
+      ..quadraticBezierTo(0, 0, 0, -s)
+      ..close();
+
+    canvas.drawPath(path, Paint()..color = color);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = inkColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.4,
+    );
+    canvas.restore();
+  }
+
+  static void _drawAleviCloud(
+    Canvas canvas,
+    Offset pos,
+    double scale,
+    bool flip,
+    Color inkColor,
+  ) {
+    canvas.save();
+    canvas.translate(pos.dx, pos.dy);
+    canvas.scale(flip ? -scale : scale, scale);
+
+    final path = Path()
+      ..moveTo(-90, 28)
+      ..cubicTo(-110, 28, -112, -5, -80, -10)
+      ..cubicTo(-75, -42, -32, -50, -14, -26)
+      ..cubicTo(6, -54, 52, -46, 58, -14)
+      ..cubicTo(88, -14, 96, 20, 74, 28)
+      ..close();
+
+    final fillPaint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: <Color>[Color(0xFFF1F5F9), Color(0xFFCBD5E1), Color(0xFF94A3B8)],
+        stops: <double>[0.0, 0.65, 1.0],
+      ).createShader(const Rect.fromLTRB(-110, -50, 95, 30));
+    canvas.drawPath(path, fillPaint);
+
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = inkColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3.2
+        ..strokeJoin = StrokeJoin.round,
+    );
+    canvas.restore();
+  }
+
+  static void _drawAleviSunburstAndMandala(
+    Canvas canvas,
+    Offset center,
+    double unit,
+    double t,
+    double tau,
+    Color inkColor,
+  ) {
+    // 1) Dış sivri güneş patlaması
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(t * tau * 0.25);
+    const spikes = 16;
+    final burstPath = Path();
+    for (var i = 0; i < spikes * 2; i++) {
+      final isOuter = i.isEven;
+      final r = (isOuter ? (172.0 + math.sin(t * tau * 2 + i) * 5.0) : 112.0) * unit;
+      final a = (i * math.pi) / spikes;
+      final px = math.cos(a) * r;
+      final py = math.sin(a) * r;
+      if (i == 0) {
+        burstPath.moveTo(px, py);
+      } else {
+        burstPath.lineTo(px, py);
+      }
+    }
+    burstPath.close();
+
+    final burstRect = Rect.fromCircle(center: Offset.zero, radius: 178 * unit);
+    canvas.drawPath(
+      burstPath,
+      Paint()
+        ..shader = const RadialGradient(
+          colors: <Color>[Color(0xFFFEF9C3), Color(0xFFFDE047), Color(0xFFF97316)],
+          stops: <double>[0.1, 0.55, 1.0],
+        ).createShader(burstRect),
+    );
+    canvas.drawPath(
+      burstPath,
+      Paint()
+        ..color = inkColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3.2 * unit
+        ..strokeJoin = StrokeJoin.round,
+    );
+    canvas.restore();
+
+    // 2) İçeride ters yönde dönen mandala deseni
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(-t * tau * 0.5);
+    final mandalaPaint = Paint()
+      ..color = const Color(0x8CB45309)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0 * unit;
+    const petals = 12;
+    for (var i = 0; i < petals; i++) {
+      canvas.save();
+      canvas.rotate((i * tau) / petals);
+      final petal = Path()
+        ..moveTo(0, -56 * unit)
+        ..quadraticBezierTo(22 * unit, -92 * unit, 0, -122 * unit)
+        ..quadraticBezierTo(-22 * unit, -92 * unit, 0, -56 * unit);
+      canvas.drawPath(petal, mandalaPaint);
+      canvas.drawCircle(Offset(0, -98 * unit), 8.5 * unit, mandalaPaint);
+      canvas.restore();
+    }
+    canvas.drawCircle(Offset.zero, 78 * unit, mandalaPaint);
+    canvas.restore();
+  }
+
+  static void _drawAleviZulfikar(
+    Canvas canvas,
+    Offset center,
+    double unit,
+    double t,
+    Color inkColor,
+  ) {
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.scale(0.84 * unit, 0.84 * unit);
+
+    // Çelik Namlu (kavisli çift uçlu Zülfikar formu)
+    final bladePath = Path()
+      ..moveTo(-28, 175)
+      ..cubicTo(-38, 45, -24, -120, 62, -262)
+      ..lineTo(72, -268)
+      ..quadraticBezierTo(50, -195, 36, -162)
+      ..lineTo(106, -208)
+      ..quadraticBezierTo(75, -145, 58, -98)
+      ..cubicTo(32, -20, 26, 75, 24, 175)
+      ..close();
+
+    final bladePaint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: <Color>[
+          Color(0xFFE0F2FE),
+          Color(0xFF7DD3FC),
+          Color(0xFF60A5FA),
+          Color(0xFF93C5FD),
+        ],
+        stops: <double>[0.0, 0.35, 0.75, 1.0],
+      ).createShader(const Rect.fromLTRB(-40, -260, 106, 175));
+    canvas.drawPath(bladePath, bladePaint);
+
+    // Hareketli parlama bandı (namlu içinde)
+    canvas.save();
+    canvas.clipPath(bladePath);
+    final glintY = 160.0 - ((t * 420.0) % 420.0);
+    canvas.drawRect(
+      Rect.fromLTWH(-60, glintY, 200, 28),
+      Paint()..color = const Color(0x59FFFFFF),
+    );
+    canvas.restore();
+
+    canvas.drawPath(
+      bladePath,
+      Paint()
+        ..color = inkColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4.4
+        ..strokeJoin = StrokeJoin.round,
+    );
+
+    // Namlu içi beyaz ışık çizgisi
+    final ridgePath = Path()
+      ..moveTo(-14, 160)
+      ..cubicTo(-20, 35, -8, -105, 54, -225);
+    canvas.drawPath(
+      ridgePath,
+      Paint()
+        ..color = const Color(0xB8FFFFFF)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3.8
+        ..strokeCap = StrokeCap.round,
+    );
+
+    // Balçak (Kıvrımlı altın koruma siperi)
+    final guardPath = Path()
+      ..moveTo(-78, 180)
+      ..cubicTo(-96, 152, -55, 134, -44, 156)
+      ..cubicTo(-38, 170, -16, 176, 0, 162)
+      ..cubicTo(18, 176, 46, 176, 68, 192)
+      ..cubicTo(96, 212, 74, 244, 48, 224)
+      ..cubicTo(36, 214, 48, 200, 56, 206)
+      ..cubicTo(40, 196, 16, 200, 0, 200)
+      ..cubicTo(-30, 200, -64, 202, -78, 180)
+      ..close();
+
+    final goldPaint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: <Color>[Color(0xFFFEF08A), Color(0xFFF59E0B), Color(0xFFD97706)],
+        stops: <double>[0.0, 0.5, 1.0],
+      ).createShader(const Rect.fromLTRB(-80, 140, 80, 350));
+
+    canvas.drawPath(guardPath, goldPaint);
+    canvas.drawPath(
+      guardPath,
+      Paint()
+        ..color = inkColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4.2
+        ..strokeJoin = StrokeJoin.round,
+    );
+
+    // Balçak ortasındaki elmas motifi
+    final diamond = Path()
+      ..moveTo(0, 168)
+      ..lineTo(10, 182)
+      ..lineTo(0, 196)
+      ..lineTo(-10, 182)
+      ..close();
+    canvas.drawPath(diamond, Paint()..color = const Color(0xFFFDE047));
+    canvas.drawPath(
+      diamond,
+      Paint()
+        ..color = inkColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.6,
+    );
+
+    // Kabza ve kıvrımlı altın topuz
+    final hiltPath = Path()
+      ..moveTo(-16, 198)
+      ..lineTo(16, 198)
+      ..cubicTo(14, 250, 24, 290, 20, 326)
+      ..cubicTo(16, 355, -24, 360, -34, 334)
+      ..cubicTo(-42, 314, -22, 294, -8, 306)
+      ..cubicTo(0, 312, -8, 325, -14, 320)
+      ..cubicTo(-18, 290, -14, 245, -16, 198)
+      ..close();
+    canvas.drawPath(hiltPath, goldPaint);
+    canvas.drawPath(
+      hiltPath,
+      Paint()
+        ..color = inkColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4.2
+        ..strokeJoin = StrokeJoin.round,
+    );
+
+    // Kabza içi süsleme kıvrımları & hareket çizgileri
+    final detailPaint = Paint()
+      ..color = inkColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2
+      ..strokeCap = StrokeCap.round;
+    final hiltSwirl = Path()
+      ..moveTo(-8, 224)
+      ..quadraticBezierTo(10, 238, -6, 260)
+      ..quadraticBezierTo(10, 280, -4, 300);
+    canvas.drawPath(hiltSwirl, detailPaint);
+
+    canvas.drawLine(const Offset(-42, 232), const Offset(-40, 286), detailPaint);
+    canvas.drawLine(const Offset(36, 236), const Offset(38, 288), detailPaint);
+    canvas.drawLine(const Offset(-48, 30), const Offset(-42, 110), detailPaint);
+
+    canvas.restore();
   }
 
   @override

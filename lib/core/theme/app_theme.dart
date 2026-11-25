@@ -171,6 +171,7 @@ abstract final class AppTheme {
       AppThemePreset.warmLatteBokeh => _warmLatteBokeh(),
       AppThemePreset.sageSunlight => _sageSunlight(),
       AppThemePreset.sakuraGarden => _sakuraGarden(),
+      AppThemePreset.aleviPower => _aleviPower(),
     };
   }
 
@@ -667,6 +668,56 @@ abstract final class AppTheme {
       readerDividerColor: Color(0x5EC76282),
       readerAccentColor: Color(0xFFA83B60),
       readerBrightness: Brightness.light,
+    );
+
+    return _buildGradientTheme(colorScheme: colorScheme, visuals: visuals);
+  }
+
+  /// Özel Tema 2 — Alevi Power:
+  /// Kozmik lacivert-mor gökyüzü, dönen galaksiler, güneş patlaması ve Zülfikar
+  /// üzerinde yüksek okunaklılık sağlayan koyu indigo yüzeyler ve sıcak altın vurgular.
+  static ThemeData _aleviPower() {
+    final base = ColorScheme.fromSeed(
+      seedColor: const Color(0xFFF59E0B),
+      brightness: Brightness.dark,
+    );
+    final colorScheme = base.copyWith(
+      primary: const Color(0xFFFBBF24),
+      onPrimary: const Color(0xFF12183A),
+      primaryContainer: const Color(0xD93B2778),
+      onPrimaryContainer: const Color(0xFFFEF08A),
+      secondary: const Color(0xFF7DD3FC),
+      onSecondary: const Color(0xFF0A1432),
+      secondaryContainer: const Color(0xD91A2B66),
+      onSecondaryContainer: const Color(0xFFE0F2FE),
+      tertiary: const Color(0xFFFDE047),
+      onTertiary: const Color(0xFF141B3F),
+      tertiaryContainer: const Color(0xD94C1D95),
+      onTertiaryContainer: const Color(0xFFFEF9C3),
+      surface: const Color(0xFF0E1538),
+      onSurface: const Color(0xFFF8FAFC),
+      onSurfaceVariant: const Color(0xFFCBD5E1),
+      surfaceContainerLowest: const Color(0xE60A102B),
+      surfaceContainerLow: const Color(0xD910183D),
+      surfaceContainer: const Color(0xDF141E4B),
+      surfaceContainerHigh: const Color(0xE61A265C),
+      surfaceContainerHighest: const Color(0xEB22306E),
+      outline: const Color(0xFF64748B),
+      outlineVariant: const Color(0x5CFBBF24),
+    );
+
+    const visuals = AppThemeVisuals(
+      preset: AppThemePreset.aleviPower,
+      appBarColor: Color(0xCC0E1538),
+      navBarColor: Color(0xEB0C1232),
+      dialogSurfaceColor: Color(0xF5121A44),
+      readerPaperColor: Color(0xEB0E1538),
+      readerSurfaceColor: Color(0xEB182356),
+      readerTextColor: Color(0xFFF8FAFC),
+      readerSecondaryTextColor: Color(0xFFCBD5E1),
+      readerDividerColor: Color(0x52FBBF24),
+      readerAccentColor: Color(0xFFFBBF24),
+      readerBrightness: Brightness.dark,
     );
 
     return _buildGradientTheme(colorScheme: colorScheme, visuals: visuals);

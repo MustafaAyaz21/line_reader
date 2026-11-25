@@ -77,6 +77,15 @@ enum AppThemePreset {
     enSubtitle: 'Swaying cherry trees & stream',
     isAnimated: true,
     isSpecial: true,
+  ),
+  aleviPower(
+    storageKey: 'alevi_power',
+    trTitle: 'Alevi Power',
+    enTitle: 'Alevi Power',
+    trSubtitle: 'Zülfikar, mandala ışığı ve kozmik gökyüzü',
+    enSubtitle: 'Zulfikar, mandala glow & cosmic sky',
+    isAnimated: true,
+    isSpecial: true,
   );
 
   const AppThemePreset({
@@ -107,7 +116,8 @@ enum AppThemePreset {
       this == AppThemePreset.nightDepth ||
       this == AppThemePreset.electricCoral ||
       this == AppThemePreset.amethystGalaxy ||
-      this == AppThemePreset.oceanDepths;
+      this == AppThemePreset.oceanDepths ||
+      this == AppThemePreset.aleviPower;
 
   static List<AppThemePreset> get staticPresets => AppThemePreset.values
       .where((p) => !p.isAnimated && !p.isSpecial)

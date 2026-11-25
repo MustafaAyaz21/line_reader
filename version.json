@@ -1,7 +1,7 @@
 {
-    "latest_version":  "0.1.40",
-    "version_code":  41,
+    "latest_version":  "0.1.41",
+    "version_code":  42,
     "min_version_code":  0,
-    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.40/app-release.apk",
-    "release_notes":  "Yeni minimalist altın amblem, 6 haneli OTP e-posta doğrulama sistemi, sürekli akan çizgi açılış animasyonu ve beta duyuru alanı."
+    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.41/app-release.apk",
+    "release_notes":  "Yeni LR monogram logosu, Alevi Power özel hareketli teması ve kayan beta duyuru alanı."
 }

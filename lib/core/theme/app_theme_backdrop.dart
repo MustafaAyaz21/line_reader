@@ -37,6 +37,7 @@ class AppThemeMeshPainter extends CustomPainter {
       case AppThemePreset.warmLatteBokeh:
       case AppThemePreset.sageSunlight:
       case AppThemePreset.sakuraGarden:
+      case AppThemePreset.aleviPower:
         return;
     }
   }
