@@ -1,7 +1,7 @@
 {
-    "latest_version":  "0.1.36",
-    "version_code":  37,
+    "latest_version":  "0.1.37",
+    "version_code":  38,
     "min_version_code":  0,
-    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.36/app-release.apk",
-    "release_notes":  "Uygulama içi iyileştirmeler."
+    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.37/app-release.apk",
+    "release_notes":  "Resmi alan adı (api.getlinereader.com) geçişi, bulut senkronizasyonu (kelime/tema/ilerleme) ve podcast kaldığı saniyeden devam etme özelliği."
 }

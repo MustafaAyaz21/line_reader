@@ -61,6 +61,9 @@ class AppUpdateService {
       : _httpClient = httpClient ?? http.Client(),
         _ownsClient = httpClient == null;
 
+  static const String cloudflareVersionJsonUrl =
+      'https://getlinereader.com/version.json';
+
   static const String versionJsonUrl =
       'https://raw.githubusercontent.com/MustafaAyaz21/line_reader/main/version.json';
 
@@ -152,7 +155,8 @@ class AppUpdateService {
     final installed = await getCurrentAppVersion();
 
     final results = await Future.wait<AppUpdateInfo?>(<Future<AppUpdateInfo?>>[
-      _fetchFromVersionJson(),
+      _fetchFromVersionJsonUrl(cloudflareVersionJsonUrl),
+      _fetchFromVersionJsonUrl(versionJsonUrl),
       _fetchFromLatestReleaseApi(),
       _fetchFromGitHubReleaseRedirect(),
     ]);
@@ -229,9 +233,9 @@ class AppUpdateService {
     );
   }
 
-  Future<AppUpdateInfo?> _fetchFromVersionJson() async {
+  Future<AppUpdateInfo?> _fetchFromVersionJsonUrl(String targetUrl) async {
     try {
-      final uri = Uri.parse(versionJsonUrl).replace(
+      final uri = Uri.parse(targetUrl).replace(
         queryParameters: <String, String>{
           't': DateTime.now().millisecondsSinceEpoch.toString(),
         },
@@ -251,7 +255,7 @@ class AppUpdateService {
       );
       return info.apkUrl.startsWith('http') ? info : null;
     } catch (error) {
-      debugPrint('[AppUpdateService] version.json kontrol hatasi: $error');
+      debugPrint('[AppUpdateService] version.json kontrol hatasi ($targetUrl): $error');
       return null;
     }
   }
