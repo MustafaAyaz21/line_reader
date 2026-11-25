@@ -1,7 +1,693 @@
 {
   "version": 1,
-  "updated_at": "2026-11-25T23:20:03.046Z",
+  "updated_at": "2026-11-25T23:24:56.699Z",
   "articles": [
+    {
+      "id": "b2-the-timeless-impact-of-english-literature",
+      "level": "B2",
+      "title": "The Timeless Impact of English Literature",
+      "description": "This article explores the enduring legacy of English Literature from its early foundations to modern classics. It highlights how these works continue to shape global culture and provide profound insights into the human experience across generations.",
+      "reading_time": "1 - 3 dk",
+      "reading_time_minutes": 2,
+      "language": "en",
+      "content": "English Literature, spanning over a millennium of written history, is a cornerstone of global cultural heritage. From the heroic verses of \"Beowulf\" to the complex psychological depths of Shakespearean drama, it offers an unparalleled record of the evolution of the English language and thought. This rich literary tradition does not merely entertain; it serves as a mirror reflecting the societal norms, philosophical shifts, and political turmoils of different eras. Studying these texts allows readers to transcend their own time and place, engaging directly with the fundamental questions of human existence.\n\nThe Renaissance period, often called the Golden Age of English Literature, saw an explosion of creativity, most notably in the works of William Shakespeare. His exploration of the human condition—love, jealousy, ambition, and despair—remains profoundly relevant today. Shakespeare’s ability to capture the essence of the human experience in such eloquent language has cemented his status as the preeminent figure in literary history. Following the Renaissance, literature continued to evolve, reflecting the Enlightenment's emphasis on reason and the Romantic reaction, which championed emotion and the sublime beauty of nature.\n\nIn the nineteenth and twentieth centuries, the novel emerged as the dominant form of literary expression. Authors like Jane Austen provided sharp social commentaries, while Charles Dickens used his platform to expose the stark inequalities of the Industrial Revolution. Later, modernist writers such as Virginia Woolf and James Joyce experimented with narrative techniques, challenging traditional storytelling and delving deeper into the subconscious mind. These writers pushed the boundaries of language, demonstrating its flexibility and power to convey complex inner worlds.\n\nToday, English Literature remains a vibrant and diverse field, encompassing voices from across the globe. Postcolonial literature, for instance, has greatly enriched the canon by offering perspectives from formerly colonized regions, challenging traditional narratives, and exploring themes of identity, displacement, and hybridity. This ongoing evolution ensures that the study of English Literature continues to be a dynamic and relevant pursuit. It remains an essential tool for fostering critical thinking, empathy, and a deeper understanding of the complexities of our interconnected world.",
+      "published_at": "2026-11-25T23:22:47.240Z",
+      "category": "Culture",
+      "author": "Line Reader",
+      "word_meanings": {
+        "spanning": "kapsayan",
+        "millennium": "bin yıl",
+        "cornerstone": "temel taşı",
+        "heritage": "miras",
+        "verses": "mısralar",
+        "unparalleled": "benzersiz",
+        "evolution": "evrim",
+        "merely": "sadece",
+        "serves as": "...görevi görür",
+        "reflecting": "yansıtma",
+        "societal norms": "toplumsal normlar",
+        "shifts": "değişimler",
+        "eras": "dönemler",
+        "transcend": "aşmak",
+        "engaging directly with": "doğrudan etkileşimde bulunmak",
+        "fundamental": "temel",
+        "golden age": "altın çağ",
+        "notably": "özellikle",
+        "human condition": "insan durumu",
+        "ambition": "hırs",
+        "despair": "umutsuzluk",
+        "relevant": "alakalı",
+        "capture": "yakalamak",
+        "essence": "öz",
+        "eloquent": "etkileyiz, güzel konuşan",
+        "cemented": "pekiştirdi",
+        "preeminent": "önde gelen, seçkin",
+        "evolve": "evrimleşmek",
+        "emphasis": "vurgu",
+        "reason": "akıl",
+        "reaction": "tepki",
+        "championed": "savundu",
+        "sublime": "yüce",
+        "emerged": "ortaya çıktı",
+        "dominant": "baskın",
+        "expression": "ifade",
+        "social commentaries": "toplumsal eleştiriler",
+        "expose": "açığa çıkarmak",
+        "stark": "tam, katı",
+        "inequalities": "eşitsizlikler",
+        "experimental": "deneysel",
+        "pushed the boundaries": "sınırları zorladı",
+        "demonstrating": "göstererek",
+        "flexibility": "esneklik",
+        "convey": "iletmek",
+        "diverse": "çeşitli",
+        "encompassing": "kapsayan",
+        "canon": "klasik eserler bütünü",
+        "formerly": "eskiden",
+        "colonized": "sömürge",
+        "displacement": "yerinden edilme",
+        "hybridity": "melezlik",
+        "fostering": "teşvik etme",
+        "pursuit": "arayış, uğraş"
+      },
+      "word_relations": {
+        "spanning": {
+          "syn": [
+            "covering"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "millennium": {
+          "syn": [
+            "period of a thousand years"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "cornerstone": {
+          "syn": [
+            "foundation",
+            "basis"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "heritage": {
+          "syn": [
+            "legacy",
+            "tradition"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "verses": {
+          "syn": [
+            "poetry lines",
+            "stanzas"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "unparalleled": {
+          "syn": [
+            "unmatched",
+            "exceptional"
+          ],
+          "ant": [
+            "common",
+            "ordinary"
+          ]
+        },
+        "evolution": {
+          "syn": [
+            "development",
+            "progression"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "merely": {
+          "syn": [
+            "only",
+            "simply"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "serves as": {
+          "syn": [
+            "functions as"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "reflecting": {
+          "syn": [
+            "mirroring",
+            "showing"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "societal norms": {
+          "syn": [
+            "cultural standards"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "shifts": {
+          "syn": [
+            "changes",
+            "alterations"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "eras": {
+          "syn": [
+            "epochs",
+            "ages"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "transcend": {
+          "syn": [
+            "rise above",
+            "exceed"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "engaging directly with": {
+          "syn": [
+            "interacting with"
+          ],
+          "ant": [
+            "avoiding"
+          ]
+        },
+        "fundamental": {
+          "syn": [
+            "basic",
+            "essential"
+          ],
+          "ant": [
+            "secondary"
+          ]
+        },
+        "golden age": {
+          "syn": [
+            "peak",
+            "flourishing period"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "notably": {
+          "syn": [
+            "especially",
+            "particularly"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "human condition": {
+          "syn": [
+            "state of being human"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "ambition": {
+          "syn": [
+            "aspiration",
+            "drive"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "despair": {
+          "syn": [
+            "hopelessness",
+            "misery"
+          ],
+          "ant": [
+            "hope",
+            "joy"
+          ]
+        },
+        "relevant": {
+          "syn": [
+            "pertinent",
+            "applicable"
+          ],
+          "ant": [
+            "irrelevant",
+            "unrelated"
+          ]
+        },
+        "capture": {
+          "syn": [
+            "seize",
+            "record"
+          ],
+          "ant": [
+            "lose",
+            "release"
+          ]
+        },
+        "essence": {
+          "syn": [
+            "core",
+            "spirit"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "eloquent": {
+          "syn": [
+            "articulate",
+            "expressive"
+          ],
+          "ant": [
+            "inarticulate"
+          ]
+        },
+        "cemented": {
+          "syn": [
+            "solidified",
+            "secured"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "preeminent": {
+          "syn": [
+            "leading",
+            "foremost"
+          ],
+          "ant": [
+            "subordinate",
+            "unknown"
+          ]
+        },
+        "evolve": {
+          "syn": [
+            "develop",
+            "progress"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "emphasis": {
+          "syn": [
+            "stress",
+            "focus"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "reason": {
+          "syn": [
+            "logic",
+            "rationality"
+          ],
+          "ant": [
+            "emotion"
+          ]
+        },
+        "reaction": {
+          "syn": [
+            "response",
+            "backlash"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "championed": {
+          "syn": [
+            "advocated",
+            "supported"
+          ],
+          "ant": [
+            "opposed"
+          ]
+        },
+        "sublime": {
+          "syn": [
+            "awe-inspiring",
+            "magnificent"
+          ],
+          "ant": [
+            "ordinary",
+            "base"
+          ]
+        },
+        "emerged": {
+          "syn": [
+            "appeared",
+            "arose"
+          ],
+          "ant": [
+            "disappeared",
+            "vanished"
+          ]
+        },
+        "dominant": {
+          "syn": [
+            "main",
+            "leading"
+          ],
+          "ant": [
+            "subordinate",
+            "minor"
+          ]
+        },
+        "expression": {
+          "syn": [
+            "communication",
+            "articulation"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "social commentaries": {
+          "syn": [
+            "societal critiques"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "expose": {
+          "syn": [
+            "reveal",
+            "uncover"
+          ],
+          "ant": [
+            "hide",
+            "conceal"
+          ]
+        },
+        "stark": {
+          "syn": [
+            "sharp",
+            "utter"
+          ],
+          "ant": [
+            "subtle",
+            "mild"
+          ]
+        },
+        "inequalities": {
+          "syn": [
+            "disparities",
+            "imbalances"
+          ],
+          "ant": [
+            "equalities",
+            "fairness"
+          ]
+        },
+        "experimental": {
+          "syn": [
+            "innovative",
+            "exploratory"
+          ],
+          "ant": [
+            "traditional",
+            "conventional"
+          ]
+        },
+        "pushed the boundaries": {
+          "syn": [
+            "extended limits"
+          ],
+          "ant": [
+            "limited"
+          ]
+        },
+        "demonstrating": {
+          "syn": [
+            "showing",
+            "proving"
+          ],
+          "ant": [
+            "hiding"
+          ]
+        },
+        "flexibility": {
+          "syn": [
+            "adaptability",
+            "pliability"
+          ],
+          "ant": [
+            "rigidity",
+            "inflexibility"
+          ]
+        },
+        "convey": {
+          "syn": [
+            "communicate",
+            "transmit"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "diverse": {
+          "syn": [
+            "varied",
+            "distinct"
+          ],
+          "ant": [
+            "uniform",
+            "similar"
+          ]
+        },
+        "encompassing": {
+          "syn": [
+            "including",
+            "covering"
+          ],
+          "ant": [
+            "excluding"
+          ]
+        },
+        "canon": {
+          "syn": [
+            "established collection"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "formerly": {
+          "syn": [
+            "previously",
+            "once"
+          ],
+          "ant": [
+            "now",
+            "currently"
+          ]
+        },
+        "colonized": {
+          "syn": [
+            "occupied",
+            "settled"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "displacement": {
+          "syn": [
+            "dislocation"
+          ],
+          "ant": [
+            "-"
+          ]
+        },
+        "hybridity": {
+          "syn": [
+            "mixture",
+            "fusion"
+          ],
+          "ant": [
+            "purity"
+          ]
+        },
+        "fostering": {
+          "syn": [
+            "promoting",
+            "encouraging"
+          ],
+          "ant": [
+            "hindering"
+          ]
+        },
+        "pursuit": {
+          "syn": [
+            "quest",
+            "endeavor"
+          ],
+          "ant": [
+            "-"
+          ]
+        }
+      },
+      "paragraph_translations": [
+        "Bin yıldan fazla yazılı tarihi kapsayan İngiliz Edebiyatı, küresel kültürel mirasın temel taşıdır. \"Beowulf\"un kahramanca mısralarından Shakespeare dramalarının karmaşık psikolojik derinliklerine kadar, İngiliz dilinin ve düşüncesinin evriminin eşsiz bir kaydını sunar. Bu zengin edebi gelenek sadece eğlendirmekle kalmaz; farklı dönemlerin toplumsal normlarını, felsefi değişimlerini ve siyasi çalkantılarını yansıtan bir ayna görevi görür. Bu metinleri incelemek, okuyucuların kendi zaman ve mekanlarını aşarak insan varoluşunun temel sorularıyla doğrudan etkileşime girmelerine olanak tanır.",
+        "Genellikle İngiliz Edebiyatının Altın Çağı olarak adlandırılan Rönesans dönemi, başta William Shakespeare'in eserleri olmak üzere yaratıcılıkta bir patlama gördü. İnsanlık durumunun—aşk, kıskançlık, hırs ve umutsuzluk—keşfi bugün bile derinden alakalı kalmaktadır. Shakespeare'in insan deneyiminin özünü bu kadar etkileyici bir dille yakalama yeteneği, onun edebi tarihteki en seçkin figür olarak statüsünü pekiştirmiştir. Rönesans'ın ardından edebiyat, Aydınlanma'nın akla yaptığı vurguyu yansıtmaya devam etti ve duyguyu ve doğanın yüce güzelliğini savunan Romantik tepkiyi izledi.",
+        "On dokuzuncu ve yirminci yüzyıllarda roman, edebi ifadenin baskın biçimi olarak ortaya çıktı. Jane Austen gibi yazarlar keskin toplumsal eleştiriler sunarken, Charles Dickens platformunu Sanayi Devrimi'nin tam eşitsizliklerini açığa çıkarmak için kullandı. Daha sonra, Virginia Woolf ve James Joyce gibi modernist yazarlar anlatım tekniklerini deneyerek geleneksel hikaye anlatımına meydan okudular ve bilinçaltına daha derinlemesine daldılar. Bu yazarlar, dilin esnekliğini ve karmaşık iç dünyaları iletme gücünü göstererek dilin sınırlarını zorladılar.",
+        "Bugün, İngiliz Edebiyatı dünyanın dört bir yanından sesleri kapsayan canlı ve çeşitli bir alan olmaya devam etmektedir. Örneğin, sömürge sonrası edebiyat, önceden sömürge altına alınmış bölgelerden perspektifler sunarak, geleneksel anlatılara meydan okuyarak ve kimlik, yerinden edilme ve melezlik temalarını keşfederek kanonu büyük ölçüde zenginleştirmiştir. Bu devam eden evrim, İngiliz Edebiyatı çalışmasının dinamik ve ilgili bir uğraş olmaya devam etmesini sağlar. Eleştirel düşünceyi, empatiyi ve birbirine bağlı dünyamızın karmaşıklıklarının daha derin bir anlayışını teşvik etmek için temel bir araç olmaya devam etmektedir."
+      ],
+      "sentence_translations": {
+        "English Literature, spanning over a millennium of written history, is a cornerstone of global cultural heritage.": "Bin yıldan fazla yazılı tarihi kapsayan İngiliz Edebiyatı, küresel kültürel mirasın temel taşıdır.",
+        "From the heroic verses of \"Beowulf\" to the complex psychological depths of Shakespearean drama, it offers an unparalleled record of the evolution of the English language and thought.": "\"Beowulf\"un kahramanca mısralarından Shakespeare dramalarının karmaşık psikolojik derinliklerine kadar, İngiliz dilinin ve düşüncesinin evriminin eşsiz bir kaydını sunar.",
+        "This rich literary tradition does not merely entertain; it serves as a mirror reflecting the societal norms, philosophical shifts, and political turmoils of different eras.": "Bu zengin edebi gelenek sadece eğlendirmekle kalmaz; farklı dönemlerin toplumsal normlarını, felsefi değişimlerini ve siyasi çalkantılarını yansıtan bir ayna görevi görür.",
+        "Studying these texts allows readers to transcend their own time and place, engaging directly with the fundamental questions of human existence.": "Bu metinleri incelemek, okuyucuların kendi zaman ve mekanlarını aşarak insan varoluşunun temel sorularıyla doğrudan etkileşime girmelerine olanak tanır.",
+        "The Renaissance period, often called the Golden Age of English Literature, saw an explosion of creativity, most notably in the works of William Shakespeare.": "Genellikle İngiliz Edebiyatının Altın Çağı olarak adlandırılan Rönesans dönemi, başta William Shakespeare'in eserleri olmak üzere yaratıcılıkta bir patlama gördü.",
+        "His exploration of the human condition—love, jealousy, ambition, and despair—remains profoundly relevant today.": "İnsanlık durumunun—aşk, kıskançlık, hırs ve umutsuzluk—keşfi bugün bile derinden alakalı kalmaktadır.",
+        "Shakespeare’s ability to capture the essence of the human experience in such eloquent language has cemented his status as the preeminent figure in literary history.": "Shakespeare'in insan deneyiminin özünü bu kadar etkileyici bir dille yakalama yeteneği, onun edebi tarihteki en seçkin figür olarak statüsünü pekiştirmiştir.",
+        "Following the Renaissance, literature continued to evolve, reflecting the Enlightenment's emphasis on reason and the Romantic reaction, which championed emotion and the sublime beauty of nature.": "Rönesans'ın ardından edebiyat, Aydınlanma'nın akla yaptığı vurguyu yansıtmaya devam etti ve duyguyu ve doğanın yüce güzelliğini savunan Romantik tepkiyi izledi.",
+        "In the nineteenth and twentieth centuries, the novel emerged as the dominant form of literary expression.": "On dokuzuncu ve yirminci yüzyıllarda roman, edebi ifadenin baskın biçimi olarak ortaya çıktı.",
+        "Authors like Jane Austen provided sharp social commentaries, while Charles Dickens used his platform to expose the stark inequalities of the Industrial Revolution.": "Jane Austen gibi yazarlar keskin toplumsal eleştiriler sunarken, Charles Dickens platformunu Sanayi Devrimi'nin tam eşitsizliklerini açığa çıkarmak için kullandı.",
+        "Later, modernist writers such as Virginia Woolf and James Joyce experimented with narrative techniques, challenging traditional storytelling and delving deeper into the subconscious mind.": "Daha sonra, Virginia Woolf ve James Joyce gibi modernist yazarlar anlatım tekniklerini deneyerek geleneksel hikaye anlatımına meydan okudular ve bilinçaltına daha derinlemesine daldılar.",
+        "These writers pushed the boundaries of language, demonstrating its flexibility and power to convey complex inner worlds.": "Bu yazarlar, dilin esnekliğini ve karmaşık iç dünyaları iletme gücünü göstererek dilin sınırlarını zorladılar.",
+        "Today, English Literature remains a vibrant and diverse field, encompassing voices from across the globe.": "Bugün, İngiliz Edebiyatı dünyanın dört bir yanından sesleri kapsayan canlı ve çeşitli bir alan olmaya devam etmektedir.",
+        "Postcolonial literature, for instance, has greatly enriched the canon by offering perspectives from formerly colonized regions, challenging traditional narratives, and exploring themes of identity, displacement, and hybridity.": "Örneğin, sömürge sonrası edebiyat, önceden sömürge altına alınmış bölgelerden perspektifler sunarak, geleneksel anlatılara meydan okuyarak ve kimlik, yerinden edilme ve melezlik temalarını keşrebek kanonu büyük ölçüde zenginleştirmiştir.",
+        "This ongoing evolution ensures that the study of English Literature continues to be a dynamic and relevant pursuit.": "Bu devam eden evrim, İngiliz Edebiyatı çalışmasının dinamik ve ilgili bir uğraş olmaya devam etmesini sağlar.",
+        "It remains an essential tool for fostering critical thinking, empathy, and a deeper understanding of the complexities of our interconnected world.": "Eleştirel düşünceyi, empatiyi ve birbirine bağlı dünyamızın karmaşıklıklarının daha derin bir anlayışını teşvik etmek için temel bir araç olmaya devam etmektedir."
+      },
+      "audio_url": "https://line-reader.pages.dev/audio/b2-the-timeless-impact-of-english-literature.m4a",
+      "image_url": "https://getlinereader.com/images/b2-the-timeless-impact-of-english-literature.jpg",
+      "audio_segments": [
+        {
+          "p": 0,
+          "s": 0,
+          "start_ms": 0,
+          "end_ms": 7780
+        },
+        {
+          "p": 0,
+          "s": 1,
+          "start_ms": 8140,
+          "end_ms": 19180
+        },
+        {
+          "p": 0,
+          "s": 2,
+          "start_ms": 19700,
+          "end_ms": 29900
+        },
+        {
+          "p": 0,
+          "s": 3,
+          "start_ms": 30880,
+          "end_ms": 40100
+        },
+        {
+          "p": 1,
+          "s": 0,
+          "start_ms": 40100,
+          "end_ms": 48780
+        },
+        {
+          "p": 1,
+          "s": 1,
+          "start_ms": 50160,
+          "end_ms": 56680
+        },
+        {
+          "p": 1,
+          "s": 2,
+          "start_ms": 58460,
+          "end_ms": 66560
+        },
+        {
+          "p": 1,
+          "s": 3,
+          "start_ms": 67960,
+          "end_ms": 78020
+        },
+        {
+          "p": 2,
+          "s": 0,
+          "start_ms": 79100,
+          "end_ms": 85560
+        },
+        {
+          "p": 2,
+          "s": 1,
+          "start_ms": 85560,
+          "end_ms": 94380
+        },
+        {
+          "p": 2,
+          "s": 2,
+          "start_ms": 94380,
+          "end_ms": 104500
+        },
+        {
+          "p": 2,
+          "s": 3,
+          "start_ms": 104500,
+          "end_ms": 110840
+        },
+        {
+          "p": 3,
+          "s": 0,
+          "start_ms": 111580,
+          "end_ms": 117840
+        },
+        {
+          "p": 3,
+          "s": 1,
+          "start_ms": 117840,
+          "end_ms": 128580
+        },
+        {
+          "p": 3,
+          "s": 2,
+          "start_ms": 128580,
+          "end_ms": 129980
+        },
+        {
+          "p": 3,
+          "s": 3,
+          "start_ms": 129980,
+          "end_ms": 130230
+        }
+      ]
+    },
     {
       "id": "a2-the-amazing-story-of-the-first-humans",
       "level": "A2",
