@@ -4,6 +4,7 @@ import '../../core/settings/api_key_controller.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/app_theme_backdrop.dart';
 import '../../core/tts/tts_service.dart';
+import '../../core/widgets/line_refresh_indicator.dart';
 import 'controllers/words_controller.dart';
 import 'models/saved_word.dart';
 import 'models/word_list.dart';
@@ -234,7 +235,7 @@ class _ListWordsScreenState extends State<ListWordsScreen> {
                     ? const Center(child: CircularProgressIndicator())
                     : words.isEmpty
                         ? const EmptyWordsView()
-                        : RefreshIndicator(
+                        : LineRefreshIndicator(
                             onRefresh: () => widget.controller
                                 .loadWordsForList(widget.listId),
                             child: ListView.separated(

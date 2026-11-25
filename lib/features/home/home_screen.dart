@@ -435,6 +435,56 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         final canPopNormally =
             !(_selectedIndex == _mainMenuTabIndex && _isBrowserOpen);
 
+        final isWideScreen = MediaQuery.of(context).size.width >= 840;
+
+        final bodyContent = IndexedStack(
+          index: _activeStackIndex,
+          children: <Widget>[
+            MainMenuScreen(
+              key: const ValueKey<String>('main_menu_screen'),
+              onOpenBrowser: _openBrowser,
+              apiKeyController: _apiKeyController!,
+              localeController: localeController,
+              authController: authController,
+              updateController: _updateController!,
+              articlesController: _articlesController!,
+              translationService: _articleTranslationService!,
+              ttsService: _ttsService,
+              onAddWord: _handleAddWord,
+              onAddWordWithLexicon: _handleAddWordWithLexicon,
+              loadWordLists: _handleLoadWordLists,
+              onCreateWordList: _handleCreateWordList,
+              onClearCache: _handleClearTranslationCache,
+            ),
+            if ((_hasOpenedBrowser ?? false) || _isBrowserOpen)
+              BrowserScreen(
+                key: const ValueKey<String>('browser_screen'),
+                onAddWord: _handleAddWord,
+                onAddWordWithLexicon: _handleAddWordWithLexicon,
+                loadWordLists: _handleLoadWordLists,
+                onCreateWordList: _handleCreateWordList,
+                translationService: _browserTranslationService!,
+                ttsService: _ttsService,
+                authController: authController,
+                onReturnToMenu: _returnToMainMenu,
+                backController: _browserBackController,
+              )
+            else
+              const SizedBox.shrink(),
+            WordsScreen(
+              key: const ValueKey<String>('words_screen'),
+              controller: _wordsController!,
+              apiKeyController: _apiKeyController!,
+              localeController: localeController,
+              authController: authController,
+              updateController: _updateController!,
+              ttsService: _ttsService,
+              onClearCache: _handleClearTranslationCache,
+              searchTriggerController: _wordsSearchTriggerController,
+            ),
+          ],
+        );
+
         return PopScope(
           canPop: canPopNormally,
           onPopInvokedWithResult: (didPop, _) {
@@ -449,78 +499,95 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 _selectedIndex == _mainMenuTabIndex && !_isBrowserOpen,
             child: Scaffold(
               backgroundColor: visuals.hasBackdrop ? Colors.transparent : null,
-              body: IndexedStack(
-              index: _activeStackIndex,
-              children: <Widget>[
-                MainMenuScreen(
-                  key: const ValueKey<String>('main_menu_screen'),
-                  onOpenBrowser: _openBrowser,
-                  apiKeyController: _apiKeyController!,
-                  localeController: localeController,
-                  authController: authController,
-                  updateController: _updateController!,
-                  articlesController: _articlesController!,
-                  translationService: _articleTranslationService!,
-                  ttsService: _ttsService,
-                  onAddWord: _handleAddWord,
-                  onAddWordWithLexicon: _handleAddWordWithLexicon,
-                  loadWordLists: _handleLoadWordLists,
-                  onCreateWordList: _handleCreateWordList,
-                  onClearCache: _handleClearTranslationCache,
-                ),
-                if ((_hasOpenedBrowser ?? false) || _isBrowserOpen)
-                  BrowserScreen(
-                    key: const ValueKey<String>('browser_screen'),
-                    onAddWord: _handleAddWord,
-                    onAddWordWithLexicon: _handleAddWordWithLexicon,
-                    loadWordLists: _handleLoadWordLists,
-                    onCreateWordList: _handleCreateWordList,
-                    translationService: _browserTranslationService!,
-                    ttsService: _ttsService,
-                    authController: authController,
-                    onReturnToMenu: _returnToMainMenu,
-                    backController: _browserBackController,
-                  )
-                else
-                  const SizedBox.shrink(),
-                WordsScreen(
-                  key: const ValueKey<String>('words_screen'),
-                  controller: _wordsController!,
-                  apiKeyController: _apiKeyController!,
-                  localeController: localeController,
-                  authController: authController,
-                  updateController: _updateController!,
-                  ttsService: _ttsService,
-                  onClearCache: _handleClearTranslationCache,
-                  searchTriggerController: _wordsSearchTriggerController,
-                ),
-              ],
-            ),
-            bottomNavigationBar: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AppBannerAd(
-                  authController: authController,
-                  placement: AppBannerPlacement.bottom,
-                ),
-                NavigationBar(
-                  selectedIndex: _selectedIndex,
-                  onDestinationSelected: _onDestinationSelected,
-                  destinations: <NavigationDestination>[
-                    NavigationDestination(
-                      icon: const Icon(Icons.home_outlined),
-                      selectedIcon: const Icon(Icons.home),
-                      label: s.mainMenuTitle,
+              body: isWideScreen
+                  ? Row(
+                      children: [
+                        NavigationRail(
+                          selectedIndex: _selectedIndex,
+                          onDestinationSelected: _onDestinationSelected,
+                          extended: MediaQuery.of(context).size.width >= 1100,
+                          minExtendedWidth: 200,
+                          leading: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 20),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 38,
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    color: Colors.black,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: const Text(
+                                    'LR',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ),
+                                if (MediaQuery.of(context).size.width >= 1100) ...[
+                                  const SizedBox(width: 12),
+                                  const Text(
+                                    'Line Reader',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 16,
+                                      letterSpacing: -0.3,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          destinations: <NavigationRailDestination>[
+                            NavigationRailDestination(
+                              icon: const Icon(Icons.home_outlined),
+                              selectedIcon: const Icon(Icons.home),
+                              label: Text(s.mainMenuTitle),
+                            ),
+                            NavigationRailDestination(
+                              icon: const Icon(Icons.bookmarks_outlined),
+                              selectedIcon: const Icon(Icons.bookmarks),
+                              label: Text(s.myWordsTitle),
+                            ),
+                          ],
+                        ),
+                        const VerticalDivider(thickness: 1, width: 1),
+                        Expanded(child: bodyContent),
+                      ],
+                    )
+                  : bodyContent,
+              bottomNavigationBar: isWideScreen
+                  ? null
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AppBannerAd(
+                          authController: authController,
+                          placement: AppBannerPlacement.bottom,
+                        ),
+                        NavigationBar(
+                          selectedIndex: _selectedIndex,
+                          onDestinationSelected: _onDestinationSelected,
+                          destinations: <NavigationDestination>[
+                            NavigationDestination(
+                              icon: const Icon(Icons.home_outlined),
+                              selectedIcon: const Icon(Icons.home),
+                              label: s.mainMenuTitle,
+                            ),
+                            NavigationDestination(
+                              icon: const Icon(Icons.bookmarks_outlined),
+                              selectedIcon: const Icon(Icons.bookmarks),
+                              label: s.myWordsTitle,
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                    NavigationDestination(
-                      icon: const Icon(Icons.bookmarks_outlined),
-                      selectedIcon: const Icon(Icons.bookmarks),
-                      label: s.myWordsTitle,
-                    ),
-                  ],
-                ),
-              ],
-            ),
             ),
           ),
         );

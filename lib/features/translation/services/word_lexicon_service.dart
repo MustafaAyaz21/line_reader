@@ -115,6 +115,8 @@ class WordLexiconService {
             word TEXT PRIMARY KEY,
             ipa_us TEXT,
             ipa_uk TEXT,
+            definition TEXT,
+            examples_json TEXT,
             synonyms_json TEXT,
             antonyms_json TEXT,
             updated_at INTEGER NOT NULL
@@ -144,6 +146,12 @@ class WordLexiconService {
         word: normalizedWord,
         ipaUs: _normalizeIpa(row['ipa_us'] as String?),
         ipaUk: _normalizeIpa(row['ipa_uk'] as String?),
+        definition: row['definition'] as String?,
+        examples: _decodeJsonTerms(
+          row['examples_json'] as String?,
+          excludeWord: '',
+          maxCount: 3,
+        ),
         synonyms: _decodeJsonTerms(
           row['synonyms_json'] as String?,
           excludeWord: normalizedWord,
@@ -171,6 +179,8 @@ class WordLexiconService {
           'word': info.word,
           'ipa_us': info.ipaUs,
           'ipa_uk': info.ipaUk,
+          'definition': info.definition,
+          'examples_json': jsonEncode(info.examples),
           'synonyms_json': jsonEncode(info.synonyms),
           'antonyms_json': jsonEncode(info.antonyms),
           'updated_at': DateTime.now().millisecondsSinceEpoch,
@@ -401,6 +411,8 @@ class WordLexiconService {
       String? ipaUs;
       String? ipaUk;
       String? fallbackIpa;
+      String? definition;
+      final examples = <String>[];
       final synonyms = <String>[];
       final antonyms = <String>[];
 
@@ -448,6 +460,16 @@ class WordLexiconService {
             if (defs is List) {
               for (final d in defs) {
                 if (d is! Map) continue;
+                if (definition == null && d['definition'] is String) {
+                  final rawDef = (d['definition'] as String).trim();
+                  if (rawDef.isNotEmpty) definition = rawDef;
+                }
+                if (d['example'] is String) {
+                  final rawEx = (d['example'] as String).trim();
+                  if (rawEx.isNotEmpty && !examples.contains(rawEx)) {
+                    examples.add(rawEx);
+                  }
+                }
                 if (d['synonyms'] is List) {
                   for (final s in d['synonyms'] as List) {
                     if (s is String) synonyms.add(s);
@@ -473,6 +495,8 @@ class WordLexiconService {
         word: word,
         ipaUs: ipaUs,
         ipaUk: ipaUk,
+        definition: definition,
+        examples: examples.take(3).toList(growable: false),
         synonyms: _parseTermList(synonyms, excludeWord: word, maxCount: 6),
         antonyms: _parseTermList(antonyms, excludeWord: word, maxCount: 5),
       );

@@ -1,12 +1,15 @@
 import '../../../core/settings/ipa_accent_controller.dart';
 
 /// Bir İngilizce kelimeye ait doğrulanmış Amerikan (US) / İngiliz (UK) IPA
-/// okunuşları ile eş anlamlı ve zıt anlamlı kelimeleri taşıyan model.
+/// okunuşları, İngilizce editoryal tanımı, örnek kullanım cümleleri ile eş ve
+/// zıt anlamlı kelimeleri taşıyan zengin sözlük modeli.
 class WordLexiconInfo {
   const WordLexiconInfo({
     required this.word,
     this.ipaUs,
     this.ipaUk,
+    this.definition,
+    this.examples = const <String>[],
     this.synonyms = const <String>[],
     this.antonyms = const <String>[],
   });
@@ -14,6 +17,8 @@ class WordLexiconInfo {
   final String word;
   final String? ipaUs;
   final String? ipaUk;
+  final String? definition;
+  final List<String> examples;
   final List<String> synonyms;
   final List<String> antonyms;
 
@@ -25,9 +30,14 @@ class WordLexiconInfo {
       (ipaUs != null && ipaUs!.trim().isNotEmpty) &&
       (ipaUk != null && ipaUk!.trim().isNotEmpty);
 
+  bool get hasDefinition => definition != null && definition!.trim().isNotEmpty;
+
+  bool get hasExamples => examples.isNotEmpty;
+
   bool get hasRelations => synonyms.isNotEmpty || antonyms.isNotEmpty;
 
-  bool get isEmpty => !hasAnyIpa && !hasRelations;
+  bool get isEmpty =>
+      !hasAnyIpa && !hasRelations && !hasDefinition && !hasExamples;
 
   /// Kullanıcının seçtiği aksana ait doğrulanmış IPA'yı ve gerçek aksan etiketini
   /// döndürür. Seçili aksan yoksa diğer aksanın doğrulanmış IPA'sını KENDİ
@@ -61,6 +71,13 @@ class WordLexiconInfo {
         ? ipaUk!.trim()
         : (other.ipaUk?.trim().isNotEmpty == true ? other.ipaUk!.trim() : null);
 
+    final mergedDef = (definition != null && definition!.trim().isNotEmpty)
+        ? definition!.trim()
+        : (other.definition?.trim().isNotEmpty == true
+            ? other.definition!.trim()
+            : null);
+
+    final mergedExamples = _mergeTerms(examples, other.examples, maxCount: 3);
     final mergedSyn = _mergeTerms(synonyms, other.synonyms, maxCount: 6);
     final mergedAnt = _mergeTerms(antonyms, other.antonyms, maxCount: 5);
 
@@ -68,6 +85,8 @@ class WordLexiconInfo {
       word: word,
       ipaUs: mergedUs,
       ipaUk: mergedUk,
+      definition: mergedDef,
+      examples: mergedExamples,
       synonyms: mergedSyn,
       antonyms: mergedAnt,
     );

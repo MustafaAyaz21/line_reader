@@ -8,6 +8,7 @@ import '../../core/localization/app_strings.dart';
 import '../../core/settings/api_key_controller.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tts/tts_service.dart';
+import '../../core/widgets/line_refresh_indicator.dart';
 import '../auth/controllers/auth_controller.dart';
 import '../settings/widgets/api_key_dialog.dart';
 import '../settings/widgets/settings_action_button.dart';
@@ -1321,7 +1322,7 @@ class _WordsScreenState extends State<WordsScreen> {
       );
     }
 
-    return RefreshIndicator(
+    return LineRefreshIndicator(
       onRefresh: widget.controller.loadLists,
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(0, 8, 0, 88),

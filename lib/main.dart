@@ -7,6 +7,7 @@ import 'core/localization/app_locale.dart';
 import 'core/platform/process_text_channel.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/app_theme_controller.dart';
+import 'features/home/home_screen.dart';
 import 'features/lookup_overlay/quick_lookup_overlay_app.dart';
 import 'features/splash/splash_screen.dart';
 
@@ -75,7 +76,7 @@ class _LineReaderAppState extends State<LineReaderApp> {
             ),
             themeMode: preset.themeMode,
             themeAnimationDuration: Duration.zero,
-            home: const SplashScreen(),
+            home: kIsWeb ? const HomeScreen() : const SplashScreen(),
           );
         },
       ),

@@ -82,6 +82,31 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
     'Charon',
   ];
 
+  final TextEditingController _manualTitleController = TextEditingController();
+  final TextEditingController _manualAuthorController = TextEditingController();
+  final TextEditingController _manualContentController = TextEditingController();
+  bool _isManualInputMode = false;
+
+  // Tek Tıkla Kaynaktan Çek & Yayınla Durumu
+  final TextEditingController _quickPublishTopicController = TextEditingController();
+  String _quickPublishLevel = 'B1';
+  String _quickPublishVoice = 'Kore';
+  bool _isQuickPublishing = false;
+  int _quickPublishStep = 0;
+  String _quickPublishStepMessage = '';
+  int _quickPublishElapsedSec = 0;
+  Timer? _quickPublishTimer;
+  DevQuickPublishResult? _lastQuickPublishResult;
+  bool _isQuickPublishSectionExpanded = true;
+
+  // Otomatik Günlük Yayın Planlayıcı Durumu
+  DevScheduleConfig? _scheduleConfig;
+  bool _isScheduleSectionExpanded = true;
+  bool _isScheduleEnabled = true;
+  int _selectedPublishHour = 9;
+  bool _isSavingSchedule = false;
+  bool _isTestingSchedule = false;
+
   @override
   void initState() {
     super.initState();
@@ -93,6 +118,7 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
 
   @override
   void dispose() {
+    _quickPublishTimer?.cancel();
     _articleGenTimer?.cancel();
     _tabController.dispose();
     _emailController.dispose();
@@ -100,6 +126,10 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
     _maxUsesController.dispose();
     _noteController.dispose();
     _articleTopicController.dispose();
+    _quickPublishTopicController.dispose();
+    _manualTitleController.dispose();
+    _manualAuthorController.dispose();
+    _manualContentController.dispose();
     _draftTitleController.dispose();
     _draftContentController.dispose();
     if (_ownsService) {
@@ -142,18 +172,27 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
         return;
       }
 
-      final results = await Future.wait<Object>(<Future<Object>>[
+      final results = await Future.wait<Object?>(<Future<Object?>>[
         _service.fetchUsers(token),
         _service.fetchCodes(token),
         _service
             .fetchArticles(token)
             .catchError((_) => const <DevArticleSummary>[]),
+        _service
+            .fetchScheduleConfig(token)
+            .catchError((_) => null),
       ]);
       if (!mounted) return;
+      final sched = results[3] as DevScheduleConfig?;
       setState(() {
         _users = results[0] as List<DevEntitlementUser>;
         _codes = results[1] as List<DevAccessCode>;
         _articles = results[2] as List<DevArticleSummary>;
+        if (sched != null) {
+          _scheduleConfig = sched;
+          _isScheduleEnabled = sched.isEnabled;
+          _selectedPublishHour = sched.publishHour;
+        }
         _isLoading = false;
       });
     } catch (error) {
@@ -1031,6 +1070,52 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
     }
   }
 
+  void _handlePrepareManualArticle() {
+    final title = _manualTitleController.text.trim();
+    final author = _manualAuthorController.text.trim();
+    final content = _manualContentController.text.trim();
+
+    if (title.isEmpty) {
+      _showSnack(context.l10n.t('Lütfen makale başlığı girin.', 'Please enter an article title.'), isError: true);
+      return;
+    }
+    if (content.length < 50) {
+      _showSnack(context.l10n.t('Makale metni en az 50 karakter olmalıdır.', 'Article text must be at least 50 chars.'), isError: true);
+      return;
+    }
+
+    final wordCount = content.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length;
+    final readingMin = (wordCount / 140).ceil().clamp(1, 30);
+    final readingTime = readingMin <= 1 ? '1 - 2 dk' : '$readingMin - ${readingMin + 1} dk';
+    final slug = title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-').replaceAll(RegExp(r'^-+|-+$'), '');
+    final id = '${_selectedLevel.toLowerCase()}-$slug';
+
+    final lines = content.split(RegExp(r'\r?\n')).map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+    final desc = lines.isNotEmpty ? (lines.first.length > 120 ? '${lines.first.substring(0, 117)}...' : lines.first) : title;
+
+    final manualDraft = DevGeneratedArticle(
+      id: id,
+      level: _selectedLevel,
+      title: title,
+      content: content,
+      readingTime: readingTime,
+      description: desc,
+      author: author.isNotEmpty ? author : 'Line Reader',
+      category: 'General',
+      sentences: lines,
+      meanings: const {},
+      wordRelations: const {},
+    );
+
+    setState(() {
+      _draftArticle = manualDraft;
+      _draftTitleController.text = title;
+      _draftContentController.text = content;
+    });
+
+    _showSnack(context.l10n.t('Manuel makale taslağı hazırlandı! Aşağıdan inceleyip yayınlayabilirsiniz.', 'Manual draft ready! Review below and publish.'));
+  }
+
   Future<void> _handlePublishArticle() async {
     final draft = _draftArticle;
     if (draft == null) return;
@@ -1132,6 +1217,103 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
       _showSnack(e.toString(), isError: true);
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  Future<void> _handleQuickPublish() async {
+    final token = await _requireToken();
+    if (token == null) return;
+
+    setState(() {
+      _isQuickPublishing = true;
+      _quickPublishStep = 1;
+      _quickPublishStepMessage = 'İlgi çekici kaynaklar taranıyor...';
+      _quickPublishElapsedSec = 0;
+      _lastQuickPublishResult = null;
+    });
+
+    _quickPublishTimer?.cancel();
+    _quickPublishTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        _quickPublishElapsedSec++;
+        if (_quickPublishStep == 1 && _quickPublishElapsedSec >= 3) {
+          _quickPublishStep = 2;
+          _quickPublishStepMessage = 'Makale bulundu! CEFR analizi ve kelime/cümle çevirileri hazırlanıyor...';
+        } else if (_quickPublishStep == 2 && _quickPublishElapsedSec >= 8) {
+          _quickPublishStep = 3;
+          _quickPublishStepMessage = 'Podcast AI stüdyo sesi üretiliyor ve zaman senkronu yapılıyor...';
+        } else if (_quickPublishStep == 3 && _quickPublishElapsedSec >= 16) {
+          _quickPublishStep = 4;
+          _quickPublishStepMessage = 'D1 veritabanı ve GitHub akışına anında yükleniyor...';
+        }
+      });
+    });
+
+    try {
+      final res = await _service.quickPublishArticle(
+        token,
+        level: _quickPublishLevel,
+        topic: _quickPublishTopicController.text.trim(),
+        voice: _quickPublishVoice,
+      );
+
+      _quickPublishTimer?.cancel();
+      if (!mounted) return;
+      setState(() {
+        _isQuickPublishing = false;
+        _quickPublishStep = 5;
+        _quickPublishStepMessage = res.message;
+        _lastQuickPublishResult = res;
+      });
+
+      _showSnack(res.message);
+      await _loadAll();
+    } catch (e) {
+      _quickPublishTimer?.cancel();
+      if (!mounted) return;
+      setState(() {
+        _isQuickPublishing = false;
+        _quickPublishStep = 0;
+      });
+      _showSnack('Tek tıkla yayınlama başarısız: $e', isError: true);
+    }
+  }
+
+  Future<void> _handleSaveScheduleConfig() async {
+    final token = await _requireToken();
+    if (token == null) return;
+    setState(() => _isSavingSchedule = true);
+    try {
+      final res = await _service.updateScheduleConfig(
+        token,
+        isEnabled: _isScheduleEnabled,
+        publishHour: _selectedPublishHour,
+      );
+      _showSnack(res.message, isError: !res.ok);
+      await _loadAll();
+    } catch (e) {
+      _showSnack('Plan kaydedilemedi: $e', isError: true);
+    } finally {
+      if (mounted) setState(() => _isSavingSchedule = false);
+    }
+  }
+
+  Future<void> _handleTestScheduleRunNow() async {
+    final token = await _requireToken();
+    if (token == null) return;
+    setState(() => _isTestingSchedule = true);
+    try {
+      final res = await _service.triggerScheduleRunNow(token, mode: 'full_pipeline');
+      _showSnack(res.message, isError: !res.ok);
+      await _loadAll();
+    } catch (e) {
+      _showSnack('Test çalışması başarısız: $e', isError: true);
+    } finally {
+      if (mounted) setState(() => _isTestingSchedule = false);
     }
   }
 
@@ -1420,32 +1602,539 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
     );
   }
 
+  Widget _buildQuickPublishSection(
+    ThemeData theme,
+    ColorScheme colorScheme,
+    AppStrings s,
+  ) {
+    final busy = _isSubmitting || _isGeneratingArticle || _isGeneratingAudio || _isQuickPublishing;
+    final lastRes = _lastQuickPublishResult;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        _buildSectionToggleButton(
+          key: const ValueKey<String>('dev_panel_toggle_quick_publish_btn'),
+          theme: theme,
+          colorScheme: colorScheme,
+          icon: Icons.bolt_rounded,
+          title: s.t('⚡ Tek Tıkla Makale Çek & Yayınla', '⚡ One-Click Fetch & Publish'),
+          subtitle: _isQuickPublishing
+              ? s.t('İşlem sürüyor (${_quickPublishElapsedSec} sn)...', 'Processing (${_quickPublishElapsedSec}s)...')
+              : s.t('Seviyeyi seç; ilgi çekici yazıyı bulsun, seslendirsin ve anında canlıya alsın', 'Select level to find, voice, and publish instantly'),
+          isExpanded: _isQuickPublishSectionExpanded,
+          onTap: () => setState(
+            () => _isQuickPublishSectionExpanded = !_isQuickPublishSectionExpanded,
+          ),
+        ),
+        if (_isQuickPublishSectionExpanded) ...<Widget>[
+          const SizedBox(height: 10),
+          Card(
+            margin: EdgeInsets.zero,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Text(
+                    s.t('Hedef CEFR Seviyesi Seçin *', 'Select Target CEFR Level *'),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    s.t(
+                      'Sistem seçilen seviyeye uygun merak uyandırıcı, ilgi çekici bir konuyu tarar, kelime ve cümle anlamlarını çıkarır ve stüdyo Podcast AI sesini oluşturur.',
+                      'The system picks a captivating topic for this level, analyzes vocabulary, and generates studio Podcast AI audio.',
+                    ),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _levels.map((lvl) {
+                      return ChoiceChip(
+                        label: Text(lvl, style: const TextStyle(fontWeight: FontWeight.w700)),
+                        selected: _quickPublishLevel == lvl,
+                        onSelected: busy
+                            ? null
+                            : (_) => setState(() => _quickPublishLevel = lvl),
+                      );
+                    }).toList(growable: false),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _quickPublishTopicController,
+                    enabled: !busy,
+                    decoration: InputDecoration(
+                      labelText: s.t(
+                        'Odak Konusu (İsteğe bağlı — boşsa sistem popüler konulardan seçer)',
+                        'Focus Topic (Optional — system picks if blank)',
+                      ),
+                      hintText: s.t(
+                        'Örn: Nörobilim, Derin Uzay, İnsan Psikolojisi, Gizemler...',
+                        'e.g. Neuroscience, Deep Space, Human Psychology, Mysteries...',
+                      ),
+                      isDense: true,
+                      prefixIcon: const Icon(Icons.explore_rounded, size: 20),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: <Widget>[
+                      Text(
+                        s.t('Podcast Sesi:', 'Podcast Voice:'),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Wrap(
+                          spacing: 6,
+                          children: _voices.map((v) {
+                            return ChoiceChip(
+                              label: Text(v),
+                              selected: _quickPublishVoice == v,
+                              onSelected: busy
+                                  ? null
+                                  : (_) => setState(() => _quickPublishVoice = v),
+                            );
+                          }).toList(growable: false),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed: busy ? null : _handleQuickPublish,
+                    icon: _isQuickPublishing
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.bolt_rounded, size: 20),
+                    label: Text(
+                      _isQuickPublishing
+                          ? s.t('Makale Çekiliyor ve Yayınlanıyor (${_quickPublishElapsedSec} sn)...', 'Publishing (${_quickPublishElapsedSec}s)...')
+                          : s.t('Makaleyi Bul, Seslendir ve Yayınla', 'Find, Voice & Publish Article'),
+                    ),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  if (_isQuickPublishing || lastRes != null || _quickPublishStep > 0) ...<Widget>[
+                    const SizedBox(height: 16),
+                    _buildQuickPublishLiveCard(theme, colorScheme, s),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildQuickPublishLiveCard(
+    ThemeData theme,
+    ColorScheme colorScheme,
+    AppStrings s,
+  ) {
+    final lastRes = _lastQuickPublishResult;
+    final isDone = _quickPublishStep >= 5;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDone
+            ? colorScheme.primaryContainer.withOpacity(0.18)
+            : colorScheme.surfaceVariant.withOpacity(0.35),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDone
+              ? colorScheme.primary.withOpacity(0.4)
+              : colorScheme.outlineVariant.withOpacity(0.5),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Icon(
+                isDone ? Icons.check_circle_rounded : Icons.sync_rounded,
+                size: 20,
+                color: isDone ? Colors.green : colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  isDone
+                      ? s.t('Makale Başarıyla Yayına Alındı!', 'Article Successfully Published!')
+                      : s.t('Canlı Yayınlama Durumu', 'Live Publishing Status'),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isDone ? Colors.green.withOpacity(0.15) : colorScheme.primary.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Icon(Icons.timer_outlined, size: 14, color: isDone ? Colors.green : colorScheme.primary),
+                    const SizedBox(width: 4),
+                    Text(
+                      isDone
+                          ? '${lastRes?.totalSec ?? _quickPublishElapsedSec} sn'
+                          : '$_quickPublishElapsedSec sn',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: isDone ? Colors.green : colorScheme.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildLiveStepRow(
+            stepNumber: 1,
+            label: s.t('1. İlgi çekici kaynaklar ve konular taranıyor...', '1. Curating engaging sources & topics...'),
+            currentStep: _quickPublishStep,
+            colorScheme: colorScheme,
+            theme: theme,
+          ),
+          const SizedBox(height: 8),
+          _buildLiveStepRow(
+            stepNumber: 2,
+            label: lastRes?.article != null
+                ? s.t(
+                    '2. Makale bulundu: "${lastRes!.article!.title}" (${lastRes.article!.level})',
+                    '2. Article found: "${lastRes!.article!.title}" (${lastRes.article!.level})',
+                  )
+                : s.t(
+                    '2. Makale bulundu ve CEFR kelime/cümle analizi yapılıyor...',
+                    '2. Article found & analyzing vocabulary and CEFR level...',
+                  ),
+            currentStep: _quickPublishStep,
+            colorScheme: colorScheme,
+            theme: theme,
+          ),
+          const SizedBox(height: 8),
+          _buildLiveStepRow(
+            stepNumber: 3,
+            label: s.t(
+              '3. Podcast AI stüdyo sesi üretiliyor ve zaman senkronu yapılıyor...',
+              '3. Producing studio Podcast AI audio & word timing...',
+            ),
+            currentStep: _quickPublishStep,
+            colorScheme: colorScheme,
+            theme: theme,
+          ),
+          const SizedBox(height: 8),
+          _buildLiveStepRow(
+            stepNumber: 4,
+            label: s.t(
+              '4. D1 veritabanı ve GitHub akışına anında yükleniyor...',
+              '4. Instant upload to D1 database and GitHub feed...',
+            ),
+            currentStep: _quickPublishStep,
+            colorScheme: colorScheme,
+            theme: theme,
+          ),
+          if (isDone && lastRes != null) ...<Widget>[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.green.withOpacity(0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    '🎉 ${lastRes.message}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: Colors.green.shade800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '⏱️ Metin & Analiz: ${(lastRes.articleMs / 1000).toStringAsFixed(1)}s  |  🎙️ Podcast Sesi: ${(lastRes.audioMs / 1000).toStringAsFixed(1)}s  |  🚀 Canlıya Alma: ${(lastRes.publishMs / 1000).toStringAsFixed(1)}s',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLiveStepRow({
+    required int stepNumber,
+    required String label,
+    required int currentStep,
+    required ColorScheme colorScheme,
+    required ThemeData theme,
+  }) {
+    final bool isCompleted = currentStep > stepNumber || currentStep >= 5;
+    final bool isActive = currentStep == stepNumber && currentStep < 5;
+
+    Widget iconWidget;
+    Color textColor;
+    if (isCompleted) {
+      iconWidget = const Icon(Icons.check_circle_rounded, size: 18, color: Colors.green);
+      textColor = colorScheme.onSurface;
+    } else if (isActive) {
+      iconWidget = SizedBox(
+        width: 18,
+        height: 18,
+        child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.primary),
+      );
+      textColor = colorScheme.primary;
+    } else {
+      iconWidget = Icon(Icons.radio_button_unchecked_rounded, size: 18, color: colorScheme.outlineVariant);
+      textColor = colorScheme.onSurfaceVariant.withOpacity(0.6);
+    }
+
+    return Row(
+      children: <Widget>[
+        iconWidget,
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: textColor,
+              fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildScheduleConfigSection(
+    ThemeData theme,
+    ColorScheme colorScheme,
+    AppStrings s,
+  ) {
+    final cfg = _scheduleConfig;
+    final busy = _isSubmitting || _isSavingSchedule || _isTestingSchedule;
+    final preHour = (_selectedPublishHour - 1 + 24) % 24;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        _buildSectionToggleButton(
+          key: const ValueKey<String>('dev_panel_toggle_schedule_section_btn'),
+          theme: theme,
+          colorScheme: colorScheme,
+          icon: Icons.schedule_rounded,
+          title: s.t('📅 Otomatik Günlük Yayın Planlayıcı', '📅 Automated Scheduled Publisher'),
+          subtitle: _isScheduleEnabled
+              ? s.t(
+                  'Her gün saat ${_selectedPublishHour.toString().padLeft(2, '0')}:00\'da A1-C2 tüm 6 seviye yayınlanır',
+                  'Every day at ${_selectedPublishHour.toString().padLeft(2, '0')}:00 all 6 levels go live',
+                )
+              : s.t('Otomatik yayınlama devre dışı', 'Scheduled publishing disabled'),
+          isExpanded: _isScheduleSectionExpanded,
+          onTap: () => setState(
+            () => _isScheduleSectionExpanded = !_isScheduleSectionExpanded,
+          ),
+        ),
+        if (_isScheduleSectionExpanded) ...<Widget>[
+          const SizedBox(height: 10),
+          Card(
+            margin: EdgeInsets.zero,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      s.t('Otomatik Günlük Yayınlama', 'Automated Daily Publishing'),
+                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    subtitle: Text(
+                      s.t(
+                        'Açık olduğunda her gün belirlediğin saatte tüm seviyeler (A1, A2, B1, B2, C1, C2) için 6 yeni makale otomatik yayınlanır.',
+                        'When enabled, 6 fresh articles (A1-C2) are published daily at your specified hour.',
+                      ),
+                      style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                    ),
+                    value: _isScheduleEnabled,
+                    onChanged: busy ? null : (val) => setState(() => _isScheduleEnabled = val),
+                  ),
+                  const Divider(height: 24),
+                  Text(
+                    s.t('Yayın Saati Seçin (Türkiye Saati / UTC+3) *', 'Select Publish Hour (Turkey Time) *'),
+                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: <int>[6, 7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 21].map((h) {
+                      final label = '${h.toString().padLeft(2, '0')}:00';
+                      return ChoiceChip(
+                        label: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        selected: _selectedPublishHour == h,
+                        onSelected: busy
+                            ? null
+                            : (_) => setState(() => _selectedPublishHour = h),
+                      );
+                    }).toList(growable: false),
+                  ),
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: colorScheme.primary.withOpacity(0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Row(
+                          children: <Widget>[
+                            Icon(Icons.bolt_rounded, size: 18, color: colorScheme.primary),
+                            const SizedBox(width: 6),
+                            Text(
+                              s.t('İki Aşamalı Kusursuz Çalışma Prensibi', 'Two-Stage Instant Publishing Principle'),
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: colorScheme.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          s.t(
+                            '1. Hazırlık (Saat ${preHour.toString().padLeft(2, '0')}:15): Sistem arka planda A1\'den C2\'ye 6 seviyenin tamamı için ilgi çekici makaleleri, kelime analizlerini ve Podcast AI seslerini hazırlar, gizli olarak yükler.\n'
+                            '2. Canlıya Alma (Saat ${_selectedPublishHour.toString().padLeft(2, '0')}:00): Hedef saat geldiğinde hiçbir bekleme veya gecikme olmaksızın tüm makaleler tek saniyede yayına açılır.',
+                            '1. Pre-bake (${preHour.toString().padLeft(2, '0')}:15): System prepares all 6 CEFR level articles with audio and keeps them hidden.\n'
+                            '2. Go-Live (${_selectedPublishHour.toString().padLeft(2, '0')}:00): Instant zero-delay unhiding at the exact target hour.',
+                          ),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            height: 1.4,
+                          ),
+                        ),
+                        if (cfg?.lastPreparedDate != null || cfg?.lastPublishedDate != null) ...<Widget>[
+                          const SizedBox(height: 8),
+                          Text(
+                            '📅 Son Hazırlık: ${cfg?.lastPreparedDate ?? "-"}  |  🚀 Son Yayın: ${cfg?.lastPublishedDate ?? "-"}',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: busy ? null : _handleSaveScheduleConfig,
+                          icon: _isSavingSchedule
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Icon(Icons.save_rounded, size: 18),
+                          label: Text(s.t('Planı Kaydet', 'Save Schedule')),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: busy ? null : _handleTestScheduleRunNow,
+                          icon: _isTestingSchedule
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.play_circle_outline_rounded, size: 18),
+                          label: Text(s.t('Şimdi Test Et (6 Seviye)', 'Test Run (6 Levels)')),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+        ],
+      ],
+    );
+  }
+
   Widget _buildArticlesTab(
     ThemeData theme,
     ColorScheme colorScheme,
     AppStrings s,
   ) {
-    final busy = _isSubmitting || _isGeneratingArticle || _isGeneratingAudio;
+    final busy = _isSubmitting || _isGeneratingArticle || _isGeneratingAudio || _isQuickPublishing;
     final draft = _draftArticle;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 36),
       children: <Widget>[
-        // 1. Açılır/Kapanır Bölüm: Makale Yayınla (Gemini + Masaüstü benzeri taslak ekranı)
+        // 1. Yeni Bölüm: Tek Tıkla Kaynaktan Çek & Canlı Yayınla (Canlı Adım Takibi)
+        _buildQuickPublishSection(theme, colorScheme, s),
+
+        // 2. Yeni Bölüm: Otomatik Günlük Yayın Planlayıcı (A1-C2 İki Aşamalı Sistem)
+        _buildScheduleConfigSection(theme, colorScheme, s),
+
+        // 3. Açılır/Kapanır Bölüm: Detaylı Makale Yayınla (Gemini + Manuel Metin Taslağı)
         _buildSectionToggleButton(
           key: const ValueKey<String>('dev_panel_toggle_publish_section_btn'),
           theme: theme,
           colorScheme: colorScheme,
           icon: Icons.auto_awesome_rounded,
-          title: s.t('Makale Yayınla', 'Publish Article'),
+          title: s.t('Detaylı Makale / Taslak Yayınla', 'Detailed Article / Draft Publishing'),
           subtitle: draft != null
               ? s.t(
                   'Taslak hazır: ${draft.title}',
                   'Draft ready: ${draft.title}',
                 )
               : s.t(
-                  'Gemini ile yeni makale ve Podcast AI sesi üret',
-                  'Generate new article & Podcast AI audio with Gemini',
+                  'Manuel metin gir veya özel parametrelerle taslak hazırla',
+                  'Enter manual text or prepare custom draft',
                 ),
           isExpanded: _isPublishSectionExpanded,
           onTap: () => setState(
@@ -1461,12 +2150,100 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  Text(
-                    s.t('Gemini ile Makale Üret', 'Generate Article with Gemini'),
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+                  SegmentedButton<bool>(
+                    segments: <ButtonSegment<bool>>[
+                      ButtonSegment<bool>(
+                        value: false,
+                        icon: const Icon(Icons.auto_awesome_rounded, size: 16),
+                        label: Text(s.t('AI İle Üret', 'Generate with AI')),
+                      ),
+                      ButtonSegment<bool>(
+                        value: true,
+                        icon: const Icon(Icons.edit_note_rounded, size: 16),
+                        label: Text(s.t('Manuel Metin Gir', 'Manual Input')),
+                      ),
+                    ],
+                    selected: <bool>{_isManualInputMode},
+                    onSelectionChanged: busy
+                        ? null
+                        : (val) => setState(() => _isManualInputMode = val.first),
                   ),
+                  const SizedBox(height: 14),
+                  if (_isManualInputMode) ...<Widget>[
+                    Text(
+                      s.t('Gerçek / Manuel Makale Girişi', 'Manual Article Publishing'),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      s.t(
+                        'Başlık, yazar/kaynak ve doğrudan gerçek İngilizce makale metnini girin.',
+                        'Enter title, author/source, and paste the authentic English text.',
+                      ),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: _levels.map((lvl) {
+                        return ChoiceChip(
+                          label: Text(lvl),
+                          selected: _selectedLevel == lvl,
+                          onSelected: busy
+                              ? null
+                              : (_) => setState(() => _selectedLevel = lvl),
+                        );
+                      }).toList(growable: false),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _manualTitleController,
+                      enabled: !busy,
+                      decoration: InputDecoration(
+                        labelText: s.t('Makale Başlığı *', 'Article Title *'),
+                        isDense: true,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _manualAuthorController,
+                      enabled: !busy,
+                      decoration: InputDecoration(
+                        labelText: s.t('Yazar / Kaynak (örn. The Conversation)', 'Author / Source'),
+                        isDense: true,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _manualContentController,
+                      enabled: !busy,
+                      maxLines: 6,
+                      decoration: InputDecoration(
+                        labelText: s.t('Gerçek Makale Metni *', 'Article Text *'),
+                        alignLabelWithHint: true,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      onPressed: busy ? null : _handlePrepareManualArticle,
+                      icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+                      label: Text(s.t('Taslağı Hazırla ve İncele', 'Prepare & Review Draft')),
+                    ),
+                  ] else ...<Widget>[
+                    Text(
+                      s.t('Gemini ile Makale Üret', 'Generate Article with Gemini'),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   const SizedBox(height: 6),
                   Text(
                     s.t(
@@ -1532,6 +2309,7 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
                     const SizedBox(height: 10),
                     _buildArticleGenProgressBox(theme, colorScheme, s),
                   ],
+                ],
                 ],
               ),
             ),

@@ -331,13 +331,16 @@ class _SelectableRelationChip extends StatelessWidget {
   final Color selectedFg;
   final VoidCallback onTap;
 
+  static const Color _greenActiveBorder = Color(0xFF10B981);
+  static const Color _greenActiveBg = Color(0x1F10B981);
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
     return Material(
-      color: selected ? selectedBg : colorScheme.surfaceContainerHighest.withAlpha(110),
+      color: selected ? _greenActiveBg : colorScheme.surfaceContainerHighest.withAlpha(120),
       borderRadius: BorderRadius.circular(999),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -348,25 +351,26 @@ class _SelectableRelationChip extends StatelessWidget {
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
               color: selected
-                  ? accentColor.withAlpha(130)
-                  : colorScheme.outlineVariant.withAlpha(130),
+                  ? _greenActiveBorder
+                  : colorScheme.outlineVariant.withAlpha(140),
+              width: selected ? 1.4 : 1.0,
             ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               if (selected) ...<Widget>[
-                Icon(Icons.check_rounded, size: 13, color: selectedFg),
+                const Icon(Icons.check_rounded, size: 14, color: _greenActiveBorder),
                 const SizedBox(width: 4),
               ],
               Text(
                 label,
                 style: theme.textTheme.labelMedium?.copyWith(
                   color: selected
-                      ? selectedFg
-                      : colorScheme.onSurfaceVariant.withAlpha(165),
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                  decoration: selected ? null : TextDecoration.lineThrough,
+                      ? colorScheme.onSurface
+                      : colorScheme.onSurfaceVariant,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  decoration: null, // Asla uzeri cizili gosterme, normal kelime gibi goster
                 ),
               ),
             ],
@@ -484,6 +488,122 @@ class DidYouMeanCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Kelimenin İngilizce editoryal tanımı ve gerçek kullanım örnek cümlelerini
+/// şık ve minimalist bir editoryal kutuda sunan bileşen.
+class WordDefinitionAndExamplesSection extends StatelessWidget {
+  const WordDefinitionAndExamplesSection({
+    super.key,
+    required this.lexiconInfo,
+  });
+
+  final WordLexiconInfo? lexiconInfo;
+
+  @override
+  Widget build(BuildContext context) {
+    final info = lexiconInfo;
+    if (info == null) return const SizedBox.shrink();
+
+    final hasDef = info.hasDefinition;
+    final hasEx = info.hasExamples;
+    if (!hasDef && !hasEx) return const SizedBox.shrink();
+
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final s = context.l10n;
+
+    return Container(
+      key: const ValueKey<String>('word_definition_examples_section'),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withAlpha(140),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (hasDef) ...[
+            Row(
+              children: [
+                Icon(
+                  Icons.menu_book_rounded,
+                  size: 15,
+                  color: colorScheme.primary,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  s.t('İngilizce Tanım', 'English Definition'),
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.primary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              info.definition!,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontStyle: FontStyle.italic,
+                color: colorScheme.onSurface,
+                height: 1.4,
+              ),
+            ),
+          ],
+          if (hasDef && hasEx) const SizedBox(height: 10),
+          if (hasEx) ...[
+            Row(
+              children: [
+                Icon(
+                  Icons.format_quote_rounded,
+                  size: 16,
+                  color: colorScheme.secondary,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  s.t('Örnek Cümleler', 'Usage Examples'),
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.secondary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            for (final ex in info.examples)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '• ',
+                      style: TextStyle(
+                        color: colorScheme.secondary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        ex,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ],
       ),
     );
   }

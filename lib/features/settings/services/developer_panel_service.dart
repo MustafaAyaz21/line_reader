@@ -300,6 +300,97 @@ class DevAudioResult {
   final List<Map<String, dynamic>> audioSegments;
 }
 
+/// Otomatik Günlük Yayın Planlayıcı yapılandırması.
+class DevScheduleConfig {
+  const DevScheduleConfig({
+    required this.isEnabled,
+    required this.publishHour,
+    this.timezoneOffset = 3,
+    this.lastPreparedDate,
+    this.lastPublishedDate,
+    this.updatedAt,
+    this.serverTimeTr,
+    this.scheduleSummary,
+  });
+
+  final bool isEnabled;
+  final int publishHour;
+  final int timezoneOffset;
+  final String? lastPreparedDate;
+  final String? lastPublishedDate;
+  final String? updatedAt;
+  final String? serverTimeTr;
+  final String? scheduleSummary;
+
+  int get prebakeHour => (publishHour - 1 + 24) % 24;
+
+  String get publishHourFormatted => '${publishHour.toString().padLeft(2, '0')}:00';
+  String get prebakeHourFormatted => '${prebakeHour.toString().padLeft(2, '0')}:15';
+
+  factory DevScheduleConfig.fromJson(Map<String, dynamic> json, {String? serverTimeTr, String? scheduleSummary}) {
+    final cfg = json['config'] is Map<String, dynamic>
+        ? json['config'] as Map<String, dynamic>
+        : json;
+    return DevScheduleConfig(
+      isEnabled: cfg['is_enabled'] == true || cfg['is_enabled'] == 1 || cfg['is_enabled'] == '1',
+      publishHour: int.tryParse((cfg['publish_hour'] ?? 9).toString()) ?? 9,
+      timezoneOffset: int.tryParse((cfg['timezone_offset'] ?? 3).toString()) ?? 3,
+      lastPreparedDate: cfg['last_prepared_date']?.toString(),
+      lastPublishedDate: cfg['last_published_date']?.toString(),
+      updatedAt: cfg['updated_at']?.toString(),
+      serverTimeTr: serverTimeTr ?? json['server_time_tr']?.toString(),
+      scheduleSummary: scheduleSummary ?? json['schedule_summary']?.toString(),
+    );
+  }
+}
+
+/// Tek Tıkla Makale Çek, Seslendir & Yayınla işlem sonucu.
+class DevQuickPublishResult {
+  const DevQuickPublishResult({
+    required this.ok,
+    required this.message,
+    this.article,
+    this.audioGenerated = false,
+    this.githubSynced = false,
+    this.totalSec = '0.0',
+    this.totalMs = 0,
+    this.articleMs = 0,
+    this.audioMs = 0,
+    this.publishMs = 0,
+  });
+
+  final bool ok;
+  final String message;
+  final DevGeneratedArticle? article;
+  final bool audioGenerated;
+  final bool githubSynced;
+  final String totalSec;
+  final int totalMs;
+  final int articleMs;
+  final int audioMs;
+  final int publishMs;
+
+  factory DevQuickPublishResult.fromJson(Map<String, dynamic> json) {
+    final timing = json['timing'] is Map<String, dynamic>
+        ? json['timing'] as Map<String, dynamic>
+        : const <String, dynamic>{};
+    return DevQuickPublishResult(
+      ok: json['ok'] == true,
+      message: (json['message'] ?? '').toString(),
+      article: json['article'] is Map<String, dynamic>
+          ? DevGeneratedArticle.fromJson(json['article'] as Map<String, dynamic>)
+          : null,
+      audioGenerated: json['audio_generated'] == true,
+      githubSynced: json['github_synced'] == true,
+      totalSec: (timing['total_sec'] ?? '0.0').toString(),
+      totalMs: int.tryParse((timing['total_ms'] ?? 0).toString()) ?? 0,
+      articleMs: int.tryParse((timing['article_ms'] ?? 0).toString()) ?? 0,
+      audioMs: int.tryParse((timing['audio_ms'] ?? 0).toString()) ?? 0,
+      publishMs: int.tryParse((timing['publish_ms'] ?? 0).toString()) ?? 0,
+    );
+  }
+}
+
 /// Mobil Geliştirici Paneli için sunucu istemcisi.
 ///
 /// APK içinde hiçbir gizli anahtar tutulmaz; her istek kullanıcının imzalı
@@ -730,6 +821,97 @@ class DeveloperPanelService {
               ? 'Makale silindi.'
               : 'Makale silinemedi (HTTP ${res.statusCode}).'),
     );
+  }
+
+  /// Otomatik günlük yayın planını getirir.
+  Future<DevScheduleConfig> fetchScheduleConfig(String idToken) async {
+    final res = await _request('GET', '/dev/schedule', idToken: idToken);
+    final data = _decodeJsonMap(res.body);
+    if (res.statusCode != 200 || data['ok'] != true) {
+      throw Exception(data['message']?.toString() ?? 'Planlayıcı bilgisi alınamadı.');
+    }
+    return DevScheduleConfig.fromJson(
+      data,
+      serverTimeTr: data['server_time_tr']?.toString(),
+      scheduleSummary: data['schedule_summary']?.toString(),
+    );
+  }
+
+  /// Otomatik günlük yayın planını günceller.
+  Future<DevActionResult> updateScheduleConfig(
+    String idToken, {
+    required bool isEnabled,
+    required int publishHour,
+    int timezoneOffset = 3,
+  }) async {
+    final res = await _request(
+      'POST',
+      '/dev/schedule',
+      idToken: idToken,
+      jsonBody: <String, Object?>{
+        'is_enabled': isEnabled,
+        'publish_hour': publishHour,
+        'timezone_offset': timezoneOffset,
+      },
+    );
+    final data = _decodeJsonMap(res.body);
+    return DevActionResult(
+      ok: res.statusCode == 200 && data['ok'] == true,
+      message: data['message']?.toString() ??
+          (res.statusCode == 200
+              ? 'Yayın planı kaydedildi.'
+              : 'Yayın planı kaydedilemedi (HTTP ${res.statusCode}).'),
+    );
+  }
+
+  /// Planlayıcıyı anında manuel çalıştırır ('prebake', 'publish', veya 'full_pipeline').
+  Future<DevActionResult> triggerScheduleRunNow(
+    String idToken, {
+    String mode = 'full_pipeline',
+  }) async {
+    final res = await _request(
+      'POST',
+      '/dev/schedule/run-now',
+      idToken: idToken,
+      jsonBody: <String, Object?>{'mode': mode},
+      timeout: const Duration(seconds: 120),
+    );
+    final data = _decodeJsonMap(res.body);
+    return DevActionResult(
+      ok: res.statusCode == 200 && data['ok'] == true,
+      message: data['message']?.toString() ??
+          (res.statusCode == 200
+              ? 'Planlayıcı tetiklendi.'
+              : 'İşlem başarısız (HTTP ${res.statusCode}).'),
+    );
+  }
+
+  /// Tek tıkla kaynaktan çek, analiz et, seslendir ve yayınla.
+  Future<DevQuickPublishResult> quickPublishArticle(
+    String idToken, {
+    required String level,
+    String topic = '',
+    String voice = 'Kore',
+  }) async {
+    final res = await _request(
+      'POST',
+      '/dev/articles/quick-publish',
+      idToken: idToken,
+      jsonBody: <String, Object?>{
+        'level': level.trim().toUpperCase(),
+        'topic': topic.trim(),
+        'voice': voice.trim(),
+      },
+      timeout: const Duration(seconds: 110),
+    );
+    final data = _decodeJsonMap(res.body);
+    if (res.statusCode != 200 || data['ok'] != true) {
+      throw Exception(
+        data['message']?.toString() ??
+            'Tek tıkla yayınlama başarısız oldu (HTTP ${res.statusCode}).',
+      );
+    }
+    return DevQuickPublishResult.fromJson(data);
   }
 
   Map<String, dynamic> _decodeJsonMap(String body) {

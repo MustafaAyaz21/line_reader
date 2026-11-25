@@ -4,6 +4,7 @@ import '../../../core/localization/app_strings.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_theme_backdrop.dart';
 import '../../../core/tts/tts_service.dart';
+import '../../../core/widgets/line_refresh_indicator.dart';
 import '../../auth/controllers/auth_controller.dart';
 import '../../browser/browser_screen.dart';
 import '../../translation/services/word_translation_service.dart';
@@ -153,7 +154,7 @@ class _LevelArticlesScreenState extends State<LevelArticlesScreen> {
                     onRefreshPressed: widget.controller.applyPendingArticles,
                   ),
                   Expanded(
-                    child: RefreshIndicator(
+                    child: LineRefreshIndicator(
                       onRefresh: _handlePullToRefresh,
                       child: levelArticles.isEmpty
                           ? _buildEmptyState(context, level)

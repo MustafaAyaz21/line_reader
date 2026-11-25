@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../../core/database/app_database.dart';
@@ -88,6 +90,76 @@ class WordPreviewSheet extends StatefulWidget {
     TtsService? ttsService,
     AuthController? authController,
   }) {
+    final media = MediaQuery.of(context);
+    final isDesktopWeb = media.size.width >= 800;
+
+    if (isDesktopWeb) {
+      // Masaüstü / Geniş ekranda ekranın altını kaplamak yerine sağda lüks bir modal dialog olarak sun
+      return showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        builder: (dialogContext) {
+          return Dialog(
+            alignment: Alignment.centerRight,
+            insetPadding: const EdgeInsets.fromLTRB(20, 24, 32, 24),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            clipBehavior: Clip.antiAlias,
+            child: SizedBox(
+              width: 440,
+              height: math.min(media.size.height * 0.88, 720.0),
+              child: WordPreviewSheet(
+                word: word,
+                contextSentence: contextSentence,
+                translationService: translationService,
+                lexiconService: lexiconService,
+                wordLists: wordLists,
+                loadWordLists: loadWordLists,
+                onCreateWordList: onCreateWordList,
+                ttsService: ttsService,
+                authController: authController,
+                onAddWord: (
+                  selectedWord,
+                  selectedMeaning,
+                  meanings,
+                  listId,
+                  listName,
+                ) {
+                  Navigator.of(dialogContext).pop();
+                  onAddWord(
+                    selectedWord,
+                    selectedMeaning,
+                    meanings,
+                    listId,
+                    listName,
+                  );
+                },
+                onAddWordWithLexicon: onAddWordWithLexicon == null
+                    ? null
+                    : (
+                        selectedWord,
+                        selectedMeaning,
+                        meanings,
+                        listId,
+                        listName,
+                        selectedLexicon,
+                      ) {
+                        Navigator.of(dialogContext).pop();
+                        onAddWordWithLexicon(
+                          selectedWord,
+                          selectedMeaning,
+                          meanings,
+                          listId,
+                          listName,
+                          selectedLexicon,
+                        );
+                      },
+              ),
+            ),
+          );
+        },
+      );
+    }
+
     return showModalBottomSheet<void>(
       context: context,
       showDragHandle: false,

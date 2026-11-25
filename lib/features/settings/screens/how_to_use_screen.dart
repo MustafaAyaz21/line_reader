@@ -19,6 +19,37 @@ class HowToUseScreen extends StatelessWidget {
 
     final sections = <_GuideItem>[
       _GuideItem(
+        icon: Icons.devices_rounded,
+        iconBg: colorScheme.surfaceContainerHighest,
+        iconColor: colorScheme.primary,
+        title: s.t(
+          'Tüm Cihazlarda Eşitlenmiş Kütüphane (Web & Mobil)',
+          'Cross-Device Library (Web, Tablet & Mobile)',
+        ),
+        summary: s.t(
+          'Bilgisayar, tablet veya telefon; dilediğin tarayıcıdan kesintisiz devam et.',
+          'Read seamlessly on PC, tablet, or phone from any supported browser.',
+        ),
+        steps: <String>[
+          s.t(
+            'Bilgisayarından, tabletinden veya destekleyen herhangi bir cihazından getlinereader.com adresine git.',
+            'Visit getlinereader.com on your PC, tablet, or any supported web browser.',
+          ),
+          s.t(
+            'Mobil uygulamada kullandığın hesabınla (Google veya E-posta) giriş yap.',
+            'Sign in using the same account (Google or Email) you use on your mobile device.',
+          ),
+          s.t(
+            'Telefonda kaydettiğin tüm kelime listelerin, kelimelerin ve okuyup bitirdiğin makalelerin ("Tamamlandı" rozetleriyle birlikte) anında tarayıcında karşına gelir.',
+            'All your saved vocabulary, custom word lists, and completed articles (with "Completed" badges) sync instantly in your browser.',
+          ),
+        ],
+        tip: s.t(
+          'Büyük ekranda rahatça okuyup çalışabilir, yoldayken telefondan kaldığın yerden devam edebilirsin. Kütüphanen daima seninle.',
+          'Enjoy reading on a large screen at home or office, and pick up right where you left off on your phone. Your library is always with you.',
+        ),
+      ),
+      _GuideItem(
         icon: Icons.menu_book_rounded,
         iconBg: colorScheme.primaryContainer,
         iconColor: colorScheme.onPrimaryContainer,

@@ -100,11 +100,11 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF090D16),
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Stack(
           children: [
-            // Hafif lüks ambiyans parıltısı
+            // Hafif minimalist ambiyans gölgesi
             Center(
               child: Container(
                 width: 260,
@@ -113,15 +113,15 @@ class _SplashScreenState extends State<SplashScreen>
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFFD97706).withAlpha(18),
-                      blurRadius: 100,
-                      spreadRadius: 20,
+                      color: Colors.black.withAlpha(10),
+                      blurRadius: 90,
+                      spreadRadius: 10,
                     ),
                   ],
                 ),
               ),
             ),
-            // Tam merkezde akan altın çizgi kompozisyonu
+            // Tam merkezde akan siyah çizgi kompozisyonu
             Center(
               child: AnimatedBuilder(
                 animation: _controller,
@@ -149,9 +149,9 @@ class _SplashScreenState extends State<SplashScreen>
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.w400,
+                      fontWeight: FontWeight.w500,
                       letterSpacing: 1.2,
-                      color: Color(0x80D1D5DB),
+                      color: Color(0x996B7280),
                     ),
                   ),
                 ),
@@ -204,39 +204,26 @@ class _FlowingGoldenLinePainter extends CustomPainter {
     linePath.cubicTo(w * 0.78, h * 0.50, w * 0.74, h * 0.58, w * 0.69, h * 0.58);
     linePath.cubicTo(w * 0.74, h * 0.58, w * 0.82, h * 0.56, w * 0.92, h * 0.56);
 
-    // 2) Altın çizgi boyası
+    // 2) Siyah çizgi boyası
     final Paint linePaint = Paint()
+      ..color = const Color(0xFF111827) // Saf obsidiyen koyu siyah
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.6
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
     final Paint glowPaint = Paint()
+      ..color = Colors.black.withAlpha(20)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 7.5
+      ..strokeWidth = 6.0
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
 
     // Çizgi animasyon ilerlemesi (0.0 -> 0.72)
     final double drawT = Curves.easeInOutCubic.transform(
       (progress / 0.72).clamp(0.0, 1.0),
     );
-
-    // Altın ışıltı gradyanı
-    final Rect bounds = Rect.fromLTWH(0, 0, w, h);
-    final Shader goldShader = const LinearGradient(
-      colors: [
-        Color(0xFFFDE68A), // Açık altın
-        Color(0xFFF59E0B), // Sıcak kehribar
-        Color(0xFFD97706), // Bronz altın
-        Color(0xFFFBBF24), // Parlak altın
-      ],
-      stops: [0.0, 0.35, 0.70, 1.0],
-    ).createShader(bounds);
-
-    linePaint.shader = goldShader;
-    glowPaint.color = const Color(0xFFF59E0B).withAlpha(140);
 
     // Metrikler üzerinden yolu çiz
     Offset? cursorHead;
@@ -254,15 +241,15 @@ class _FlowingGoldenLinePainter extends CustomPainter {
       }
     }
 
-    // 'i' harfinin noktası (ilerleme %46'yı geçtiğinde zarif bir parıltıyla konur)
+    // 'i' harfinin noktası (ilerleme %46'yı geçtiğinde zarifçe konur)
     if (progress > 0.46) {
       final double dotT = ((progress - 0.46) / 0.16).clamp(0.0, 1.0);
       final double dotScale = Curves.elasticOut.transform(dotT);
       final Offset dotPos = Offset(w * 0.41, h * 0.25);
-      final Paint dotPaint = Paint()..color = const Color(0xFFFDE68A);
+      final Paint dotPaint = Paint()..color = const Color(0xFF111827);
       final Paint dotGlow = Paint()
-        ..color = const Color(0xFFF59E0B).withAlpha(160)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
+        ..color = Colors.black.withAlpha(25)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
 
       canvas.drawCircle(dotPos, 2.8 * dotScale, dotGlow);
       canvas.drawCircle(dotPos, 2.2 * dotScale, dotPaint);
@@ -272,11 +259,11 @@ class _FlowingGoldenLinePainter extends CustomPainter {
     if (cursorHead != null && progress < 0.78) {
       final double pulse = math.sin(progress * 18) * 0.5 + 0.5;
       final Paint headGlow = Paint()
-        ..color = const Color(0xFFFDE68A).withAlpha((180 + 75 * pulse).round())
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
-      final Paint headCenter = Paint()..color = Colors.white;
+        ..color = Colors.black.withAlpha((35 + 25 * pulse).round())
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+      final Paint headCenter = Paint()..color = const Color(0xFF111827);
 
-      canvas.drawCircle(cursorHead, 4.2, headGlow);
+      canvas.drawCircle(cursorHead, 4.0, headGlow);
       canvas.drawCircle(cursorHead, 2.2, headCenter);
     }
 
@@ -285,9 +272,9 @@ class _FlowingGoldenLinePainter extends CustomPainter {
       final double appsT = ((progress - 0.50) / 0.38).clamp(0.0, 1.0);
       final double opacity = Curves.easeOut.transform(appsT);
 
-      // İnce şık ayırıcı altın çizgi
+      // İnce şık ayırıcı siyah çizgi
       final Paint dividerPaint = Paint()
-        ..color = const Color(0xFFF59E0B).withAlpha((opacity * 160).round())
+        ..color = const Color(0xFF111827).withAlpha((opacity * 160).round())
         ..strokeWidth = 1.2
         ..strokeCap = StrokeCap.round;
 
@@ -303,9 +290,9 @@ class _FlowingGoldenLinePainter extends CustomPainter {
       final textSpan = TextSpan(
         text: 'A  P  P  S',
         style: TextStyle(
-          color: const Color(0xFFF3F4F6).withAlpha((opacity * 240).round()),
+          color: const Color(0xFF111827).withAlpha((opacity * 230).round()),
           fontSize: 12.0,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w800,
           letterSpacing: 4.8,
         ),
       );

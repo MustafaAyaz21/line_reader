@@ -116,6 +116,14 @@ export default {
 
     return jsonResponse({ error: "not_found" }, 404);
   },
+
+  async scheduled(event, env, ctx) {
+    if (ctx && typeof ctx.waitUntil === "function") {
+      ctx.waitUntil(handleScheduledPublishRun(env, "cron"));
+    } else {
+      await handleScheduledPublishRun(env, "cron");
+    }
+  },
 };
 
 /* ---------------- Herkese Açık D1 Önbellekli Örnek Cümle Üretici ---------------- */
@@ -342,7 +350,27 @@ async function ensureSchema(db) {
         created_at TEXT NOT NULL
       )
     `),
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS publish_schedule_config (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        is_enabled INTEGER NOT NULL DEFAULT 1,
+        publish_hour INTEGER NOT NULL DEFAULT 9,
+        timezone_offset INTEGER NOT NULL DEFAULT 3,
+        last_prepared_date TEXT,
+        last_published_date TEXT,
+        updated_at TEXT NOT NULL
+      )
+    `),
   ]);
+
+  try {
+    await db
+      .prepare(`
+        INSERT OR IGNORE INTO publish_schedule_config (id, is_enabled, publish_hour, timezone_offset, updated_at)
+        VALUES (1, 1, 9, 3, datetime('now'))
+      `)
+      .run();
+  } catch (_) {}
 
   // Mevcut canlı D1 tabloları için güvenli sütun geçişleri (zaten varsa sessizce geçer)
   try {
@@ -1538,6 +1566,156 @@ async function handleDeveloperPanelRequest(request, env, verifiedUser, path, met
     });
   }
 
+  // 4) Otomatik Günlük Yayın Planlayıcı Ayarları (A1-C2 İki Aşamalı Sistem)
+  if (path === "/dev/schedule") {
+    if (method === "GET") {
+      let cfg = await env.DB
+        .prepare("SELECT is_enabled, publish_hour, timezone_offset, last_prepared_date, last_published_date, updated_at FROM publish_schedule_config WHERE id = 1 LIMIT 1")
+        .first();
+      if (!cfg) {
+        cfg = {
+          is_enabled: 1,
+          publish_hour: 9,
+          timezone_offset: 3,
+          last_prepared_date: null,
+          last_published_date: null,
+          updated_at: new Date().toISOString(),
+        };
+      }
+      const tzOffset = Number(cfg.timezone_offset ?? 3);
+      const localNow = new Date(Date.now() + tzOffset * 3600 * 1000);
+      const serverTimeTr = `${String(localNow.getUTCHours()).padStart(2, "0")}:${String(localNow.getUTCMinutes()).padStart(2, "0")}`;
+      const pubHour = Number(cfg.publish_hour ?? 9);
+      const preHour = (pubHour - 1 + 24) % 24;
+
+      return jsonResponse({
+        ok: true,
+        config: {
+          is_enabled: Boolean(cfg.is_enabled),
+          publish_hour: pubHour,
+          timezone_offset: tzOffset,
+          last_prepared_date: cfg.last_prepared_date || null,
+          last_published_date: cfg.last_published_date || null,
+          updated_at: cfg.updated_at || null,
+        },
+        server_time_tr: serverTimeTr,
+        schedule_summary: `Her gün saat ${String(pubHour).padStart(2, "0")}:00'da yayınlanır (${String(preHour).padStart(2, "0")}:15'te A1-C2 tüm 6 seviye önceden hazırlanıp gizlenir).`,
+      });
+    }
+
+    if (method === "POST") {
+      const body = await safeReadJson(request);
+      const isEnabled = body?.is_enabled !== false ? 1 : 0;
+      let pubHour = parseInt(body?.publish_hour ?? 9, 10);
+      if (isNaN(pubHour) || pubHour < 0 || pubHour > 23) pubHour = 9;
+      let tzOffset = parseInt(body?.timezone_offset ?? 3, 10);
+      if (isNaN(tzOffset) || tzOffset < -12 || tzOffset > 14) tzOffset = 3;
+
+      await env.DB
+        .prepare(`
+          INSERT INTO publish_schedule_config (id, is_enabled, publish_hour, timezone_offset, updated_at)
+          VALUES (1, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            is_enabled = excluded.is_enabled,
+            publish_hour = excluded.publish_hour,
+            timezone_offset = excluded.timezone_offset,
+            updated_at = excluded.updated_at
+        `)
+        .bind(isEnabled, pubHour, tzOffset, new Date().toISOString())
+        .run();
+
+      const preHour = (pubHour - 1 + 24) % 24;
+      return jsonResponse({
+        ok: true,
+        message: isEnabled
+          ? `Otomatik yayın saati ${String(pubHour).padStart(2, "0")}:00 olarak ayarlandı (Hazırlık: ${String(preHour).padStart(2, "0")}:15).`
+          : "Otomatik günlük yayınlama devre dışı bırakıldı.",
+      });
+    }
+  }
+
+  // 5) Planlayıcıyı Manuel Tetikleme (Test & Anında Çalıştırma)
+  if (path === "/dev/schedule/run-now" && method === "POST") {
+    const body = await safeReadJson(request);
+    const mode = String(body?.mode || "full_pipeline").trim(); // 'prebake' | 'publish' | 'full_pipeline'
+    const result = await handleScheduledPublishRun(env, "manual", mode);
+    return jsonResponse({
+      ok: true,
+      result,
+      message: `Planlayıcı test çalışması tamamlandı (Mod: ${mode}).`,
+    });
+  }
+
+  // 6) Tek Tıkla Kaynaktan Çek, Analiz Et, Seslendir & Yayınla (Anında Canlı Akış)
+  if (path === "/dev/articles/quick-publish" && method === "POST") {
+    const startTime = Date.now();
+    const body = await safeReadJson(request);
+    const rawLevel = String(body?.level || "B1").trim().toUpperCase();
+    const level = ["A1", "A2", "B1", "B2", "C1", "C2"].includes(rawLevel) ? rawLevel : "B1";
+    let topic = String(body?.topic || "").trim();
+    if (!topic) {
+      topic = pickEngagingTopic(level);
+    }
+    const voice = String(body?.voice || "Kore").trim() || "Kore";
+
+    const t0 = Date.now();
+    const article = await generateArticleResilient(env, level, topic);
+    const tArticle = Date.now() - t0;
+
+    let tAudio = 0;
+    let audioGenerated = false;
+    if (env.GEMINI_API_KEY && env.GITHUB_TOKEN) {
+      const tAudioStart = Date.now();
+      try {
+        const audioRes = await generatePodcastAudioWithGemini(
+          env,
+          article.id,
+          article.title,
+          article.content,
+          voice
+        );
+        article.audio_url = audioRes.audio_url;
+        article.audio_voice = audioRes.audio_voice;
+        article.audio_duration_sec = audioRes.audio_duration_sec;
+        if (audioRes.audio_segments) {
+          article.audio_segments = audioRes.audio_segments;
+        }
+        audioGenerated = true;
+      } catch (audioErr) {
+        // Ses hatası makalenin yayına girmesini engellemez
+      }
+      tAudio = Date.now() - tAudioStart;
+    }
+
+    const tPubStart = Date.now();
+    const list = await loadArticlesList(env);
+    const existingIdx = list.findIndex((a) => String(a?.id || "") === article.id);
+    if (existingIdx >= 0) {
+      list[existingIdx] = article;
+    } else {
+      list.unshift(article);
+    }
+    const syncInfo = await saveArticlesList(env, list, `Quick publish article ${article.id}`);
+    const tPub = Date.now() - tPubStart;
+    const totalMs = Date.now() - startTime;
+    const totalSec = (totalMs / 1000).toFixed(1);
+
+    return jsonResponse({
+      ok: true,
+      article,
+      audio_generated: audioGenerated,
+      github_synced: syncInfo.githubSynced,
+      timing: {
+        total_ms: totalMs,
+        total_sec: totalSec,
+        article_ms: tArticle,
+        audio_ms: tAudio,
+        publish_ms: tPub,
+      },
+      message: `"${article.title}" (${article.level}) başarıyla oluşturuldu, ${audioGenerated ? "seslendirildi ve " : ""}yayına alındı! (${totalSec} sn)`,
+    });
+  }
+
   return jsonResponse({ ok: false, error: "not_found" }, 404);
 }
 
@@ -1647,10 +1825,43 @@ async function generateArticleResilient(env, level, topic) {
   throw geminiErr || new Error("GEMINI_API_KEY veya Workers AI yapılandırılmamış.");
 }
 
+const CURATED_ENGAGING_TOPICS = [
+  // Bilim ve Evren
+  "The bizarre physics of neutron stars where a single teaspoon weighs a billion tons",
+  "The James Webb Space Telescope discovering the earliest galaxies in our universe",
+  "The mystery of ocean worlds: Hunting for alien life under the icy crust of Europa and Enceladus",
+  "Why time slows down near black holes: Einstein's general relativity explained simply",
+  // Psikoloji ve İnsan Beyni
+  "The Neuroscience of Déjà Vu: Why your brain tricks you into feeling you have lived this before",
+  "The Psychology of Music: Why sad songs provide comfort and trigger goosebumps",
+  "The Paradox of Choice: Why having too many options makes modern humans less happy",
+  "How bilingualism reshapes the human brain structure and slows cognitive aging",
+  "The science of sleep: What happens to our memories and cells during deep REM sleep",
+  "The flow state: How high performers enter the zone of peak productivity",
+  // Sıradışı Doğa ve Canlılar
+  "The Wood Wide Web: The secret underground fungal network connecting forest trees",
+  "Creatures of the abyss: How deep-sea animals thrive under crushing pressure in the Mariana Trench",
+  "The extraordinary navigational superpowers of migrating monarch butterflies and birds",
+  "The surprising intelligence of octopuses and their nine distributed brains",
+  // Gelecek ve Teknoloji
+  "How brain-computer interfaces are helping paralyzed patients walk and speak again",
+  "Can artificial intelligence ever develop genuine human consciousness and emotions?",
+  "The revolutionary science of lab-grown meat and vertical farming",
+  // Gizemli Tarih ve İnsan Dayanıklılığı
+  "The lost engineering secrets of Roman concrete that grew stronger inside seawater for millennia",
+  "The Library of Alexandria: How ancient scholars calculated Earth's circumference with shadows",
+  "The Voynich Manuscript: The unsolved 600-year-old mystery book that nobody can decipher",
+  "The incredible story of Ernest Shackleton's Antarctic survival against impossible odds",
+];
+
+function pickEngagingTopic(level) {
+  const seed = Math.floor(Math.random() * CURATED_ENGAGING_TOPICS.length);
+  return CURATED_ENGAGING_TOPICS[seed];
+}
+
 function buildArticleGenerationPrompt(level, topic) {
-  const topicInstruction = topic
-    ? `Write the article specifically about this topic: "${topic}".`
-    : "Choose an engaging, fresh, real-world topic suitable for English learners (science, psychology, culture, technology, daily life, history, or nature).";
+  const chosenTopic = topic || pickEngagingTopic(level);
+  const topicInstruction = `Write the article specifically about this captivating topic: "${chosenTopic}".`;
 
   const levelWordTarget = {
     A1: "140 to 190 words in 3 short paragraphs using simple everyday vocabulary and short clear sentences",
@@ -1665,6 +1876,10 @@ function buildArticleGenerationPrompt(level, topic) {
     `You are an expert English curriculum author creating a CEFR ${level} reading article for Turkish learners of English.`,
     topicInstruction,
     `Length & style: ${levelWordTarget}. Separate paragraphs with \\n\\n.`,
+    "Tone & Quality Requirements:",
+    "- The opening sentence MUST be a compelling hook (a curious question, striking scientific phenomenon, or immersive story). Never start with dry textbook definitions.",
+    "- Keep the reader genuinely captivated and eager to read the next sentence.",
+    "- Avoid dry academic jargon unless explained in context.",
     "Return ONLY one valid JSON object (no markdown fences) with these EXACT keys:",
     "{",
     '  "title": "Engaging English title",',
@@ -2046,6 +2261,147 @@ async function upsertGitHubFile(githubToken, repoPath, contentBase64, commitMess
     const errText = await putRes.text().catch(() => "");
     throw new Error(`GitHub yükleme hatası (HTTP ${putRes.status}): ${errText.slice(0, 160)}`);
   }
+}
+
+/**
+ * İki Aşamalı Otomatik Yayınlama Sistemi:
+ * 1. Hazırlık (Pre-bake): Hedef saatten (örn: 09:00) 1 saat önce (08:00-08:59)
+ *    A1'den C2'ye kadar 6 seviyenin tamamı için makale + analiz + podcast sesini hazırlar,
+ *    sisteme `is_hidden = true` olarak gizlice yükler.
+ * 2. Yayınlama (Publish): Hedef saat (09:00) geldiğinde tüm hazır makaleleri
+ *    tek saniyede `is_hidden = false` yaparak anında canlıya alır (0 gecikme).
+ */
+async function handleScheduledPublishRun(env, triggerSource = "cron", forceMode = null) {
+  if (!env || !env.DB) return { ok: false, error: "no_db" };
+  await ensureSchema(env.DB);
+
+  let cfg = await env.DB
+    .prepare("SELECT * FROM publish_schedule_config WHERE id = 1 LIMIT 1")
+    .first();
+  if (!cfg) {
+    cfg = {
+      is_enabled: 1,
+      publish_hour: 9,
+      timezone_offset: 3,
+      last_prepared_date: null,
+      last_published_date: null,
+    };
+  }
+
+  const isEnabled = Boolean(cfg.is_enabled);
+  if (!isEnabled && forceMode !== "full_pipeline" && forceMode !== "prebake" && forceMode !== "publish") {
+    return { ok: true, skipped: true, reason: "schedule_disabled" };
+  }
+
+  const tzOffset = Number(cfg.timezone_offset ?? 3);
+  const now = new Date();
+  const localNow = new Date(now.getTime() + tzOffset * 3600 * 1000);
+  const currentHour = localNow.getUTCHours();
+  const todayStr = localNow.toISOString().slice(0, 10);
+  const publishHour = Number(cfg.publish_hour ?? 9);
+  const prebakeHour = (publishHour - 1 + 24) % 24;
+
+  const results = { prebaked: 0, published: 0, errors: [] };
+
+  // 1) ÖN HAZIRLIK AŞAMASI (Pre-bake)
+  const shouldPrebake =
+    forceMode === "prebake" ||
+    forceMode === "full_pipeline" ||
+    (currentHour === prebakeHour && cfg.last_prepared_date !== todayStr);
+
+  if (shouldPrebake) {
+    const levels = ["A1", "A2", "B1", "B2", "C1", "C2"];
+    const targetPublishTime = `${todayStr}T${String(publishHour).padStart(2, "0")}:00:00Z`;
+
+    for (const lvl of levels) {
+      try {
+        const topic = pickEngagingTopic(lvl);
+        const article = await generateArticleResilient(env, lvl, topic);
+        if (article) {
+          article.is_hidden = true;
+          article.publish_at = targetPublishTime;
+
+          if (env.GEMINI_API_KEY && env.GITHUB_TOKEN) {
+            try {
+              const audioRes = await generatePodcastAudioWithGemini(
+                env,
+                article.id,
+                article.title,
+                article.content,
+                "Kore"
+              );
+              article.audio_url = audioRes.audio_url;
+              article.audio_voice = audioRes.audio_voice;
+              article.audio_duration_sec = audioRes.audio_duration_sec;
+              if (audioRes.audio_segments) {
+                article.audio_segments = audioRes.audio_segments;
+              }
+            } catch (audioErr) {
+              results.errors.push(`Audio (${lvl}): ${String(audioErr?.message || audioErr)}`);
+            }
+          }
+
+          const list = await loadArticlesList(env);
+          const existingIdx = list.findIndex((a) => String(a?.id || "") === article.id);
+          if (existingIdx >= 0) {
+            list[existingIdx] = article;
+          } else {
+            list.unshift(article);
+          }
+          await saveArticlesList(env, list, `Prebake scheduled article ${article.id} for ${todayStr}`);
+          results.prebaked++;
+        }
+      } catch (genErr) {
+        results.errors.push(`Generate (${lvl}): ${String(genErr?.message || genErr)}`);
+      }
+    }
+
+    await env.DB
+      .prepare("UPDATE publish_schedule_config SET last_prepared_date = ?, updated_at = ? WHERE id = 1")
+      .bind(todayStr, new Date().toISOString())
+      .run();
+  }
+
+  // 2) YAYINLAMA AŞAMASI (Publish)
+  const shouldPublish =
+    forceMode === "publish" ||
+    forceMode === "full_pipeline" ||
+    (currentHour === publishHour && cfg.last_published_date !== todayStr);
+
+  if (shouldPublish) {
+    const list = await loadArticlesList(env);
+    let unhiddenCount = 0;
+    for (const a of list) {
+      if (a.is_hidden) {
+        // Eğer hedef tarih bugün veya geçmişse yayına aç
+        const pDate = a.publish_at ? String(a.publish_at).slice(0, 10) : todayStr;
+        if (pDate <= todayStr) {
+          a.is_hidden = false;
+          unhiddenCount++;
+        }
+      }
+    }
+
+    if (unhiddenCount > 0) {
+      await saveArticlesList(env, list, `Publish scheduled articles for ${todayStr} (${unhiddenCount} articles live)`);
+      results.published = unhiddenCount;
+    }
+
+    await env.DB
+      .prepare("UPDATE publish_schedule_config SET last_published_date = ?, updated_at = ? WHERE id = 1")
+      .bind(todayStr, new Date().toISOString())
+      .run();
+  }
+
+  return {
+    ok: true,
+    results,
+    current_hour: currentHour,
+    publish_hour: publishHour,
+    prebake_hour: prebakeHour,
+    today: todayStr,
+    trigger_source: triggerSource,
+  };
 }
 
 function pcmToWavBytes(pcmBytes, sampleRate = 24000) {
