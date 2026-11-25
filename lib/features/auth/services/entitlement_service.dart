@@ -15,6 +15,7 @@ class EntitlementStatus {
     this.codeUsed,
     this.role,
     this.hasSpecialThemes = false,
+    this.emailVerified = false,
   });
 
   static const EntitlementStatus standard = EntitlementStatus(isUnlimited: false);
@@ -28,6 +29,9 @@ class EntitlementStatus {
 
   /// Kullanıcının gizli "Özel Temalar" koleksiyonuna erişim hakkı.
   final bool hasSpecialThemes;
+
+  /// D1 veya Firebase üzerinden e-posta doğrulama durumu.
+  final bool emailVerified;
 
   bool get isAuthorizedStaff =>
       isUnlimited &&
@@ -53,6 +57,21 @@ class RedeemCodeResult {
   final String message;
 }
 
+/// 6 haneli e-posta OTP gönderme / doğrulama sonucu.
+class OtpActionResult {
+  const OtpActionResult({
+    required this.isSuccess,
+    required this.message,
+    this.fallbackToLink = false,
+    this.cooldownSeconds = 0,
+  });
+
+  final bool isSuccess;
+  final String message;
+  final bool fallbackToLink;
+  final int cooldownSeconds;
+}
+
 /// Cloudflare Worker `/me` ve `/redeem` uç noktaları için soyut istemci.
 abstract class EntitlementClient {
   Future<EntitlementStatus?> fetchEntitlement(String idToken);
@@ -61,6 +80,26 @@ abstract class EntitlementClient {
     required String idToken,
     required String code,
   });
+
+  Future<OtpActionResult> sendEmailVerificationOtp(
+    String idToken, {
+    String lang = 'tr',
+  }) async =>
+      const OtpActionResult(
+        isSuccess: false,
+        fallbackToLink: true,
+        message: '',
+      );
+
+  Future<OtpActionResult> verifyEmailOtp({
+    required String idToken,
+    required String code,
+    String lang = 'tr',
+  }) async =>
+      const OtpActionResult(
+        isSuccess: false,
+        message: '',
+      );
 
   void dispose();
 }
@@ -156,6 +195,7 @@ class CloudflareEntitlementService implements EntitlementClient {
           codeUsed: decoded['code_used']?.toString(),
           role: decoded['role']?.toString(),
           hasSpecialThemes: hasSpecialThemes,
+          emailVerified: decoded['email_verified'] == true,
         );
       } catch (error) {
         debugPrint(
@@ -262,6 +302,172 @@ class CloudflareEntitlementService implements EntitlementClient {
     return const RedeemCodeResult(
       isSuccess: false,
       message: 'Kod işlenirken beklenmeyen bir hata oluştu.',
+    );
+  }
+
+  @override
+  Future<OtpActionResult> sendEmailVerificationOtp(
+    String idToken, {
+    String lang = 'tr',
+  }) async {
+    final token = idToken.trim();
+    if (!_hasEndpoint || token.isEmpty) {
+      return const OtpActionResult(
+        isSuccess: false,
+        fallbackToLink: true,
+        message: 'Oturum doğrulanamadı.',
+      );
+    }
+
+    for (final base in _orderedBaseUrls()) {
+      try {
+        final uri = Uri.parse('$base/auth/send-otp');
+        final response = await _httpClient
+            .post(
+              uri,
+              headers: <String, String>{
+                'Content-Type': 'application/json; charset=utf-8',
+                'Accept': 'application/json',
+                'Authorization': 'Bearer $token',
+              },
+              body: jsonEncode(<String, Object?>{'lang': lang}),
+            )
+            .timeout(ApiConfig.requestTimeout);
+
+        Map<String, Object?> data = const <String, Object?>{};
+        try {
+          final decoded = jsonDecode(
+            utf8.decode(response.bodyBytes, allowMalformed: true),
+          );
+          if (decoded is Map) {
+            data = Map<String, Object?>.from(decoded);
+          }
+        } catch (_) {}
+
+        final serverMsg = (data['message']?.toString() ?? '').trim();
+        final cooldown = (data['cooldown_seconds'] as num?)?.toInt() ?? 0;
+
+        if (response.statusCode == 200 && data['ok'] == true) {
+          _preferredBaseUrl = base;
+          return OtpActionResult(
+            isSuccess: true,
+            cooldownSeconds: cooldown > 0 ? cooldown : 60,
+            message: serverMsg.isNotEmpty
+                ? serverMsg
+                : '6 haneli doğrulama kodu e-posta adresinize gönderildi.',
+          );
+        }
+
+        if (data['fallback_to_firebase_link'] == true) {
+          return OtpActionResult(
+            isSuccess: false,
+            fallbackToLink: true,
+            message: serverMsg,
+          );
+        }
+
+        if (response.statusCode >= 400 && response.statusCode < 500) {
+          _preferredBaseUrl = base;
+          return OtpActionResult(
+            isSuccess: false,
+            cooldownSeconds: cooldown,
+            message: serverMsg.isNotEmpty
+                ? serverMsg
+                : 'Doğrulama kodu gönderilemedi.',
+          );
+        }
+      } catch (error) {
+        debugPrint(
+          '[CloudflareEntitlementService] /auth/send-otp hatasi ($base): $error',
+        );
+      }
+    }
+
+    return const OtpActionResult(
+      isSuccess: false,
+      fallbackToLink: true,
+      message: 'Kod servisine ulaşılamadı.',
+    );
+  }
+
+  @override
+  Future<OtpActionResult> verifyEmailOtp({
+    required String idToken,
+    required String code,
+    String lang = 'tr',
+  }) async {
+    final token = idToken.trim();
+    final digits = code.replaceAll(RegExp(r'\D'), '').trim();
+    if (!_hasEndpoint || token.isEmpty) {
+      return const OtpActionResult(
+        isSuccess: false,
+        message: 'Oturum doğrulanamadı.',
+      );
+    }
+    if (digits.length != 6) {
+      return const OtpActionResult(
+        isSuccess: false,
+        message: 'Lütfen 6 haneli doğrulama kodunu girin.',
+      );
+    }
+
+    for (final base in _orderedBaseUrls()) {
+      try {
+        final uri = Uri.parse('$base/auth/verify-otp');
+        final response = await _httpClient
+            .post(
+              uri,
+              headers: <String, String>{
+                'Content-Type': 'application/json; charset=utf-8',
+                'Accept': 'application/json',
+                'Authorization': 'Bearer $token',
+              },
+              body: jsonEncode(<String, Object?>{
+                'code': digits,
+                'lang': lang,
+              }),
+            )
+            .timeout(ApiConfig.requestTimeout);
+
+        Map<String, Object?> data = const <String, Object?>{};
+        try {
+          final decoded = jsonDecode(
+            utf8.decode(response.bodyBytes, allowMalformed: true),
+          );
+          if (decoded is Map) {
+            data = Map<String, Object?>.from(decoded);
+          }
+        } catch (_) {}
+
+        final serverMsg = (data['message']?.toString() ?? '').trim();
+
+        if (response.statusCode == 200 && data['ok'] == true) {
+          _preferredBaseUrl = base;
+          return OtpActionResult(
+            isSuccess: true,
+            message: serverMsg.isNotEmpty ? serverMsg : 'E-posta doğrulandı!',
+          );
+        }
+
+        if (response.statusCode >= 400 && response.statusCode < 500) {
+          _preferredBaseUrl = base;
+          return OtpActionResult(
+            isSuccess: false,
+            message: serverMsg.isNotEmpty
+                ? serverMsg
+                : 'Kod doğrulanamadı (HTTP ${response.statusCode}).',
+          );
+        }
+      } catch (error) {
+        debugPrint(
+          '[CloudflareEntitlementService] /auth/verify-otp hatasi ($base): $error',
+        );
+      }
+    }
+
+    return const OtpActionResult(
+      isSuccess: false,
+      message: 'Doğrulama sunucusuna bağlanılamadı. Lütfen tekrar deneyin.',
     );
   }
 

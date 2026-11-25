@@ -8,6 +8,7 @@ import '../../features/articles/controllers/article_reading_progress_controller.
 import '../../features/articles/models/article_reading_progress.dart';
 import '../../features/auth/controllers/auth_controller.dart';
 import '../../features/words/data/word_repository.dart';
+import '../../features/words/models/word_list.dart';
 import '../config/api_config.dart';
 import '../database/app_database.dart';
 import '../settings/settings_repository.dart';
@@ -30,6 +31,10 @@ class CloudSyncService {
 
   static final CloudSyncService shared = CloudSyncService();
 
+  static const String _deletedWordsKey = 'sync_deleted_words_v1';
+  static const String _deletedListsKey = 'sync_deleted_lists_v1';
+  static const Duration _tombstoneRetention = Duration(days: 30);
+
   final http.Client _httpClient;
   AuthController? _authController;
   final WordRepository _wordRepository;
@@ -39,9 +44,11 @@ class CloudSyncService {
   bool _pendingSyncAfterCurrent = false;
   bool _isApplyingRemoteTheme = false;
   bool _themeListenerAttached = false;
+  bool _isAppActive = true;
   String? _lastSyncedUid;
   String? _preferredBaseUrl;
   Timer? _debounceTimer;
+  Timer? _periodicTimer;
   VoidCallback? onSyncCompleted;
 
   void configure({
@@ -60,8 +67,30 @@ class CloudSyncService {
       _themeListenerAttached = true;
       AppThemeController.shared.addListener(_onThemeChanged);
     }
-    // Eğer oturum configure anında zaten hazırsa hemen senkronize et.
+    _ensurePeriodicTimer();
     _onAuthChanged();
+  }
+
+  /// Uygulama ön plandayken periyodik hızlı senkronizasyonu açık tutar,
+  /// arka plana geçince durdurur.
+  void setAppActive(bool active) {
+    _isAppActive = active;
+    if (active) {
+      _ensurePeriodicTimer();
+    } else {
+      _periodicTimer?.cancel();
+      _periodicTimer = null;
+    }
+  }
+
+  void _ensurePeriodicTimer() {
+    if (!_isAppActive) return;
+    _periodicTimer ??= Timer.periodic(const Duration(seconds: 15), (_) {
+      final auth = _authController;
+      if (_isAppActive && auth != null && auth.isAuthenticated && !_isSyncing) {
+        unawaited(syncNow());
+      }
+    });
   }
 
   void _onAuthChanged() {
@@ -79,15 +108,91 @@ class CloudSyncService {
 
   void _onThemeChanged() {
     if (_isApplyingRemoteTheme) return;
-    // Sistem tarafından zorlanan (updateTimestamp: false) fallback değişikliklerini
-    // buluta kullanıcı seçimi gibi göndermiyoruz.
     if (AppThemeController.shared.themeUpdatedAtIso == null) return;
-    scheduleSync();
+    scheduleSync(delay: const Duration(milliseconds: 300));
   }
 
-  /// Yerel veriler (tema, kelimeler, ilerleme) değiştiğinde buluta
+  static String _norm(String raw) =>
+      raw.trim().replaceAll('İ', 'i').toLowerCase();
+
+  static String _wordTombstoneKey(String listName, String word) =>
+      '${_norm(listName)}::${_norm(word)}';
+
+  Future<Map<String, String>> _loadTombstones(String key) async {
+    try {
+      final raw = await _settingsRepository.getString(key);
+      if (raw == null || raw.isEmpty) return <String, String>{};
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return <String, String>{};
+      final cutoff = DateTime.now().toUtc().subtract(_tombstoneRetention);
+      final out = <String, String>{};
+      for (final entry in decoded.entries) {
+        final k = entry.key.toString();
+        final v = entry.value?.toString() ?? '';
+        final dt = DateTime.tryParse(v);
+        if (dt != null && dt.isAfter(cutoff)) {
+          out[k] = v;
+        }
+      }
+      return out;
+    } catch (_) {
+      return <String, String>{};
+    }
+  }
+
+  Future<void> _saveTombstones(String key, Map<String, String> map) async {
+    try {
+      await _settingsRepository.saveString(key, jsonEncode(map));
+    } catch (_) {}
+  }
+
+  /// Yerel bir kelime silindiğinde diğer cihazların kelimeyi geri getirmesini
+  /// önlemek ve diğer cihazlardan da silmek için silme kaydı (tombstone) tutar.
+  Future<void> recordDeletedWord({
+    required String listName,
+    required String word,
+  }) async {
+    final w = _norm(word);
+    if (w.isEmpty) return;
+    final l = listName.trim().isEmpty ? 'Favoriler' : listName;
+    final map = await _loadTombstones(_deletedWordsKey);
+    map[_wordTombstoneKey(l, w)] = DateTime.now().toUtc().toIso8601String();
+    await _saveTombstones(_deletedWordsKey, map);
+  }
+
+  Future<void> clearDeletedWord({
+    required String listName,
+    required String word,
+  }) async {
+    final w = _norm(word);
+    if (w.isEmpty) return;
+    final l = listName.trim().isEmpty ? 'Favoriler' : listName;
+    final map = await _loadTombstones(_deletedWordsKey);
+    if (map.remove(_wordTombstoneKey(l, w)) != null) {
+      await _saveTombstones(_deletedWordsKey, map);
+    }
+  }
+
+  Future<void> recordDeletedList(String listName) async {
+    final l = _norm(listName);
+    if (l.isEmpty) return;
+    final map = await _loadTombstones(_deletedListsKey);
+    map[l] = DateTime.now().toUtc().toIso8601String();
+    await _saveTombstones(_deletedListsKey, map);
+  }
+
+  Future<void> clearDeletedList(String listName) async {
+    final l = _norm(listName);
+    if (l.isEmpty) return;
+    final map = await _loadTombstones(_deletedListsKey);
+    if (map.remove(l) != null) {
+      await _saveTombstones(_deletedListsKey, map);
+    }
+  }
+
+  /// Yerel veriler (tema, kelimeler, listeler, ilerleme) değiştiğinde buluta
   /// yükleme işlemini kısa bir gecikmeyle (debounce) güvenle tetikler.
-  void scheduleSync({Duration delay = const Duration(milliseconds: 900)}) {
+  void scheduleSync({Duration delay = const Duration(milliseconds: 250)}) {
     final auth = _authController;
     if (auth == null || !auth.isAuthenticated) return;
     _debounceTimer?.cancel();
@@ -106,11 +211,8 @@ class CloudSyncService {
     }
 
     addIfValid(_preferredBaseUrl);
-    // 1) Aynı origin / Cloudflare Pages /api proxy (Web'de CORS sorunsuz, mobilde operatör engeli yok)
     addIfValid(ApiConfig.browserAiFallbackEndpoint);
-    // 2) Doğrudan Cloudflare Worker adresi
     addIfValid(ApiConfig.browserAiTranslateEndpoint);
-    // 3) Netlify proxy yedeği
     addIfValid(ApiConfig.browserAiSecondaryFallbackEndpoint);
     return urls;
   }
@@ -137,12 +239,10 @@ class CloudSyncService {
                 .post(uri, headers: headers, body: body)
                 .timeout(const Duration(seconds: 10));
 
-        // 401 ise token süresi dolmuş olabilir — üst katmana bildir
         if (res.statusCode == 401) {
           return (baseUrl: base, response: res);
         }
 
-        // 200 ve geçerli JSON ise bu uç nokta sağlıklıdır
         if (res.statusCode == 200) {
           final trimmed = res.body.trimLeft();
           if (trimmed.startsWith('{')) {
@@ -162,7 +262,7 @@ class CloudSyncService {
   }
 
   /// Kullanıcı oturum açtığında, uygulamaya girdiğinde veya veri değiştiğinde çağrılır.
-  /// 1) Sunucudan güncel verileri çeker ve yerel veritabanına birleştirir.
+  /// 1) Sunucudan güncel verileri çeker ve silme kayıtlarını (tombstone) dikkate alarak birleştirir.
   /// 2) Yerel güncel durumu paketleyip sunucuya yükler.
   Future<bool> syncNow({bool force = false}) async {
     final auth = _authController;
@@ -176,7 +276,6 @@ class CloudSyncService {
 
     _isSyncing = true;
     try {
-      // Yerel tema ve ilerleme durumu yüklenmeden senkronizasyona başlama
       await AppThemeController.shared.load();
       await ArticleReadingProgressController.shared.load();
 
@@ -239,10 +338,46 @@ class CloudSyncService {
     }
   }
 
+  Map<String, String> _mergeTombstoneMaps(
+    Map<String, String> local,
+    Object? remoteRaw,
+  ) {
+    final merged = Map<String, String>.from(local);
+    if (remoteRaw is Map) {
+      final cutoff = DateTime.now().toUtc().subtract(_tombstoneRetention);
+      for (final entry in remoteRaw.entries) {
+        final k = entry.key.toString();
+        final v = entry.value?.toString() ?? '';
+        final remoteDt = DateTime.tryParse(v);
+        if (remoteDt == null || !remoteDt.isAfter(cutoff)) continue;
+        final localDt = DateTime.tryParse(merged[k] ?? '');
+        if (localDt == null || remoteDt.isAfter(localDt)) {
+          merged[k] = v;
+        }
+      }
+    }
+    return merged;
+  }
+
   Future<void> _applyRemoteToLocal(Map<String, dynamic> remote) async {
     try {
-      // A) Temayı senkronize et (zaman damgası karşılaştırmasıyla)
       final prefs = remote['preferences'];
+
+      // 0) Silme kayıtlarını (tombstone) birleştir
+      final localDeletedWords = await _loadTombstones(_deletedWordsKey);
+      final localDeletedLists = await _loadTombstones(_deletedListsKey);
+      final mergedDeletedWords = _mergeTombstoneMaps(
+        localDeletedWords,
+        prefs is Map ? prefs['deleted_words'] : null,
+      );
+      final mergedDeletedLists = _mergeTombstoneMaps(
+        localDeletedLists,
+        prefs is Map ? prefs['deleted_lists'] : null,
+      );
+      await _saveTombstones(_deletedWordsKey, mergedDeletedWords);
+      await _saveTombstones(_deletedListsKey, mergedDeletedLists);
+
+      // A) Temayı senkronize et (zaman damgası karşılaştırmasıyla)
       if (prefs is Map) {
         final themeKey = prefs['theme'] as String?;
         final remoteUpdatedAtStr = prefs['theme_updated_at'] as String?;
@@ -291,26 +426,138 @@ class CloudSyncService {
         }
       }
 
-      // C) Kelimeleri senkronize et
-      final wordsList = remote['saved_words'];
-      if (wordsList is List) {
-        final defaultListId = await _wordRepository.getDefaultFavoritesListId();
-        for (final item in wordsList) {
-          if (item is Map) {
-            final word = (item['word'] as String? ?? '').trim();
-            final meaning = (item['meaning'] as String? ?? '').trim();
-            if (word.isNotEmpty && meaning.isNotEmpty) {
-              await _wordRepository.saveWord(
-                listId: defaultListId,
-                word: word,
-                meaning: meaning,
-                ipaUs: item['ipa_us'] as String?,
-                ipaUk: item['ipa_uk'] as String?,
+      // C) Kelime listelerini senkronize et (oluşturma, renk ve silme)
+      var localLists = await _wordRepository.getAllLists();
+      for (final localList in localLists) {
+        if (localList.isDefault) continue;
+        final deletedIso = mergedDeletedLists[_norm(localList.name)];
+        final deletedAt =
+            deletedIso != null ? DateTime.tryParse(deletedIso) : null;
+        if (deletedAt != null &&
+            !localList.createdAt.toUtc().isAfter(deletedAt)) {
+          await _wordRepository.deleteList(localList.id);
+        }
+      }
+
+      final remoteLists = remote['word_lists'];
+      if (remoteLists is List) {
+        localLists = await _wordRepository.getAllLists();
+        final byNormName = <String, WordList>{
+          for (final l in localLists) _norm(l.name): l,
+        };
+        for (final item in remoteLists) {
+          if (item is! Map) continue;
+          final name = (item['name'] as String? ?? '').trim();
+          if (name.isEmpty) continue;
+          final isDefault = item['is_default'] == true;
+          final colorValue =
+              (item['color_value'] as num?)?.toInt() ?? WordListColors.palette.first;
+          final createdIso = item['created_at'] as String?;
+          final remoteCreated =
+              createdIso != null ? DateTime.tryParse(createdIso) : null;
+
+          if (!isDefault) {
+            final deletedIso = mergedDeletedLists[_norm(name)];
+            final deletedAt =
+                deletedIso != null ? DateTime.tryParse(deletedIso) : null;
+            if (deletedAt != null &&
+                (remoteCreated == null || !remoteCreated.isAfter(deletedAt))) {
+              continue;
+            }
+          }
+
+          final existing = isDefault
+              ? localLists.where((l) => l.isDefault).firstOrNull
+              : byNormName[_norm(name)];
+          if (existing == null && !isDefault) {
+            try {
+              final created = await _wordRepository.createList(
+                name: name,
+                colorValue: colorValue,
               );
+              byNormName[_norm(created.name)] = created;
+            } catch (_) {}
+          } else if (existing != null && existing.colorValue != colorValue) {
+            try {
+              await _wordRepository.updateList(
+                id: existing.id,
+                name: existing.name,
+                colorValue: colorValue,
+                isDefault: existing.isDefault,
+              );
+            } catch (_) {}
+          }
+        }
+      }
+
+      // D) Kelimeleri senkronize et (tüm listeler + silinenleri geri getirmeme + diğer cihazdan silme)
+      localLists = await _wordRepository.getAllLists();
+      final defaultListId = await _wordRepository.getDefaultFavoritesListId();
+      final listIdByNormName = <String, int>{
+        for (final l in localLists) _norm(l.name): l.id,
+      };
+      final listNameById = <int, String>{
+        for (final l in localLists) l.id: l.name,
+      };
+
+      // D.1) Silinmiş kelimeleri yerelden temizle
+      for (final list in localLists) {
+        final listWords = await _wordRepository.getWordsByList(list.id);
+        for (final w in listWords) {
+          final tKey = _wordTombstoneKey(list.name, w.word);
+          final deletedIso = mergedDeletedWords[tKey];
+          final deletedAt =
+              deletedIso != null ? DateTime.tryParse(deletedIso) : null;
+          if (deletedAt != null && !w.createdAt.toUtc().isAfter(deletedAt)) {
+            if (w.id != null) {
+              await _wordRepository.deleteWord(w.id!);
             }
           }
         }
       }
+
+      // D.2) Sunucudan gelen kelimeleri ilgili listelere ekle
+      final wordsList = remote['saved_words'];
+      if (wordsList is List) {
+        for (final item in wordsList) {
+          if (item is! Map) continue;
+          final word = (item['word'] as String? ?? '').trim();
+          final meaning = (item['meaning'] as String? ?? '').trim();
+          if (word.isEmpty || meaning.isEmpty) continue;
+
+          final rawListName = (item['list_name'] as String? ?? '').trim();
+          final isDefaultWord = item['is_default'] == true;
+          final resolvedListId = isDefaultWord || rawListName.isEmpty
+              ? defaultListId
+              : (listIdByNormName[_norm(rawListName)] ?? defaultListId);
+          final resolvedListName =
+              listNameById[resolvedListId] ?? 'Favoriler';
+
+          final tKey = _wordTombstoneKey(resolvedListName, word);
+          final deletedIso = mergedDeletedWords[tKey];
+          final deletedAt =
+              deletedIso != null ? DateTime.tryParse(deletedIso) : null;
+          final createdIso = item['created_at'] as String?;
+          final remoteCreated =
+              createdIso != null ? DateTime.tryParse(createdIso) : null;
+
+          // Bu kelime bu listeden silindiyse ve silinme tarihi eklenme tarihinden
+          // yeni/eşitse ASLA geri getirme!
+          if (deletedAt != null &&
+              (remoteCreated == null || !remoteCreated.isAfter(deletedAt))) {
+            continue;
+          }
+
+          await _wordRepository.saveWord(
+            listId: resolvedListId,
+            word: word,
+            meaning: meaning,
+            ipaUs: item['ipa_us'] as String?,
+            ipaUk: item['ipa_uk'] as String?,
+          );
+        }
+      }
+
       onSyncCompleted?.call();
     } catch (e) {
       debugPrint('[CloudSyncService] Remote merge hatasi: $e');
@@ -318,50 +565,51 @@ class CloudSyncService {
   }
 
   Future<Map<String, dynamic>> _buildLocalPayload() async {
-    // 1) Kelimeler (tüm listelerdeki kelimeleri topla)
+    // 1) Kelime Listeleri ve Kelimeler (her kelimede list_name ile)
     final allLists = await _wordRepository.getAllLists();
     final wordsJson = <Map<String, dynamic>>[];
     for (final list in allLists) {
-      if (list.id != null) {
-        final listWords = await _wordRepository.getWordsByList(list.id!);
-        for (final w in listWords) {
-          wordsJson.add(<String, dynamic>{
-            'word': w.word,
-            'meaning': w.meaning,
-            'ipa_us': w.ipaUs,
-            'ipa_uk': w.ipaUk,
-            'created_at': w.createdAt.toIso8601String(),
-          });
-        }
+      final listWords = await _wordRepository.getWordsByList(list.id);
+      for (final w in listWords) {
+        wordsJson.add(<String, dynamic>{
+          'word': w.word,
+          'meaning': w.meaning,
+          'ipa_us': w.ipaUs,
+          'ipa_uk': w.ipaUk,
+          'list_name': list.name,
+          'is_default': list.isDefault,
+          'created_at': w.createdAt.toUtc().toIso8601String(),
+        });
       }
     }
 
-    // 2) Kelime Listeleri
     final listsJson = allLists
         .map((l) => <String, dynamic>{
               'id': l.id,
               'name': l.name,
               'color_value': l.colorValue,
               'is_default': l.isDefault,
+              'created_at': l.createdAt.toUtc().toIso8601String(),
             })
         .toList(growable: false);
 
-    // 3) Okuma ilerlemeleri
+    // 2) Tüm makale okuma & podcast ilerlemeleri
     final progressCtrl = ArticleReadingProgressController.shared;
-    final progressMap = <String, dynamic>{};
-    final lastProg = progressCtrl.lastProgress;
-    if (lastProg != null) {
-      progressMap[lastProg.articleId] = lastProg.toJson();
-    }
+    final progressMap = <String, dynamic>{
+      for (final entry in progressCtrl.allProgressItems.entries)
+        entry.key: entry.value.toJson(),
+    };
 
-    // 4) Tercihler (Tema vb.)
-    // Yerel cihaz hiç tema seçmemişse sahte "şimdi" tarihi üretme;
-    // null bırak ki diğer cihazın gerçek tema seçimi ezilmesin.
+    // 3) Tercihler + Silme kayıtları (tombstones)
     final themeUpdatedAt = AppThemeController.shared.themeUpdatedAtIso ??
         await _settingsRepository.getString('app_theme_updated_at');
+    final deletedWords = await _loadTombstones(_deletedWordsKey);
+    final deletedLists = await _loadTombstones(_deletedListsKey);
     final prefsMap = <String, dynamic>{
       'theme': AppThemeController.shared.preset.storageKey,
       if (themeUpdatedAt != null) 'theme_updated_at': themeUpdatedAt,
+      if (deletedWords.isNotEmpty) 'deleted_words': deletedWords,
+      if (deletedLists.isNotEmpty) 'deleted_lists': deletedLists,
     };
 
     return <String, dynamic>{

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/localization/app_strings.dart';
 import '../../../core/theme/app_theme.dart';
@@ -49,12 +50,17 @@ class _AuthScreenState extends State<AuthScreen> with WidgetsBindingObserver {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _otpController = TextEditingController();
+  final FocusNode _otpFocusNode = FocusNode();
 
   late bool _isSignUpMode;
   bool _obscurePassword = true;
   bool _justVerified = false;
   bool _isCheckingVerification = false;
+  bool _isVerifyingOtp = false;
+  int _resendCooldown = 0;
   Timer? _verificationPollTimer;
+  Timer? _resendCooldownTimer;
   String? _errorMessage;
   String? _infoMessage;
 
@@ -64,7 +70,15 @@ class _AuthScreenState extends State<AuthScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _isSignUpMode = widget.initialSignUpTab;
     if (widget.controller.isAwaitingEmailVerification) {
-      _startVerificationPolling();
+      if (widget.controller.isOtpVerificationMode) {
+        _startCooldownTimer(
+          widget.controller.otpResendCooldownSeconds > 0
+              ? widget.controller.otpResendCooldownSeconds
+              : 60,
+        );
+      } else {
+        _startVerificationPolling();
+      }
     }
   }
 
@@ -72,10 +86,35 @@ class _AuthScreenState extends State<AuthScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _verificationPollTimer?.cancel();
+    _resendCooldownTimer?.cancel();
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _otpController.dispose();
+    _otpFocusNode.dispose();
     super.dispose();
+  }
+
+  void _startCooldownTimer(int seconds) {
+    _resendCooldownTimer?.cancel();
+    if (!mounted) return;
+    setState(() => _resendCooldown = seconds.clamp(0, 120));
+    if (_resendCooldown <= 0) return;
+    _resendCooldownTimer = Timer.periodic(
+      const Duration(seconds: 1),
+      (timer) {
+        if (!mounted) {
+          timer.cancel();
+          return;
+        }
+        if (_resendCooldown <= 1) {
+          timer.cancel();
+          setState(() => _resendCooldown = 0);
+        } else {
+          setState(() => _resendCooldown -= 1);
+        }
+      },
+    );
   }
 
   @override
@@ -116,20 +155,67 @@ class _AuthScreenState extends State<AuthScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _handleResendVerification() async {
-    final result = await widget.controller.resendVerificationEmail();
+    if (_resendCooldown > 0) return;
+    final lang = context.l10n.t('tr', 'en');
+    final result = await widget.controller.resendVerificationEmail(lang: lang);
     if (!mounted) return;
     setState(() {
       if (result.isSuccess) {
         _infoMessage = result.message ??
             context.l10n.t(
-              'Doğrulama e-postası tekrar gönderildi.',
-              'Verification email resent.',
+              'Doğrulama kodu tekrar gönderildi.',
+              'Verification code resent.',
             );
         _errorMessage = null;
       } else {
         _errorMessage = result.message;
       }
     });
+    if (widget.controller.isOtpVerificationMode) {
+      _startCooldownTimer(
+        widget.controller.otpResendCooldownSeconds > 0
+            ? widget.controller.otpResendCooldownSeconds
+            : 60,
+      );
+    } else {
+      _startVerificationPolling();
+    }
+  }
+
+  Future<void> _handleVerifyOtp() async {
+    final code = _otpController.text.replaceAll(RegExp(r'\D'), '').trim();
+    if (code.length != 6 || _isVerifyingOtp || _justVerified) return;
+    setState(() {
+      _isVerifyingOtp = true;
+      _errorMessage = null;
+      _infoMessage = null;
+    });
+    final lang = context.l10n.t('tr', 'en');
+    final result = await widget.controller.verifyEmailOtp(code, lang: lang);
+    if (!mounted) return;
+    if (result.isSuccess) {
+      HapticFeedback.mediumImpact();
+      _resendCooldownTimer?.cancel();
+      setState(() {
+        _isVerifyingOtp = false;
+        _justVerified = true;
+      });
+      await Future<void>.delayed(const Duration(milliseconds: 900));
+      if (!mounted) return;
+      if (widget.canPop) {
+        Navigator.of(context).pop(true);
+      }
+    } else {
+      HapticFeedback.lightImpact();
+      setState(() {
+        _isVerifyingOtp = false;
+        _errorMessage = result.message ??
+            context.l10n.t(
+              'Kod doğrulanamadı.',
+              'Could not verify code.',
+            );
+      });
+    }
   }
 
   Future<void> _handleGoogleSignIn() async {
@@ -203,11 +289,13 @@ class _AuthScreenState extends State<AuthScreen> with WidgetsBindingObserver {
       _infoMessage = null;
     });
 
+    final lang = s.t('tr', 'en');
     final result = _isSignUpMode
         ? await widget.controller.signUpWithEmail(
             email: email,
             password: password,
             displayName: name,
+            lang: lang,
           )
         : await widget.controller.signInWithEmail(
             email: email,
@@ -218,13 +306,31 @@ class _AuthScreenState extends State<AuthScreen> with WidgetsBindingObserver {
 
     if (result.isSuccess) {
       if (widget.controller.isAwaitingEmailVerification) {
-        _startVerificationPolling();
-        setState(() {
-          _infoMessage = s.t(
-            'Doğrulama bağlantısı $email adresine gönderildi. Maildeki linke tıklayınca otomatik giriş yapılacaktır.',
-            'Verification link sent to $email. Click the link in your email to continue automatically.',
+        if (widget.controller.isOtpVerificationMode) {
+          _otpController.clear();
+          _startCooldownTimer(
+            widget.controller.otpResendCooldownSeconds > 0
+                ? widget.controller.otpResendCooldownSeconds
+                : 60,
           );
-        });
+          setState(() {
+            _infoMessage = s.t(
+              '6 haneli doğrulama kodunu $email adresine gönderdik.',
+              'We sent a 6-digit verification code to $email.',
+            );
+          });
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _otpFocusNode.requestFocus();
+          });
+        } else {
+          _startVerificationPolling();
+          setState(() {
+            _infoMessage = s.t(
+              'Doğrulama bağlantısı $email adresine gönderildi. Maildeki linke tıklayınca otomatik giriş yapılacaktır.',
+              'Verification link sent to $email. Click the link in your email to continue automatically.',
+            );
+          });
+        }
         return;
       }
       if (widget.canPop) {
@@ -631,6 +737,92 @@ class _AuthScreenState extends State<AuthScreen> with WidgetsBindingObserver {
     );
   }
 
+  Widget _buildOtpBoxes(ThemeData theme, ColorScheme colorScheme) {
+    final code = _otpController.text.replaceAll(RegExp(r'\D'), '');
+    return GestureDetector(
+      onTap: () => _otpFocusNode.requestFocus(),
+      child: Stack(
+        alignment: Alignment.center,
+        children: <Widget>[
+          // Gizli gerçek TextField (kopyala-yapıştır ve klavye otomatik doldurma için)
+          Opacity(
+            opacity: 0.0,
+            child: SizedBox(
+              height: 56,
+              child: TextField(
+                key: const ValueKey<String>('auth_otp_input'),
+                controller: _otpController,
+                focusNode: _otpFocusNode,
+                keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.done,
+                autofillHints: const <String>[AutofillHints.oneTimeCode],
+                inputFormatters: <TextInputFormatter>[
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(6),
+                ],
+                onChanged: (value) {
+                  setState(() => _errorMessage = null);
+                  if (value.length == 6) {
+                    _handleVerifyOtp();
+                  }
+                },
+                onSubmitted: (_) => _handleVerifyOtp(),
+              ),
+            ),
+          ),
+          // 6 adet modern OTP kutucuğu
+          IgnorePointer(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: List<Widget>.generate(6, (index) {
+                final hasChar = index < code.length;
+                final isActive =
+                    _otpFocusNode.hasFocus && index == code.length.clamp(0, 5);
+                final char = hasChar ? code[index] : '';
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 160),
+                  width: 46,
+                  height: 56,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: hasChar
+                        ? colorScheme.primaryContainer.withAlpha(90)
+                        : colorScheme.surfaceContainerHighest.withAlpha(110),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isActive
+                          ? colorScheme.primary
+                          : (hasChar
+                              ? colorScheme.primary.withAlpha(150)
+                              : colorScheme.outlineVariant),
+                      width: isActive ? 2.0 : 1.2,
+                    ),
+                    boxShadow: isActive
+                        ? <BoxShadow>[
+                            BoxShadow(
+                              color: colorScheme.primary.withAlpha(36),
+                              blurRadius: 10,
+                              spreadRadius: 1,
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Text(
+                    char,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildVerificationScaffold(
     BuildContext context, {
     required ThemeData theme,
@@ -639,6 +831,8 @@ class _AuthScreenState extends State<AuthScreen> with WidgetsBindingObserver {
     required AppStrings s,
   }) {
     final email = widget.controller.user?.email ?? _emailController.text.trim();
+    final isOtpMode = widget.controller.isOtpVerificationMode;
+    final otpDigits = _otpController.text.replaceAll(RegExp(r'\D'), '');
 
     return AppThemeBackdrop(
       child: Scaffold(
@@ -646,28 +840,41 @@ class _AuthScreenState extends State<AuthScreen> with WidgetsBindingObserver {
         body: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(22),
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 400),
-                child: Card(
-                  margin: EdgeInsets.zero,
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: colorScheme.surface.withAlpha(242),
+                    borderRadius: BorderRadius.circular(26),
+                    border: Border.all(
+                      color: colorScheme.outlineVariant.withAlpha(130),
+                    ),
+                    boxShadow: <BoxShadow>[
+                      BoxShadow(
+                        color: Colors.black.withAlpha(18),
+                        blurRadius: 24,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
                   child: Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
                     child: _justVerified
                         ? Column(
                             mainAxisSize: MainAxisSize.min,
                             children: <Widget>[
                               CircleAvatar(
-                                radius: 32,
-                                backgroundColor: const Color(0xFF16A34A)
-                                    .withAlpha(36),
+                                radius: 34,
+                                backgroundColor:
+                                    const Color(0xFF16A34A).withAlpha(36),
                                 child: const Icon(
                                   Icons.check_rounded,
-                                  size: 36,
+                                  size: 38,
                                   color: Color(0xFF16A34A),
                                 ),
                               ),
-                              const SizedBox(height: 16),
+                              const SizedBox(height: 18),
                               Text(
                                 s.t('Doğrulandınız!', 'Email Verified!'),
                                 key: const ValueKey<String>(
@@ -696,17 +903,24 @@ class _AuthScreenState extends State<AuthScreen> with WidgetsBindingObserver {
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: <Widget>[
                               Center(
-                                child: CircleAvatar(
-                                  radius: 30,
-                                  backgroundColor: colorScheme.primaryContainer,
+                                child: Container(
+                                  width: 64,
+                                  height: 64,
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.primaryContainer
+                                        .withAlpha(190),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
                                   child: Icon(
-                                    Icons.mark_email_unread_outlined,
-                                    size: 30,
+                                    isOtpMode
+                                        ? Icons.mark_email_read_rounded
+                                        : Icons.mark_email_unread_outlined,
+                                    size: 32,
                                     color: colorScheme.onPrimaryContainer,
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 16),
+                              const SizedBox(height: 18),
                               Text(
                                 s.t(
                                   'E-postanızı Doğrulayın',
@@ -720,79 +934,186 @@ class _AuthScreenState extends State<AuthScreen> with WidgetsBindingObserver {
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              Text(
-                                s.t(
-                                  kIsWeb
-                                      ? '$email adresine doğrulama bağlantısı gönderdik. Maildeki "E-postayı Doğrula" bağlantısına tıkladığınızda web sitesine otomatik dönüp giriş yapacaksınız.'
-                                      : '$email adresine doğrulama bağlantısı gönderdik. Maildeki "E-postayı Doğrula" bağlantısına tıkladığınızda uygulamaya otomatik dönüp giriş yapacaksınız.',
-                                  'We sent a verification link to $email. Tap the link in your email to return and sign in automatically.',
+                              const SizedBox(height: 10),
+                              Center(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.surfaceContainerHighest
+                                        .withAlpha(140),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    email,
+                                    style: theme.textTheme.labelMedium?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      color: colorScheme.onSurface,
+                                    ),
+                                  ),
                                 ),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                isOtpMode
+                                    ? s.t(
+                                        'Gelen kutunuza gönderdiğimiz 6 haneli tek kullanımlık doğrulama kodunu aşağıya girin.',
+                                        'Enter the 6-digit verification code we sent to your inbox below.',
+                                      )
+                                    : s.t(
+                                        kIsWeb
+                                            ? 'Maildeki "E-postayı Doğrula" bağlantısına tıkladığınızda web sitesine otomatik dönüp giriş yapacaksınız.'
+                                            : 'Maildeki "E-postayı Doğrula" bağlantısına tıkladığınızda uygulamaya otomatik dönüp giriş yapacaksınız.',
+                                        'Tap the verification link in your email to return and sign in automatically.',
+                                      ),
                                 textAlign: TextAlign.center,
                                 style: theme.textTheme.bodyMedium?.copyWith(
                                   color: colorScheme.onSurfaceVariant,
                                   height: 1.45,
                                 ),
                               ),
-                              const SizedBox(height: 18),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: <Widget>[
-                                  const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
+                              const SizedBox(height: 22),
+                              if (isOtpMode) ...<Widget>[
+                                _buildOtpBoxes(theme, colorScheme),
+                                const SizedBox(height: 20),
+                                FilledButton(
+                                  key: const ValueKey<String>(
+                                    'auth_verify_otp_button',
+                                  ),
+                                  onPressed: (otpDigits.length == 6 &&
+                                          !_isVerifyingOtp)
+                                      ? _handleVerifyOtp
+                                      : null,
+                                  style: FilledButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 14,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
                                     ),
                                   ),
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    s.t(
-                                      'Doğrulama bekleniyor...',
-                                      'Waiting for verification...',
+                                  child: _isVerifyingOtp
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.2,
+                                          ),
+                                        )
+                                      : Text(
+                                          s.t(
+                                            'Doğrula ve Devam Et',
+                                            'Verify and Continue',
+                                          ),
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                ),
+                              ] else
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: <Widget>[
+                                    const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
                                     ),
-                                    style: theme.textTheme.labelMedium?.copyWith(
-                                      color: colorScheme.primary,
-                                      fontWeight: FontWeight.w600,
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      s.t(
+                                        'Doğrulama bekleniyor...',
+                                        'Waiting for verification...',
+                                      ),
+                                      style:
+                                          theme.textTheme.labelMedium?.copyWith(
+                                        color: colorScheme.primary,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              ),
+                                  ],
+                                ),
                               if (_infoMessage != null) ...<Widget>[
                                 const SizedBox(height: 14),
-                                Text(
-                                  _infoMessage!,
-                                  textAlign: TextAlign.center,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: colorScheme.primary,
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 9,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.primaryContainer
+                                        .withAlpha(140),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    _infoMessage!,
+                                    textAlign: TextAlign.center,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: colorScheme.onPrimaryContainer,
+                                    ),
                                   ),
                                 ),
                               ],
                               if (_errorMessage != null) ...<Widget>[
                                 const SizedBox(height: 14),
-                                Text(
-                                  _errorMessage!,
-                                  textAlign: TextAlign.center,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: colorScheme.error,
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 9,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.errorContainer,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    _errorMessage!,
+                                    textAlign: TextAlign.center,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: colorScheme.onErrorContainer,
+                                    ),
                                   ),
                                 ),
                               ],
                               const SizedBox(height: 18),
                               OutlinedButton.icon(
-                                onPressed: _handleResendVerification,
+                                onPressed: _resendCooldown > 0
+                                    ? null
+                                    : _handleResendVerification,
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
                                 icon: const Icon(Icons.refresh_rounded, size: 18),
                                 label: Text(
-                                  s.t(
-                                    'Doğrulama Mailini Tekrar Gönder',
-                                    'Resend Verification Email',
-                                  ),
+                                  _resendCooldown > 0
+                                      ? s.t(
+                                          'Kodu Tekrar Gönder ($_resendCooldown sn)',
+                                          'Resend Code (${_resendCooldown}s)',
+                                        )
+                                      : s.t(
+                                          isOtpMode
+                                              ? 'Kodu Tekrar Gönder'
+                                              : 'Doğrulama Mailini Tekrar Gönder',
+                                          isOtpMode
+                                              ? 'Resend Code'
+                                              : 'Resend Verification Email',
+                                        ),
                                 ),
                               ),
                               const SizedBox(height: 6),
                               TextButton(
                                 onPressed: () async {
                                   _verificationPollTimer?.cancel();
+                                  _resendCooldownTimer?.cancel();
+                                  _otpController.clear();
                                   await widget.controller.signOut();
                                   if (!mounted) return;
                                   setState(() {

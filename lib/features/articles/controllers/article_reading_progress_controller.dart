@@ -63,6 +63,9 @@ class ArticleReadingProgressController extends ChangeNotifier {
     return newest;
   }
 
+  Map<String, ArticleReadingProgress> get allProgressItems =>
+      Map<String, ArticleReadingProgress>.unmodifiable(_itemsById);
+
   ArticleReadingProgress? progressForArticle(String articleId) {
     final trimmed = articleId.trim();
     if (trimmed.isEmpty) return null;
@@ -169,7 +172,7 @@ class ArticleReadingProgressController extends ChangeNotifier {
     if (persist) {
       await _persistState();
       CloudSyncService.shared.scheduleSync(
-        delay: const Duration(milliseconds: 2500),
+        delay: const Duration(milliseconds: 800),
       );
     }
   }

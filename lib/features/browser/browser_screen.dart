@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../core/database/app_database.dart';
 import '../../core/tts/tts_service.dart';
+import '../../core/utils/external_url_opener.dart';
 import '../../core/utils/url_helper.dart';
 import '../ads/widgets/promo_interstitial_dialog.dart';
 import '../auth/controllers/auth_controller.dart';
@@ -105,8 +107,8 @@ class BrowserScreen extends StatefulWidget {
 }
 
 class _BrowserScreenState extends State<BrowserScreen> {
-  late final WebViewController _webViewController;
-  late final Widget _webViewWidget;
+  WebViewController? _webViewController;
+  Widget? _webViewWidget;
   late final WordTranslationService _translationService;
   late final bool _ownsTranslationService;
 
@@ -217,38 +219,41 @@ class _BrowserScreenState extends State<BrowserScreen> {
     SelectionModeChannel.setPenMode(_isPenMode.value);
 
     // Otomatik olarak google.com veya herhangi bir dış sayfa yüklenmez;
-    // WebView yalnızca kullanıcı bir URL, favori site veya arama sonucu seçince yüklenir.
-    _webViewController = WebViewFactory.createController(
-      backgroundColor: Colors.white,
-      channelName: WordSelectionScript.channelName,
-      onMessageReceived: _handleWordSelectionMessage,
-      navigationDelegate: NavigationDelegate(
-        onNavigationRequest: _handleNavigationRequest,
-        onPageStarted: _handlePageStarted,
-        onProgress: _handleProgress,
-        onPageFinished: _handlePageFinished,
-        onUrlChange: (change) {
-          final nextUrl = change.url;
-          if (!mounted || nextUrl == null || nextUrl.isEmpty) return;
-          _syncAddressBar(nextUrl);
-          _injectPageScripts();
-        },
-        onWebResourceError: (_) {
-          if (!mounted) return;
-          _loadingProgress.value = 0;
-        },
-      ),
-    );
+    // WebView yalnızca mobil platformlarda ve kullanıcı bir URL/sonuç seçince yüklenir.
+    if (!kIsWeb) {
+      final controller = WebViewFactory.createController(
+        backgroundColor: Colors.white,
+        channelName: WordSelectionScript.channelName,
+        onMessageReceived: _handleWordSelectionMessage,
+        navigationDelegate: NavigationDelegate(
+          onNavigationRequest: _handleNavigationRequest,
+          onPageStarted: _handlePageStarted,
+          onProgress: _handleProgress,
+          onPageFinished: _handlePageFinished,
+          onUrlChange: (change) {
+            final nextUrl = change.url;
+            if (!mounted || nextUrl == null || nextUrl.isEmpty) return;
+            _syncAddressBar(nextUrl);
+            _injectPageScripts();
+          },
+          onWebResourceError: (_) {
+            if (!mounted) return;
+            _loadingProgress.value = 0;
+          },
+        ),
+      );
+      _webViewController = controller;
+      _webViewWidget = WebViewFactory.createWidget(controller);
 
-    _webViewWidget = WebViewFactory.createWidget(_webViewController);
+      // JS kanalına ek olarak Dart tarafında da 400ms yedek seçim okuma
+      // çalıştır; böylece hiçbir sitede mavi seçili kelime cevapsız kalmaz.
+      _selectionPollTimer = Timer.periodic(
+        const Duration(milliseconds: 400),
+        (_) => _pollSelectionFromDart(),
+      );
+    }
+
     widget.backController?.attach(_handleSystemBack);
-
-    // JS kanalına ek olarak Dart tarafında da 400ms yedek seçim okuma
-    // çalıştır; böylece hiçbir sitede mavi seçili kelime cevapsız kalmaz.
-    _selectionPollTimer = Timer.periodic(
-      const Duration(milliseconds: 400),
-      (_) => _pollSelectionFromDart(),
-    );
   }
 
   @override
@@ -267,7 +272,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
     // beyaz tarayıcı tuvaline koyu metin yazar. Koyu uygulama temalarında
     // siyah metnin koyu arka planda kaybolmaması için WebView tuvali daima
     // beyaz tutulur (yalnızca tarayıcı üst çubuğu ve başlangıç ekranı temaya uyar).
-    _webViewController.setBackgroundColor(Colors.white);
+    _webViewController?.setBackgroundColor(Colors.white);
   }
 
   @override
@@ -336,8 +341,10 @@ class _BrowserScreenState extends State<BrowserScreen> {
   }
 
   Future<void> _updatePageTitle() async {
+    final ctrl = _webViewController;
+    if (ctrl == null) return;
     try {
-      final title = await _webViewController.getTitle();
+      final title = await ctrl.getTitle();
       if (mounted && title != null && title.trim().isNotEmpty) {
         _currentPageTitle = title.trim();
       }
@@ -351,8 +358,10 @@ class _BrowserScreenState extends State<BrowserScreen> {
   }
 
   Future<void> _injectPageScripts() async {
+    final ctrl = _webViewController;
+    if (ctrl == null) return;
     try {
-      await _webViewController.runJavaScript(
+      await ctrl.runJavaScript(
         WordSelectionScript.buildInjectionScript(
           initialPenMode: _isPenMode.value,
         ),
@@ -362,7 +371,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
     }
 
     try {
-      await _webViewController.runJavaScript(
+      await ctrl.runJavaScript(
         AdBlocker.buildInjectionScript(
           enabled: _resolveAdBlockerNotifier().value,
         ),
@@ -374,13 +383,28 @@ class _BrowserScreenState extends State<BrowserScreen> {
 
   Future<void> _openWebUrl(Uri uri, {String? initialTitle}) async {
     _addressFocusNode.unfocus();
+    if (kIsWeb || _webViewController == null) {
+      openExternalUrlInNewTab(uri.toString());
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text('${uri.host} yeni tarayıcı sekmesinde açıldı.'),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+      }
+      return;
+    }
     _currentPageTitle = initialTitle ?? '';
     _hasEarlyInjectedCurrentPage = false;
     _hasLoadedAnyWebPage = true;
     _resolveViewMode().value = _BrowserViewMode.web;
     _syncAddressBar(uri.toString());
     _loadingProgress.value = 10;
-    await _webViewController.loadRequest(uri);
+    await _webViewController!.loadRequest(uri);
   }
 
   Future<void> _performBackgroundSearch(String rawQuery) async {
@@ -433,12 +457,13 @@ class _BrowserScreenState extends State<BrowserScreen> {
     _isPenMode.value = nextMode;
 
     await SelectionModeChannel.setPenMode(nextMode);
-    if (_resolveViewMode().value == _BrowserViewMode.web) {
+    if (_resolveViewMode().value == _BrowserViewMode.web &&
+        _webViewController != null) {
       try {
-        await _webViewController.runJavaScript(
+        await _webViewController!.runJavaScript(
           WordSelectionScript.buildInjectionScript(initialPenMode: nextMode),
         );
-        await _webViewController.runJavaScript(
+        await _webViewController!.runJavaScript(
           WordSelectionScript.setPenModeScript(nextMode),
         );
       } catch (_) {}
@@ -465,12 +490,13 @@ class _BrowserScreenState extends State<BrowserScreen> {
     final nextEnabled = !notifier.value;
     notifier.value = nextEnabled;
 
-    if (_resolveViewMode().value == _BrowserViewMode.web) {
+    if (_resolveViewMode().value == _BrowserViewMode.web &&
+        _webViewController != null) {
       try {
-        await _webViewController.runJavaScript(
+        await _webViewController!.runJavaScript(
           AdBlocker.buildInjectionScript(enabled: nextEnabled),
         );
-        await _webViewController.runJavaScript(
+        await _webViewController!.runJavaScript(
           AdBlocker.setEnabledScript(nextEnabled),
         );
       } catch (_) {}
@@ -586,7 +612,9 @@ class _BrowserScreenState extends State<BrowserScreen> {
   }
 
   Future<void> _pollSelectionFromDart() async {
-    if (!mounted ||
+    final ctrl = _webViewController;
+    if (ctrl == null ||
+        !mounted ||
         _isWordSheetOpen ||
         !_isPenMode.value ||
         _isPollingSelection ||
@@ -597,7 +625,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
 
     _isPollingSelection = true;
     try {
-      final rawResult = await _webViewController.runJavaScriptReturningResult(
+      final rawResult = await ctrl.runJavaScriptReturningResult(
         WordSelectionScript.readSelectionOnceScript,
       );
       if (!mounted || _isWordSheetOpen || !_isPenMode.value) return;
@@ -690,7 +718,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
     } finally {
       _isWordSheetOpen = false;
       try {
-        await _webViewController.runJavaScript(
+        await _webViewController?.runJavaScript(
           WordSelectionScript.clearSelectionScript,
         );
       } catch (_) {}
@@ -716,7 +744,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
     WordLexiconInfo? selectedLexicon,
   ) async {
     try {
-      await _webViewController.runJavaScript(
+      await _webViewController?.runJavaScript(
         WordSelectionScript.clearSelectionScript,
       );
     } catch (_) {}
@@ -778,9 +806,11 @@ class _BrowserScreenState extends State<BrowserScreen> {
   }
 
   Future<void> _updateNavigationState() async {
+    final ctrl = _webViewController;
+    if (ctrl == null) return;
     final results = await Future.wait<bool>(<Future<bool>>[
-      _webViewController.canGoBack(),
-      _webViewController.canGoForward(),
+      ctrl.canGoBack(),
+      ctrl.canGoForward(),
     ]);
     if (!mounted) return;
     _canGoBack.value = results[0];
@@ -809,8 +839,9 @@ class _BrowserScreenState extends State<BrowserScreen> {
   Future<bool> _handleSystemBack() async {
     final mode = _resolveViewMode().value;
     if (mode == _BrowserViewMode.web) {
-      if (await _webViewController.canGoBack()) {
-        await _webViewController.goBack();
+      final ctrl = _webViewController;
+      if (ctrl != null && await ctrl.canGoBack()) {
+        await ctrl.goBack();
         await _updateNavigationState();
         return true;
       }
@@ -840,9 +871,11 @@ class _BrowserScreenState extends State<BrowserScreen> {
   }
 
   Future<void> _handleForward() async {
-    if (_resolveViewMode().value == _BrowserViewMode.web &&
-        await _webViewController.canGoForward()) {
-      await _webViewController.goForward();
+    final ctrl = _webViewController;
+    if (ctrl != null &&
+        _resolveViewMode().value == _BrowserViewMode.web &&
+        await ctrl.canGoForward()) {
+      await ctrl.goForward();
       await _updateNavigationState();
     }
   }
@@ -856,15 +889,16 @@ class _BrowserScreenState extends State<BrowserScreen> {
       return;
     }
 
-    if (mode != _BrowserViewMode.web) return;
+    final ctrl = _webViewController;
+    if (mode != _BrowserViewMode.web || ctrl == null) return;
 
     if (_isLoading) {
-      await _webViewController.runJavaScript('window.stop();');
+      await ctrl.runJavaScript('window.stop();');
       if (!mounted) return;
       _loadingProgress.value = 0;
       return;
     }
-    await _webViewController.reload();
+    await ctrl.reload();
   }
 
   @override
@@ -974,10 +1008,12 @@ class _BrowserScreenState extends State<BrowserScreen> {
                     ),
                     // WebView'i başlangıç ekranında görünmez (offstage) başlatma;
                     // ilk kez bir web sayfası açıldığında görünür olarak bağla.
-                    if (_hasLoadedAnyWebPage || mode == _BrowserViewMode.web)
+                    if (!kIsWeb &&
+                        _webViewWidget != null &&
+                        (_hasLoadedAnyWebPage || mode == _BrowserViewMode.web))
                       ColoredBox(
                         color: Colors.white,
-                        child: _webViewWidget,
+                        child: _webViewWidget!,
                       )
                     else
                       const SizedBox.shrink(),

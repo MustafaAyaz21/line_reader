@@ -95,7 +95,7 @@ class _InMemoryAuthLocalStore implements AuthLocalStore {
   }
 }
 
-class _FakeEntitlementClient implements EntitlementClient {
+class _FakeEntitlementClient extends EntitlementClient {
   bool remoteUnlimited = false;
   String? remoteCodeUsed;
   String? remoteRole;
@@ -209,9 +209,6 @@ class _FakeAuthBackend implements AuthBackend {
       provider: AuthProviderType.email,
       emailVerified: !signUpReturnsUnverified,
     );
-    if (signUpReturnsUnverified) {
-      verificationSendCount += 1;
-    }
     _stream.add(_current);
     return AuthActionResult.success(user: _current);
   }

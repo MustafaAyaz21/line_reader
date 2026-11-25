@@ -136,7 +136,9 @@ class WordsController extends ChangeNotifier {
         name: name,
         colorValue: colorValue,
       );
+      await CloudSyncService.shared.clearDeletedList(created.name);
       await loadLists();
+      CloudSyncService.shared.scheduleSync();
       return (list: created, error: null);
     } on FormatException catch (error) {
       return (list: null, error: error.message);
@@ -163,6 +165,7 @@ class WordsController extends ChangeNotifier {
         isDefault: list.isDefault,
       );
       await loadLists();
+      CloudSyncService.shared.scheduleSync();
       return null;
     } on FormatException catch (error) {
       return error.message;
@@ -175,9 +178,20 @@ class WordsController extends ChangeNotifier {
   /// Özel bir kelime listesini siler (varsayılan "Favoriler" korunur).
   Future<void> deleteList(int listId) async {
     try {
+      String? deletedName;
+      for (final item in lists) {
+        if (item.id == listId && !item.isDefault) {
+          deletedName = item.name;
+          break;
+        }
+      }
       await _repository.deleteList(listId);
       _wordsByList?.remove(listId);
+      if (deletedName != null) {
+        await CloudSyncService.shared.recordDeletedList(deletedName);
+      }
       await loadLists();
+      CloudSyncService.shared.scheduleSync();
     } catch (error) {
       debugPrint('[WordsController] Liste silinemedi: $error');
       _errorMessage = 'Liste silinirken bir sorun oluştu.';
@@ -227,6 +241,15 @@ class WordsController extends ChangeNotifier {
       );
 
       if (status == SaveWordStatus.saved) {
+        final targetListName = lists
+                .where((l) => l.id == targetListId)
+                .map((l) => l.name)
+                .firstOrNull ??
+            'Favoriler';
+        await CloudSyncService.shared.clearDeletedWord(
+          listName: targetListName,
+          word: word,
+        );
         await Future.wait<void>(<Future<void>>[
           loadLists(),
           loadWordsForList(targetListId),
@@ -259,6 +282,17 @@ class WordsController extends ChangeNotifier {
         antonyms: antonyms,
       );
       if (status == SaveWordStatus.saved) {
+        if (meanings.isEmpty) {
+          final targetListName = lists
+                  .where((l) => l.id == existingWord.listId)
+                  .map((l) => l.name)
+                  .firstOrNull ??
+              'Favoriler';
+          await CloudSyncService.shared.recordDeletedWord(
+            listName: targetListName,
+            word: existingWord.word,
+          );
+        }
         await Future.wait<void>(<Future<void>>[
           loadLists(),
           loadWordsForList(existingWord.listId),
@@ -276,7 +310,16 @@ class WordsController extends ChangeNotifier {
     final id = item.id;
     if (id == null) return;
     try {
+      final targetListName = lists
+              .where((l) => l.id == item.listId)
+              .map((l) => l.name)
+              .firstOrNull ??
+          'Favoriler';
       await _repository.deleteWord(id);
+      await CloudSyncService.shared.recordDeletedWord(
+        listName: targetListName,
+        word: item.word,
+      );
       await Future.wait<void>(<Future<void>>[
         loadLists(),
         loadWordsForList(item.listId),

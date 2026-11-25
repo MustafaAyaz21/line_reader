@@ -311,6 +311,7 @@ class ArticleAudioController extends ChangeNotifier {
   Duration _duration = Duration.zero;
   String? _statusNotice;
   bool _hasAppliedCustomRate = false;
+  DateTime? _ignorePositionEventsUntil;
 
   /// Yüksek frekanslı (~200 ms) konum güncellemelerini tüm makale metnini
   /// yeniden çizmeden yalnızca alt oynatıcı çubuğuna iletir.
@@ -370,6 +371,10 @@ class ArticleAudioController extends ChangeNotifier {
   void _attachPodcastListeners() {
     _posSub = _podcastPlayer.onPositionChanged.listen((pos) {
       if (_isDisposed || _mode != ArticleAudioMode.podcastAudio) return;
+      final ignoreUntil = _ignorePositionEventsUntil;
+      if (ignoreUntil != null && DateTime.now().isBefore(ignoreUntil)) {
+        return;
+      }
       _position = pos;
       positionNotifier.value = pos;
       final mapped = _sentenceIndexForPosition(pos);
@@ -537,18 +542,26 @@ class ArticleAudioController extends ChangeNotifier {
     _currentSentenceIndex = clamped;
 
     if (_mode == ArticleAudioMode.podcastAudio) {
-      final targetMs = _startMsForSentence(clamped);
+      final targetMs = _seekTargetMsForSentence(clamped);
       final targetDuration = Duration(milliseconds: targetMs);
+      // Seek tamamlanana ve oynatıcı yeni konuma oturana kadar eski konum
+      // akışlarının _currentSentenceIndex değerini geri sarmasını engelle.
+      _ignorePositionEventsUntil =
+          DateTime.now().add(const Duration(milliseconds: 550));
       _position = targetDuration;
       positionNotifier.value = targetDuration;
       _safeNotify();
       if (_podcastLoaded) {
         try {
           await _podcastPlayer.seek(targetDuration);
+          _ignorePositionEventsUntil =
+              DateTime.now().add(const Duration(milliseconds: 350));
           if (wasPlaying) {
             await _podcastPlayer.resume();
           }
-        } catch (_) {}
+        } catch (_) {
+          _ignorePositionEventsUntil = null;
+        }
       } else if (wasPlaying) {
         await play();
       }
@@ -1034,6 +1047,24 @@ class ArticleAudioController extends ChangeNotifier {
     }
     if (totalChars <= 0) return 0;
     return ((charsBefore / totalChars) * totalMs).round();
+  }
+
+  /// M4A/AAC ses dosyalarında seek işlemi sınırın 10-40 ms gerisine
+  /// düşebildiği için hedef cümlenin içine güvenli (+60 ms) konumlandırır.
+  int _seekTargetMsForSentence(int sentenceIndex) {
+    final startMs = _startMsForSentence(sentenceIndex);
+    if (startMs <= 0) return 0;
+    final segments = article.audioSegments;
+    for (final seg in segments) {
+      if (seg.sentenceIndex == sentenceIndex) {
+        final span = seg.endMs - seg.startMs;
+        if (span > 140) {
+          return seg.startMs + 60;
+        }
+        return seg.startMs;
+      }
+    }
+    return startMs + 60;
   }
 
   int _sentenceIndexForPosition(Duration pos) {

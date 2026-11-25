@@ -47,6 +47,9 @@ class AuthController extends ChangeNotifier {
   bool _isSyncingEntitlement = false;
   bool _isUnlimited = false;
   bool _hasSpecialThemes = false;
+  bool _d1EmailVerified = false;
+  bool _isOtpVerificationMode = true;
+  int _otpResendCooldownSeconds = 0;
   String? _entitlementCodeUsed;
   String? _entitlementRole;
   String _quotaDateKey = '';
@@ -419,12 +422,17 @@ class AuthController extends ChangeNotifier {
   bool get isAwaitingEmailVerification =>
       _user != null &&
       _user!.provider == AuthProviderType.email &&
-      !_user!.emailVerified;
+      !_user!.emailVerified &&
+      !_d1EmailVerified;
+
+  bool get isOtpVerificationMode => _isOtpVerificationMode;
+  int get otpResendCooldownSeconds => _otpResendCooldownSeconds;
 
   Future<AuthActionResult> signUpWithEmail({
     required String email,
     required String password,
     String? displayName,
+    String lang = 'tr',
   }) async {
     if (_isBusy) return const AuthActionResult.cancelled();
     _isBusy = true;
@@ -438,6 +446,7 @@ class AuthController extends ChangeNotifier {
       );
       if (result.isSuccess && result.user != null) {
         _user = result.user;
+        _d1EmailVerified = false;
         _sessionLookupCount = 0;
         if (result.user!.emailVerified) {
           _status = AuthSessionStatus.authenticated;
@@ -445,9 +454,74 @@ class AuthController extends ChangeNotifier {
           await _syncEntitlementAfterSignIn();
         } else {
           _status = AuthSessionStatus.unauthenticated;
+          final token = await _backend.getIdToken();
+          if (token != null && token.trim().isNotEmpty) {
+            final otpRes = await _entitlementClient.sendEmailVerificationOtp(
+              token,
+              lang: lang,
+            );
+            if (otpRes.isSuccess) {
+              _isOtpVerificationMode = true;
+              _otpResendCooldownSeconds = otpRes.cooldownSeconds;
+            } else if (otpRes.fallbackToLink) {
+              _isOtpVerificationMode = false;
+              await _backend.sendEmailVerification();
+            } else {
+              _isOtpVerificationMode = true;
+              _otpResendCooldownSeconds = otpRes.cooldownSeconds;
+            }
+          } else {
+            _isOtpVerificationMode = false;
+            await _backend.sendEmailVerification();
+          }
         }
       }
       return result;
+    } finally {
+      _isBusy = false;
+      _safeNotify();
+    }
+  }
+
+  /// 6 haneli doğrulama kodunu Cloudflare Worker + D1 üzerinden onaylar.
+  Future<AuthActionResult> verifyEmailOtp(
+    String code, {
+    String lang = 'tr',
+  }) async {
+    if (_isBusy) return const AuthActionResult.cancelled();
+    _isBusy = true;
+    _safeNotify();
+
+    try {
+      final token = await _backend.getIdToken();
+      if (token == null || token.trim().isEmpty) {
+        return const AuthActionResult.failure(
+          errorCode: 'no_token',
+          message: 'Oturum doğrulanamadı. Lütfen tekrar deneyin.',
+        );
+      }
+
+      final otpRes = await _entitlementClient.verifyEmailOtp(
+        idToken: token,
+        code: code,
+        lang: lang,
+      );
+      if (!otpRes.isSuccess) {
+        return AuthActionResult.failure(
+          errorCode: 'invalid_otp',
+          message: otpRes.message,
+        );
+      }
+
+      _d1EmailVerified = true;
+      _status = AuthSessionStatus.authenticated;
+      _sessionLookupCount = 0;
+      await _localStore.setGuestModeEnabled(false);
+      await _syncEntitlementAfterSignIn();
+      return AuthActionResult.success(
+        user: _user,
+        message: otpRes.message,
+      );
     } finally {
       _isBusy = false;
       _safeNotify();
@@ -458,6 +532,7 @@ class AuthController extends ChangeNotifier {
   /// sessizce kontrol eder; doğrulandıysa oturumu otomatik aktif eder.
   Future<bool> checkEmailVerified() async {
     try {
+      if (_d1EmailVerified) return true;
       final reloaded = await _backend.reloadCurrentUser();
       if (reloaded == null) return false;
       _user = reloaded;
@@ -476,7 +551,32 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  Future<AuthActionResult> resendVerificationEmail() {
+  Future<AuthActionResult> resendVerificationEmail({String lang = 'tr'}) async {
+    final token = await _backend.getIdToken();
+    if (token != null && token.trim().isNotEmpty) {
+      final otpRes = await _entitlementClient.sendEmailVerificationOtp(
+        token,
+        lang: lang,
+      );
+      if (otpRes.isSuccess) {
+        _isOtpVerificationMode = true;
+        _otpResendCooldownSeconds = otpRes.cooldownSeconds;
+        _safeNotify();
+        return AuthActionResult.success(message: otpRes.message);
+      }
+      if (!otpRes.fallbackToLink) {
+        if (otpRes.cooldownSeconds > 0) {
+          _otpResendCooldownSeconds = otpRes.cooldownSeconds;
+          _safeNotify();
+        }
+        return AuthActionResult.failure(
+          errorCode: 'otp_send_failed',
+          message: otpRes.message,
+        );
+      }
+    }
+    _isOtpVerificationMode = false;
+    _safeNotify();
     return _backend.sendEmailVerification();
   }
 
@@ -493,6 +593,9 @@ class AuthController extends ChangeNotifier {
         }
         final remote = await _entitlementClient.fetchEntitlement(token);
         if (remote != null) {
+          if (remote.emailVerified) {
+            _d1EmailVerified = true;
+          }
           _isUnlimited = remote.isUnlimited;
           _hasSpecialThemes = remote.effectiveSpecialThemes;
           _entitlementCodeUsed = remote.codeUsed;
@@ -553,6 +656,9 @@ class AuthController extends ChangeNotifier {
         hasSpecialThemes: false,
       );
       _user = null;
+      _d1EmailVerified = false;
+      _isOtpVerificationMode = true;
+      _otpResendCooldownSeconds = 0;
       _isUnlimited = false;
       _hasSpecialThemes = false;
       _entitlementCodeUsed = null;

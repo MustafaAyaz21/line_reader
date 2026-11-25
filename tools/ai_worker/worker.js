@@ -26,7 +26,7 @@ const FALLBACK_AI_MODEL = "@cf/meta/llama-3.1-8b-instruct";
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Admin-Secret",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Admin-Secret, If-None-Match",
 };
 
 let cachedJwks = null;
@@ -82,6 +82,14 @@ export default {
 
     if (method === "GET" && path === "/me") {
       return handleGetMe(env, verifiedUser);
+    }
+
+    if (method === "POST" && path === "/auth/send-otp") {
+      return handleSendVerificationOtp(request, env, verifiedUser);
+    }
+
+    if (method === "POST" && path === "/auth/verify-otp") {
+      return handleVerifyEmailOtp(request, env, verifiedUser);
     }
 
     if (method === "POST" && path === "/redeem") {
@@ -322,6 +330,17 @@ async function ensureSchema(db) {
         updated_at TEXT NOT NULL
       )
     `),
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS email_verification_codes (
+        email TEXT PRIMARY KEY,
+        uid TEXT NOT NULL,
+        code_hash TEXT NOT NULL,
+        expires_at INTEGER NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        last_sent_at INTEGER NOT NULL,
+        created_at TEXT NOT NULL
+      )
+    `),
   ]);
 
   // Mevcut canlı D1 tabloları için güvenli sütun geçişleri (zaten varsa sessizce geçer)
@@ -333,6 +352,11 @@ async function ensureSchema(db) {
   try {
     await db
       .prepare("ALTER TABLE registered_users ADD COLUMN auth_provider TEXT")
+      .run();
+  } catch (_) {}
+  try {
+    await db
+      .prepare("ALTER TABLE registered_users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0")
       .run();
   } catch (_) {}
 }
@@ -528,6 +552,17 @@ async function handleGetMe(env, user) {
   try {
     const ent = await getUserEntitlement(env.DB, user);
     await upsertRegisteredUser(env.DB, user);
+    let d1Verified = false;
+    const normalizedEmail = String(user.email || "").trim().toLowerCase();
+    if (env.DB && normalizedEmail) {
+      try {
+        const reg = await env.DB
+          .prepare("SELECT email_verified FROM registered_users WHERE LOWER(email) = ? LIMIT 1")
+          .bind(normalizedEmail)
+          .first();
+        d1Verified = Number(reg?.email_verified || 0) === 1;
+      } catch (_) {}
+    }
     const role = ent.isUnlimited
       ? (String(ent.source || "").toLowerCase() === "admin" ? "admin" : "premium")
       : "standard";
@@ -535,6 +570,7 @@ async function handleGetMe(env, user) {
       ok: true,
       uid: user.uid,
       email: user.email,
+      email_verified: Boolean(user.emailVerified || d1Verified),
       is_unlimited: ent.isUnlimited,
       source: ent.source,
       role,
@@ -543,6 +579,333 @@ async function handleGetMe(env, user) {
     });
   } catch (err) {
     return jsonResponse({ error: "db_error", message: String(err?.message || err) }, 500);
+  }
+}
+
+/* ---------------- E-posta 6 Haneli OTP Doğrulama & HTML Şablonu ---------------- */
+
+function generateSixDigitOtp() {
+  const arr = new Uint32Array(1);
+  crypto.getRandomValues(arr);
+  const code = 100000 + (arr[0] % 900000);
+  return String(code);
+}
+
+async function sha256Hex(value) {
+  const bytes = new TextEncoder().encode(String(value));
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function buildLineReaderOtpEmailHtml({ code, displayName, isEnglish }) {
+  const safeName = String(displayName || "").trim().replace(/[<>&"']/g, "");
+  const spacedCode = String(code).split("").join(" ");
+  const title = isEnglish ? "Verify Your Email" : "E-postanızı Doğrulayın";
+  const greeting = safeName
+    ? (isEnglish ? `Hello ${safeName},` : `Merhaba ${safeName},`)
+    : (isEnglish ? "Hello," : "Merhaba,");
+  const subtitle = isEnglish
+    ? "One step left to expand your vocabulary."
+    : "Kelime dağarcığınızı genişletmeye bir adım kaldı.";
+  const bodyCopy = isEnglish
+    ? "Welcome to Line Reader. Enter the 6-digit verification code below in the app to activate your account and sync your library across devices."
+    : "Line Reader topluluğuna hoş geldiniz. Hesabınızı güvenle etkinleştirmek ve kütüphanenizi tüm cihazlarınızda eşitlemek için aşağıdaki 6 haneli kodu uygulamaya girin.";
+  const validity = isEnglish
+    ? "This code is valid for 10 minutes and is for your use only."
+    : "Bu kod 10 dakika boyunca geçerlidir ve yalnızca size özeldir.";
+  const footerNote = isEnglish
+    ? "If you did not request this account, you can safely ignore this email."
+    : "Bu hesabı siz oluşturmadıysanız bu e-postayı güvenle silebilirsiniz.";
+
+  return `<!DOCTYPE html>
+<html lang="${isEnglish ? "en" : "tr"}">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light dark" />
+  <title>${title} — Line Reader</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F5F2EC;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1E1B18;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#F5F2EC;padding:36px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:520px;background-color:#FFFFFF;border-radius:24px;border:1px solid #E7E0D6;overflow:hidden;box-shadow:0 12px 32px rgba(30,27,24,0.06);">
+          <tr>
+            <td style="padding:32px 32px 20px 32px;text-align:center;background:linear-gradient(135deg,#FFFDF9 0%,#F7F2E8 100%);border-bottom:1px solid #EFE9DF;">
+              <div style="display:inline-block;width:52px;height:52px;line-height:52px;border-radius:16px;background-color:#1E1B18;color:#F5E6C8;font-size:24px;font-weight:800;letter-spacing:-0.5px;margin-bottom:14px;">LR</div>
+              <div style="font-size:21px;font-weight:800;color:#1E1B18;letter-spacing:-0.3px;">Line Reader</div>
+              <div style="font-size:13px;color:#786F66;margin-top:4px;">${subtitle}</div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px;">
+              <h1 style="margin:0 0 12px 0;font-size:20px;font-weight:800;color:#1E1B18;">${title}</h1>
+              <p style="margin:0 0 10px 0;font-size:15px;line-height:1.6;color:#3D3731;font-weight:600;">${greeting}</p>
+              <p style="margin:0 0 26px 0;font-size:14px;line-height:1.65;color:#5E554D;">${bodyCopy}</p>
+              <div style="background-color:#FAF7F2;border:1.5px dashed #D6CBB9;border-radius:18px;padding:24px 16px;text-align:center;margin-bottom:22px;">
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:1.6px;color:#8C7F70;font-weight:700;margin-bottom:10px;">${isEnglish ? "VERIFICATION CODE" : "DOĞRULAMA KODU"}</div>
+                <div style="font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;font-size:34px;font-weight:800;letter-spacing:8px;color:#1E1B18;">${spacedCode}</div>
+              </div>
+              <p style="margin:0;font-size:12.5px;line-height:1.5;color:#786F66;text-align:center;">⏱️ ${validity}</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px 32px 26px 32px;background-color:#FAF8F5;border-top:1px solid #EFE9DF;text-align:center;">
+              <p style="margin:0 0 8px 0;font-size:12px;line-height:1.5;color:#8C8278;">${footerNote}</p>
+              <a href="https://getlinereader.com" style="font-size:12px;font-weight:700;color:#8A5A2B;text-decoration:none;">getlinereader.com</a>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+async function handleSendVerificationOtp(request, env, user) {
+  if (!env || !env.DB) {
+    return jsonResponse(
+      { ok: false, error: "db_not_configured", message: "Veri tabanı bağlı değil." },
+      503
+    );
+  }
+  const resendKey = String(env.RESEND_API_KEY || "").trim();
+  if (!resendKey) {
+    return jsonResponse(
+      {
+        ok: false,
+        fallback_to_firebase_link: true,
+        error: "email_provider_not_configured",
+        message: "Özel OTP e-posta servisi (RESEND_API_KEY) henüz yapılandırılmadı.",
+      },
+      503
+    );
+  }
+
+  const email = String(user.email || "").trim().toLowerCase();
+  if (!email || !email.includes("@")) {
+    return jsonResponse({ ok: false, error: "invalid_email", message: "Geçerli e-posta bulunamadı." }, 400);
+  }
+
+  let body = {};
+  try {
+    body = await request.json();
+  } catch (_) {}
+  const isEnglish = String(body?.lang || "tr").toLowerCase().startsWith("en");
+
+  try {
+    await ensureSchema(env.DB);
+    await upsertRegisteredUser(env.DB, user);
+
+    const nowMs = Date.now();
+    const existing = await env.DB
+      .prepare("SELECT last_sent_at FROM email_verification_codes WHERE email = ? LIMIT 1")
+      .bind(email)
+      .first();
+
+    const lastSent = Number(existing?.last_sent_at || 0);
+    const elapsedSec = Math.floor((nowMs - lastSent) / 1000);
+    if (lastSent > 0 && elapsedSec < 55) {
+      const waitSec = 60 - elapsedSec;
+      return jsonResponse(
+        {
+          ok: false,
+          error: "cooldown",
+          cooldown_seconds: waitSec,
+          message: isEnglish
+            ? `Please wait ${waitSec}s before requesting a new code.`
+            : `Yeni kod istemeden önce lütfen ${waitSec} saniye bekleyin.`,
+        },
+        429
+      );
+    }
+
+    const code = generateSixDigitOtp();
+    const codeHash = await sha256Hex(`${email}:${code}`);
+    const expiresAt = nowMs + 10 * 60 * 1000;
+
+    await env.DB
+      .prepare(`
+        INSERT INTO email_verification_codes (email, uid, code_hash, expires_at, attempts, last_sent_at, created_at)
+        VALUES (?, ?, ?, ?, 0, ?, ?)
+        ON CONFLICT(email) DO UPDATE SET
+          uid = excluded.uid,
+          code_hash = excluded.code_hash,
+          expires_at = excluded.expires_at,
+          attempts = 0,
+          last_sent_at = excluded.last_sent_at
+      `)
+      .bind(email, user.uid, codeHash, expiresAt, nowMs, new Date(nowMs).toISOString())
+      .run();
+
+    const fromAddress = String(env.RESEND_FROM_EMAIL || "Line Reader <noreply@getlinereader.com>").trim();
+    const subject = isEnglish
+      ? `${code} — Your Line Reader verification code`
+      : `${code} — Line Reader doğrulama kodunuz`;
+
+    const mailRes = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${resendKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: fromAddress,
+        to: [email],
+        subject,
+        html: buildLineReaderOtpEmailHtml({
+          code,
+          displayName: user.displayName || "",
+          isEnglish,
+        }),
+      }),
+    });
+
+    if (!mailRes.ok) {
+      const errText = await mailRes.text();
+      return jsonResponse(
+        {
+          ok: false,
+          error: "email_send_failed",
+          detail: errText.slice(0, 240),
+          message: isEnglish
+            ? "Could not send verification code email."
+            : "Doğrulama kodu e-postası gönderilemedi.",
+        },
+        502
+      );
+    }
+
+    return jsonResponse({
+      ok: true,
+      cooldown_seconds: 60,
+      expires_in_seconds: 600,
+      message: isEnglish
+        ? "A 6-digit verification code has been sent to your email."
+        : "6 haneli doğrulama kodu e-posta adresinize gönderildi.",
+    });
+  } catch (err) {
+    return jsonResponse(
+      { ok: false, error: "otp_send_error", message: String(err?.message || err) },
+      500
+    );
+  }
+}
+
+async function handleVerifyEmailOtp(request, env, user) {
+  if (!env || !env.DB) {
+    return jsonResponse({ ok: false, error: "db_not_configured" }, 503);
+  }
+  let body;
+  try {
+    body = await request.json();
+  } catch (_) {
+    return jsonResponse({ ok: false, error: "invalid_json" }, 400);
+  }
+
+  const email = String(user.email || "").trim().toLowerCase();
+  const rawCode = String(body?.code || "").replace(/\D/g, "").trim();
+  const isEnglish = String(body?.lang || "tr").toLowerCase().startsWith("en");
+
+  if (rawCode.length !== 6) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: "invalid_format",
+        message: isEnglish ? "Please enter the 6-digit code." : "Lütfen 6 haneli kodu girin.",
+      },
+      400
+    );
+  }
+
+  try {
+    await ensureSchema(env.DB);
+    const row = await env.DB
+      .prepare("SELECT code_hash, expires_at, attempts FROM email_verification_codes WHERE email = ? LIMIT 1")
+      .bind(email)
+      .first();
+
+    if (!row) {
+      return jsonResponse(
+        {
+          ok: false,
+          error: "code_not_found",
+          message: isEnglish
+            ? "No active verification code found. Please request a new one."
+            : "Aktif doğrulama kodu bulunamadı. Lütfen yeni kod isteyin.",
+        },
+        404
+      );
+    }
+
+    if (Date.now() > Number(row.expires_at || 0)) {
+      return jsonResponse(
+        {
+          ok: false,
+          error: "code_expired",
+          message: isEnglish
+            ? "Verification code has expired. Please request a new one."
+            : "Doğrulama kodunun süresi doldu. Lütfen yeni kod isteyin.",
+        },
+        400
+      );
+    }
+
+    const attempts = Number(row.attempts || 0);
+    if (attempts >= 5) {
+      return jsonResponse(
+        {
+          ok: false,
+          error: "too_many_attempts",
+          message: isEnglish
+            ? "Too many incorrect attempts. Please request a new code."
+            : "Çok fazla hatalı deneme yapıldı. Lütfen yeni kod isteyin.",
+        },
+        429
+      );
+    }
+
+    const expectedHash = String(row.code_hash || "");
+    const submittedHash = await sha256Hex(`${email}:${rawCode}`);
+    if (submittedHash !== expectedHash) {
+      await env.DB
+        .prepare("UPDATE email_verification_codes SET attempts = attempts + 1 WHERE email = ?")
+        .bind(email)
+        .run();
+      return jsonResponse(
+        {
+          ok: false,
+          error: "invalid_code",
+          message: isEnglish
+            ? "Incorrect verification code. Please check and try again."
+            : "Girdiğiniz kod hatalı. Lütfen kontrol edip tekrar deneyin.",
+        },
+        400
+      );
+    }
+
+    await env.DB.batch([
+      env.DB
+        .prepare("UPDATE registered_users SET email_verified = 1, last_seen_at = ? WHERE LOWER(email) = ?")
+        .bind(new Date().toISOString(), email),
+      env.DB
+        .prepare("DELETE FROM email_verification_codes WHERE email = ?")
+        .bind(email),
+    ]);
+
+    return jsonResponse({
+      ok: true,
+      email_verified: true,
+      message: isEnglish ? "Email verified!" : "E-posta doğrulandı!",
+    });
+  } catch (err) {
+    return jsonResponse(
+      { ok: false, error: "otp_verify_error", message: String(err?.message || err) },
+      500
+    );
   }
 }
 
@@ -2220,6 +2583,7 @@ async function verifyFirebaseIdToken(token) {
     return {
     uid: payload.sub,
     email: payload.email || "",
+    emailVerified: Boolean(payload.email_verified),
     displayName: payload.name || "",
     authProvider: normalizeAuthProvider(payload.firebase?.sign_in_provider || ""),
   };

@@ -15,6 +15,7 @@ import '../../core/settings/settings_repository.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/app_theme_backdrop.dart';
 import '../../core/tts/tts_service.dart';
+import '../ads/widgets/app_banner_ad.dart';
 import '../articles/controllers/article_reading_progress_controller.dart';
 import '../articles/controllers/articles_controller.dart';
 import '../articles/data/articles_cache_repository.dart';
@@ -113,6 +114,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      CloudSyncService.shared.setAppActive(true);
       if (!kIsWeb) {
         _checkForAppUpdateSilently();
       }
@@ -123,6 +125,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _refreshArticlesSilently();
       _authController?.refreshEntitlement();
       _wordsController?.reloadAll();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      CloudSyncService.shared.setAppActive(false);
     }
   }
 
@@ -491,19 +496,28 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
               ],
             ),
-            bottomNavigationBar: NavigationBar(
-              selectedIndex: _selectedIndex,
-              onDestinationSelected: _onDestinationSelected,
-              destinations: <NavigationDestination>[
-                NavigationDestination(
-                  icon: const Icon(Icons.home_outlined),
-                  selectedIcon: const Icon(Icons.home),
-                  label: s.mainMenuTitle,
+            bottomNavigationBar: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AppBannerAd(
+                  authController: authController,
+                  placement: AppBannerPlacement.bottom,
                 ),
-                NavigationDestination(
-                  icon: const Icon(Icons.bookmarks_outlined),
-                  selectedIcon: const Icon(Icons.bookmarks),
-                  label: s.myWordsTitle,
+                NavigationBar(
+                  selectedIndex: _selectedIndex,
+                  onDestinationSelected: _onDestinationSelected,
+                  destinations: <NavigationDestination>[
+                    NavigationDestination(
+                      icon: const Icon(Icons.home_outlined),
+                      selectedIcon: const Icon(Icons.home),
+                      label: s.mainMenuTitle,
+                    ),
+                    NavigationDestination(
+                      icon: const Icon(Icons.bookmarks_outlined),
+                      selectedIcon: const Icon(Icons.bookmarks),
+                      label: s.myWordsTitle,
+                    ),
+                  ],
                 ),
               ],
             ),

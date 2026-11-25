@@ -131,7 +131,7 @@ class _FakeThemeAuthLocalStore implements AuthLocalStore {
   }) async {}
 }
 
-class _FakeThemeEntitlementClient implements EntitlementClient {
+class _FakeThemeEntitlementClient extends EntitlementClient {
   _FakeThemeEntitlementClient({
     this.isUnlimited = false,
     this.hasSpecialThemes = false,

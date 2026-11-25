@@ -285,9 +285,6 @@ class FirebaseAuthBackend implements AuthBackend {
       }
 
       final refreshed = FirebaseAuth.instance.currentUser ?? user;
-      if (!refreshed.emailVerified) {
-        await sendEmailVerification();
-      }
       return AuthActionResult.success(user: _mapFirebaseUser(refreshed));
     } on FirebaseAuthException catch (error) {
       return AuthActionResult.failure(
