@@ -546,17 +546,22 @@ class ArticleAudioController extends ChangeNotifier {
       final targetDuration = Duration(milliseconds: targetMs);
       // Seek tamamlanana ve oynatıcı yeni konuma oturana kadar eski konum
       // akışlarının _currentSentenceIndex değerini geri sarmasını engelle.
-      _ignorePositionEventsUntil =
-          DateTime.now().add(const Duration(milliseconds: 550));
+      _ignorePositionEventsUntil = DateTime.now().add(
+        Duration(milliseconds: kIsWeb ? 900 : 550),
+      );
       _position = targetDuration;
       positionNotifier.value = targetDuration;
       _safeNotify();
       if (_podcastLoaded) {
         try {
           await _podcastPlayer.seek(targetDuration);
-          _ignorePositionEventsUntil =
-              DateTime.now().add(const Duration(milliseconds: 350));
-          if (wasPlaying) {
+          _ignorePositionEventsUntil = DateTime.now().add(
+            Duration(milliseconds: kIsWeb ? 650 : 350),
+          );
+          // Web (HTML5 Audio) üzerinde oynatma zaten sürüyorken seek() sonrası
+          // tekrar resume() çağırmak bazı tarayıcılarda sesi 0. saniyeye sarar;
+          // yalnızca web dışı platformlarda (veya duraklatılmışsa) resume çağır.
+          if (wasPlaying && !kIsWeb) {
             await _podcastPlayer.resume();
           }
         } catch (_) {
@@ -1035,9 +1040,6 @@ class ArticleAudioController extends ChangeNotifier {
       }
     }
 
-    final totalMs = _duration.inMilliseconds;
-    if (totalMs <= 0) return 0;
-
     var totalChars = 0;
     var charsBefore = 0;
     for (var i = 0; i < _sentences.length; i++) {
@@ -1046,6 +1048,12 @@ class ArticleAudioController extends ChangeNotifier {
       totalChars += weight;
     }
     if (totalChars <= 0) return 0;
+
+    // Web'de onDurationChanged henüz gelmediyse 0 ms döndürüp başa sarmak
+    // yerine karakter sayısından yaklaşık süre (~68 ms/karakter) tahmin et.
+    final totalMs = _duration.inMilliseconds > 0
+        ? _duration.inMilliseconds
+        : totalChars * 68;
     return ((charsBefore / totalChars) * totalMs).round();
   }
 

@@ -1242,8 +1242,11 @@
           <button type="button" class="btn btn-sm" id="newFromTemplateBtn" title="Seçili seviyede kendi yazacağınız makale için hazır şablon açar">
             📄 Şablon ile Ekle
           </button>
-          <button type="button" class="btn btn-sm" id="copyPromptTemplateBtn" title="Harici Gemini / ChatGPT için hazır prompt şablonunu kopyalar">
+          <button type="button" class="btn btn-sm" id="copyPromptTemplateBtn" title="Gemini Web için tek seferde kopyala-yapıştır uyumlu prompt şablonunu kopyalar">
             📋 Prompt
+          </button>
+          <button type="button" class="btn btn-sm" id="openPasteGeminiBtn" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border-color:transparent;font-weight:700;" title="Gemini Web'den kopyaladığınız tüm yanıtı tek seferde yapıştırıp tüm alanları otomatik doldurur">
+            📥 Gemini'den Yapıştır
           </button>
           <button type="button" class="btn btn-sm" id="toggleGeminiSettingsBtn" title="Yerel Gemini API anahtarı ayarı">
             <span id="aiKeyDot" class="ai-key-dot"></span>
@@ -2208,6 +2211,13 @@
                 <button type="button" class="btn btn-ai btn-sm" id="generateImageBtn" style="background:linear-gradient(135deg,#0ea5e9,#6366f1);">
                   ${article.image_url ? "🖼️ Fotoğrafı Yeniden Üret" : "🖼️ Fotoğraf Üret"}
                 </button>
+                <button type="button" class="btn btn-sm" id="pasteImageBtn" style="background:rgba(16,185,129,0.16);border-color:rgba(16,185,129,0.45);color:#34d399;font-weight:700;" title="Gemini Web'de 'Resmi Kopyala' dedikten sonra buraya basarak veya sayfada Ctrl+V yaparak doğrudan yapıştırın">
+                  📋 Fotoğraf Yapıştır (Ctrl+V)
+                </button>
+                <button type="button" class="btn btn-sm" id="uploadImageBtn" title="Bilgisayardan fotoğraf dosyası seçip yükler">
+                  📁 Dosyadan
+                </button>
+                <input type="file" id="uploadImageFileInput" accept="image/*" style="display:none;" />
                 ${article.audio_url ? `<button type="button" class="btn btn-danger-ghost btn-sm" id="removeAudioBtn">Sesi Kaldır</button>` : ""}
                 ${article.image_url ? `<button type="button" class="btn btn-danger-ghost btn-sm" id="removeImageBtn">Fotoğrafı Kaldır</button>` : ""}
                 <span class="wm-stats-badge" id="audioStatusBadge" style="${article.audio_url ? "" : "background:rgba(148,163,184,0.14);color:var(--text-muted);border-color:var(--border);"}">
@@ -2528,6 +2538,88 @@
         });
       }
 
+      async function uploadCoverImageBlob(article, blob, triggerBtn = null) {
+        if (!blob) return;
+        const prevText = triggerBtn ? triggerBtn.textContent : "";
+        if (triggerBtn) {
+          triggerBtn.disabled = true;
+          triggerBtn.textContent = "⏳ Yükleniyor...";
+        }
+        try {
+          const dataUrl = await new Promise((resolve, reject) => {
+            const r = new FileReader();
+            r.onload = () => resolve(String(r.result || ""));
+            r.onerror = () => reject(new Error("Görsel okunamadı."));
+            r.readAsDataURL(blob);
+          });
+          const res = await fetch("/api/ai/upload-image", {
+            method: "POST",
+            headers: { "Content-Type": "application/json; charset=utf-8" },
+            body: JSON.stringify({
+              id: article.id || uniqueIdFor(article.title || "article", article.level),
+              data_url: dataUrl
+            })
+          });
+          const data = await res.json();
+          if (!res.ok || !data.ok || !data.image_url) {
+            throw new Error(data.message || "Fotoğraf kaydedilemedi.");
+          }
+          article.image_url = data.image_url;
+          article._local_image_preview = data.local_preview_url || data.image_url;
+          article._imageCacheBust = Date.now();
+          state.dirty = true;
+          renderAll();
+          showToast(`🖼️ Kapak fotoğrafı yapıştırıldı ve kaydedildi (${data.size_kb || "?"} KB).`, "success");
+        } catch (err) {
+          showToast(err.message || "Fotoğraf yükleme hatası.", "error");
+        } finally {
+          if (triggerBtn) {
+            triggerBtn.disabled = false;
+            triggerBtn.textContent = prevText;
+          }
+        }
+      }
+
+      const pasteImageBtn = document.getElementById("pasteImageBtn");
+      if (pasteImageBtn) {
+        pasteImageBtn.addEventListener("click", async () => {
+          try {
+            if (!navigator.clipboard || !navigator.clipboard.read) {
+              showToast("Tarayıcı panoya doğrudan erişime izin vermedi — sayfada doğrudan Ctrl+V tuşuna basın!", "info");
+              return;
+            }
+            const items = await navigator.clipboard.read();
+            let imgBlob = null;
+            for (const item of items) {
+              const imgType = item.types.find(t => t.startsWith("image/"));
+              if (imgType) {
+                imgBlob = await item.getType(imgType);
+                break;
+              }
+            }
+            if (!imgBlob) {
+              showToast("Panoda kopyalanmış fotoğraf bulunamadı. Gemini'de resme sağ tıklayıp 'Resmi Kopyala' deyin.", "error");
+              return;
+            }
+            await uploadCoverImageBlob(article, imgBlob, pasteImageBtn);
+          } catch (_) {
+            showToast("Pano izni reddedildiyse sayfanın herhangi bir yerinde doğrudan Ctrl+V yapabilirsiniz!", "info");
+          }
+        });
+      }
+
+      const uploadImageBtn = document.getElementById("uploadImageBtn");
+      const uploadImageFileInput = document.getElementById("uploadImageFileInput");
+      if (uploadImageBtn && uploadImageFileInput) {
+        uploadImageBtn.addEventListener("click", () => uploadImageFileInput.click());
+        uploadImageFileInput.addEventListener("change", async () => {
+          const file = uploadImageFileInput.files && uploadImageFileInput.files[0];
+          if (!file) return;
+          await uploadCoverImageBlob(article, file, uploadImageBtn);
+          uploadImageFileInput.value = "";
+        });
+      }
+
       const removeAudioBtn = document.getElementById("removeAudioBtn");
       if (removeAudioBtn) {
         removeAudioBtn.addEventListener("click", () => {
@@ -2802,32 +2894,59 @@
       showToast(`${chosenLevel} seviyesi için hazır makale şablonu oluşturuldu.`, "success");
     }
 
-    async function copyPromptTemplate() {
+    function buildSinglePastePromptText() {
       const chosenLevel = levelMeta(document.getElementById("aiLevelSelect")?.value || "B1").code;
       const customTopic = (document.getElementById("aiTopicInput")?.value || "").trim();
+      const rawWc = parseInt(document.getElementById("aiWordCountInput")?.value || "350", 10);
+      const targetWc = Number.isFinite(rawWc) ? Math.max(100, Math.min(1200, rawWc)) : 350;
+      const minWc = Math.max(95, Math.round(targetWc * 0.95));
+      const maxWc = Math.round(targetWc * 1.12);
+      const paraCount = targetWc < 200 ? "3" : targetWc <= 420 ? "4-5" : targetWc <= 700 ? "5-6" : "6-8";
       const topicLine = customTopic
-        ? `Topic: ${customTopic}`
-        : "Topic: Choose any fresh, engaging, interesting topic (science, culture, psychology, history, travel, nature, technology, or daily life).";
+        ? `Konu: ${customTopic}`
+        : "Konu: Bilim, psikoloji, tarih, doğa, kültür veya teknoloji alanından çok ilgi çekici, merak uyandıran özgün bir konu seç.";
 
-      const promptText = [
-        `Write an original English reading article for the Line Reader app.`,
-        `Level: CEFR ${chosenLevel}`,
-        topicLine,
-        `Author: Line Reader`,
-        `Length: Around 350 words (320-380 words), divided into 4-5 clear paragraphs.`,
+      return [
+        `Sen Line Reader İngilizce okuma uygulaması için profesyonel bir içerik editörüsün.`,
+        `Aşağıdaki özelliklerde özgün ve sürükleyici bir İngilizce makale ile tüm çeviri/kelime verilerini hazırla:`,
+        `- CEFR Seviyesi: ${chosenLevel}`,
+        `- Hedef Kelime Sayısı: ${targetWc} kelime (kesinlikle ${minWc}-${maxWc} kelime arası olsun, kısa kesme; ${paraCount} dolu paragraf)`,
+        `- ${topicLine}`,
         ``,
-        `Provide the output in these exact sections:`,
-        `1) Title (in English)`,
-        `2) Description (1-2 sentence summary in English)`,
-        `3) Category (1-2 words in English)`,
-        `4) Content (4-5 English paragraphs, ~350 words)`,
-        `5) Word Meanings (35-45 key words from the article, each on a new line in "word: contextual Turkish meaning" format)`,
-        `6) Word Relations (same key words, each on a new line in "word: contextual synonym 1, synonym 2 | contextual antonym 1, antonym 2" format strictly matching the exact meaning in this article)`
+        `ÇIKTI KURALI (ÇOK ÖNEMLİ — OTOMATİK AKTARIM FORMATI):`,
+        `Tüm yanıtı TEK BİR \`\`\`text ... \`\`\` kod bloğunun içinde, tam olarak aşağıdaki etiket başlıklarıyla ver. Etiket isimlerini değiştirme, başlarına madde işareti veya yıldız koyma:`,
+        ``,
+        `===SEVIYE===`,
+        `${chosenLevel}`,
+        `===BASLIK===`,
+        `(İngilizce, merak uyandıran 4-9 kelimelik tek satır başlık)`,
+        `===ACIKLAMA===`,
+        `(İngilizce, tam 2 cümlelik, toplam 32-48 kelimelik doyurucu özet)`,
+        `===KATEGORI===`,
+        `(Tek İngilizce kelime: Science, Psychology, History, Nature, Culture, Technology, Travel, Health veya Society)`,
+        `===ICERIK===`,
+        `(Başlığı içine koyma. Tam ${minWc}-${maxWc} kelime arası, ${paraCount} paragraf, paragraflar arasında 1 boş satır bulunan akıcı İngilizce metin)`,
+        `===KELIMELER===`,
+        `(Metinde BİREBİR geçen 35-45 önemli İngilizce kelime/ifade. Her satır küçük harfle "kelime: cümledeki doğal Türkçe anlamı" formatında)`,
+        `===ES_ZIT===`,
+        `(Yukarıdaki kelimelerden en az 25-35 tanesi için SADECE bu makaledeki anlamına uyan İngilizce eş/zıt anlamlar. Her satır küçük harfle "kelime: eş1, eş2 | zıt1, zıt2" formatında; zıt anlamı yoksa | sonrasını boş bırak)`,
+        `===PARAGRAF_CEVIRI===`,
+        `(İçerikteki İngilizce paragraflarla BİREBİR aynı sayıda ve aynı sırada, aralarında 1 boş satır bırakılmış akıcı Türkçe paragraf çevirileri)`,
+        `===CUMLE_CEVIRI===`,
+        `(İçerikteki HER BİR İngilizce cümlenin birebir noktalama işaretleriyle Türkçe çevirisi. Her satır "Exact English sentence. => Doğal Türkçe çevirisi." formatında. Hiçbir cümleyi atlama)`,
+        ``,
+        `EK GÖRSEL İSTEĞİ:`,
+        `Yukarıdaki kod bloğunun hemen altına, bu makalenin başlığına ve konusuna birebir uyan, içinde HİÇBİR YAZI, HARF veya LOGO bulunmayan, sinematik National Geographic dergi kapağı kalitesinde 16:9 yatay bir kapak fotoğrafı da oluştur.`
       ].join("\n");
+    }
+
+    async function copyPromptTemplate() {
+      const chosenLevel = levelMeta(document.getElementById("aiLevelSelect")?.value || "B1").code;
+      const promptText = buildSinglePastePromptText();
 
       try {
         await navigator.clipboard.writeText(promptText);
-        showToast(`${chosenLevel} seviyesi için AI prompt şablonu panoya kopyalandı.`, "success");
+        showToast(`${chosenLevel} seviyesi için tek-yapıştırmalık Gemini prompt'u kopyalandı!`, "success");
       } catch (_) {
         window.prompt("Prompt şablonunu kopyalayın:", promptText);
       }
@@ -3788,8 +3907,251 @@
       }
     });
 
+    function parseGeminiPastePayload(rawText) {
+      const cleaned = String(rawText || "").replace(/\r\n/g, "\n").trim();
+      if (!cleaned) throw new Error("Yapıştırılacak metin boş.");
+
+      // 1) Eğer kullanıcı doğrudan JSON yapıştırdıysa onu da destekle
+      if (cleaned.startsWith("{") || /^```(?:json)?\s*\{/i.test(cleaned)) {
+        const stripped = cleaned.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+        const first = stripped.indexOf("{");
+        const last = stripped.lastIndexOf("}");
+        if (first >= 0 && last > first) {
+          const j = JSON.parse(stripped.slice(first, last + 1));
+          const lvl = levelMeta(j.level || document.getElementById("aiLevelSelect")?.value || "B1").code;
+          const content = String(j.content || "").replace(/\r\n/g, "\n").trim();
+          if (!String(j.title || "").trim() || !content) {
+            throw new Error("JSON içinde başlık veya içerik bulunamadı.");
+          }
+          return {
+            level: lvl,
+            title: String(j.title || "").trim(),
+            description: String(j.description || "").trim(),
+            category: String(j.category || "General").trim(),
+            content,
+            word_meanings_text: formatWordMeaningsMap(j.word_meanings || {}),
+            word_relations_text: formatWordRelationsMap(j.word_relations || {}),
+            paragraph_translations_text: Array.isArray(j.paragraph_translations)
+              ? j.paragraph_translations.map(p => String(p ?? "").trim()).filter(Boolean).join("\n\n")
+              : String(j.paragraph_translations || "").trim(),
+            sentence_translations_text: formatSentenceTranslationsMap(j.sentence_translations || {})
+          };
+        }
+      }
+
+      // 2) ===ETIKET=== tabanlı akıllı ayrıştırıcı
+      const tagMap = {
+        "SEVIYE": "level",
+        "SEVİYE": "level",
+        "LEVEL": "level",
+        "BASLIK": "title",
+        "BAŞLIK": "title",
+        "TITLE": "title",
+        "ACIKLAMA": "description",
+        "AÇIKLAMA": "description",
+        "DESCRIPTION": "description",
+        "KATEGORI": "category",
+        "KATEGORİ": "category",
+        "CATEGORY": "category",
+        "ICERIK": "content",
+        "İÇERİK": "content",
+        "CONTENT": "content",
+        "KELIMELER": "word_meanings_text",
+        "KELİMELER": "word_meanings_text",
+        "WORD_MEANINGS": "word_meanings_text",
+        "ES_ZIT": "word_relations_text",
+        "EŞ_ZIT": "word_relations_text",
+        "WORD_RELATIONS": "word_relations_text",
+        "PARAGRAF_CEVIRI": "paragraph_translations_text",
+        "PARAGRAF_ÇEVİRİ": "paragraph_translations_text",
+        "PARAGRAPH_TRANSLATIONS": "paragraph_translations_text",
+        "CUMLE_CEVIRI": "sentence_translations_text",
+        "CÜMLE_ÇEVİRİ": "sentence_translations_text",
+        "SENTENCE_TRANSLATIONS": "sentence_translations_text"
+      };
+
+      const sections = {};
+      let currentKey = null;
+      const lines = cleaned.split("\n");
+      for (const rawLine of lines) {
+        const trimmed = rawLine.trim();
+        if (trimmed === "```" || /^```[a-z0-9_-]*$/i.test(trimmed)) continue;
+        const m = trimmed.match(/^={2,}\s*([A-ZÇĞİÖŞÜ_]+)\s*={2,}$/i);
+        if (m) {
+          const normalizedTag = m[1].toUpperCase().replace(/İ/g, "I").replace(/Ş/g, "S").replace(/Ğ/g, "G").replace(/Ü/g, "U").replace(/Ö/g, "O").replace(/Ç/g, "C");
+          currentKey = tagMap[m[1].toUpperCase()] || tagMap[normalizedTag] || null;
+          if (currentKey && !sections[currentKey]) sections[currentKey] = [];
+          continue;
+        }
+        if (currentKey) {
+          sections[currentKey].push(rawLine);
+        }
+      }
+
+      const getSec = (k) => (sections[k] ? sections[k].join("\n").trim() : "");
+      const title = getSec("title").replace(/^["']|["']$/g, "").trim();
+      const content = getSec("content");
+      if (!title || !content) {
+        throw new Error("Metinde ===BASLIK=== ve ===ICERIK=== bölümleri bulunamadı. Lütfen hazır prompt çıktısının tamamını yapıştırın.");
+      }
+
+      const rawLvl = getSec("level") || document.getElementById("aiLevelSelect")?.value || "B1";
+      const chosenLevel = levelMeta(rawLvl).code;
+
+      return {
+        level: chosenLevel,
+        title,
+        description: getSec("description"),
+        category: getSec("category") || "General",
+        content,
+        word_meanings_text: getSec("word_meanings_text"),
+        word_relations_text: getSec("word_relations_text"),
+        paragraph_translations_text: getSec("paragraph_translations_text"),
+        sentence_translations_text: getSec("sentence_translations_text")
+      };
+    }
+
+    function setupPasteGeminiModal() {
+      const openBtn = document.getElementById("openPasteGeminiBtn");
+      const modal = document.getElementById("pasteGeminiModal");
+      const closeBtn = document.getElementById("closePasteGeminiModalBtn");
+      const cancelBtn = document.getElementById("cancelPasteGeminiBtn");
+      const copyPromptInModalBtn = document.getElementById("copyPromptInModalBtn");
+      const applyBtn = document.getElementById("applyPasteGeminiBtn");
+      const textarea = document.getElementById("pasteGeminiTextarea");
+      if (!openBtn || !modal) return;
+
+      const closeModal = () => { modal.style.display = "none"; };
+      openBtn.addEventListener("click", () => {
+        if (textarea) textarea.value = "";
+        modal.style.display = "grid";
+        setTimeout(() => textarea?.focus(), 40);
+      });
+      closeBtn?.addEventListener("click", closeModal);
+      cancelBtn?.addEventListener("click", closeModal);
+      modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
+      copyPromptInModalBtn?.addEventListener("click", copyPromptTemplate);
+
+      applyBtn?.addEventListener("click", () => {
+        try {
+          const parsed = parseGeminiPastePayload(textarea?.value || "");
+          const fresh = {
+            id: uniqueIdFor(parsed.title, parsed.level),
+            level: parsed.level,
+            title: parsed.title,
+            description: parsed.description,
+            reading_time: estimateReadingTime(parsed.content),
+            category: parsed.category,
+            author: "Line Reader",
+            language: "en",
+            content: parsed.content,
+            word_meanings_text: parsed.word_meanings_text,
+            word_relations_text: parsed.word_relations_text,
+            paragraph_translations_text: parsed.paragraph_translations_text,
+            sentence_translations_text: parsed.sentence_translations_text,
+            audio_url: "",
+            audio_segments: [],
+            _local_audio_preview: "",
+            image_url: "",
+            _local_image_preview: "",
+            _voiceName: "Kore",
+            published_at: new Date().toISOString(),
+            _autoId: true,
+            _autoReadTime: true
+          };
+
+          state.articles.unshift(fresh);
+          state.selectedIndex = 0;
+          if (state.filterLevel !== "ALL" && state.filterLevel !== parsed.level) {
+            state.filterLevel = "ALL";
+          }
+          state.dirty = true;
+          renderAll();
+          closeModal();
+
+          const wc = countWords(fresh.content);
+          const wmCount = parseWordMeaningsText(fresh.word_meanings_text).count;
+          const wrCount = parseWordRelationsText(fresh.word_relations_text).count;
+          const paraCount = splitParagraphs(fresh.paragraph_translations_text).length;
+          const sentCount = parseSentenceTranslationsText(fresh.sentence_translations_text).count;
+          showToast(`⚡ Makale aktarıldı! (${wc} kelime • ${wmCount} anlam • ${wrCount} eş/zıt • ${paraCount} paragraf • ${sentCount} cümle)`, "success");
+        } catch (err) {
+          showToast(err.message || "Metin ayrıştırılamadı.", "error");
+        }
+      });
+    }
+
+    // Global Ctrl+V ile doğrudan panodaki fotoğrafı aktif makaleye kapak olarak yapıştır
+    window.addEventListener("paste", async (e) => {
+      const modal = document.getElementById("pasteGeminiModal");
+      if (modal && modal.style.display !== "none") return;
+      const items = e.clipboardData && e.clipboardData.items ? Array.from(e.clipboardData.items) : [];
+      const imgItem = items.find(it => it.type && it.type.startsWith("image/"));
+      if (!imgItem) return;
+      const activeArticle = state.articles[state.selectedIndex];
+      if (!activeArticle) return;
+      e.preventDefault();
+      const blob = imgItem.getAsFile();
+      if (!blob) return;
+      try {
+        showToast("⏳ Panodaki fotoğraf makaleye işleniyor...", "info");
+        const dataUrl = await new Promise((resolve, reject) => {
+          const r = new FileReader();
+          r.onload = () => resolve(String(r.result || ""));
+          r.onerror = () => reject(new Error("Görsel okunamadı."));
+          r.readAsDataURL(blob);
+        });
+        const res = await fetch("/api/ai/upload-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json; charset=utf-8" },
+          body: JSON.stringify({
+            id: activeArticle.id || uniqueIdFor(activeArticle.title || "article", activeArticle.level),
+            data_url: dataUrl
+          })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok || !data.image_url) {
+          throw new Error(data.message || "Fotoğraf kaydedilemedi.");
+        }
+        activeArticle.image_url = data.image_url;
+        activeArticle._local_image_preview = data.local_preview_url || data.image_url;
+        activeArticle._imageCacheBust = Date.now();
+        state.dirty = true;
+        renderAll();
+        showToast(`🖼️ Fotoğraf Ctrl+V ile doğrudan yapıştırıldı (${data.size_kb || "?"} KB)!`, "success");
+      } catch (err) {
+        showToast(err.message || "Fotoğraf yapıştırma hatası.", "error");
+      }
+    });
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", setupPasteGeminiModal);
+    } else {
+      setTimeout(setupPasteGeminiModal, 0);
+    }
     loadInitial();
     loadAiConfig();
   </script>
+
+  <!-- 📥 Gemini Web Çıktısını Tek Seferde Yapıştır Modalı -->
+  <div id="pasteGeminiModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);backdrop-filter:blur(4px);z-index:9999;place-items:center;padding:20px;">
+    <div style="background:var(--surface);border:1px solid var(--border-strong);border-radius:16px;max-width:720px;width:100%;padding:22px;box-shadow:0 16px 48px rgba(0,0,0,0.5);display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <h3 style="margin:0;font-size:17px;font-weight:800;">📥 Gemini Çıktısını Tek Seferde Yapıştır</h3>
+        <button type="button" id="closePasteGeminiModalBtn" class="btn btn-sm" style="padding:4px 9px;">✕</button>
+      </div>
+      <p style="margin:0;font-size:12.5px;color:var(--text-muted);line-height:1.45;">
+        Gemini Web'den kopyaladığınız tüm çıktıyı aşağıdaki kutuya tek seferde yapıştırın; <b>Başlık, Açıklama, Kategori, İçerik, Kelime Anlamları, Eş/Zıt Anlamlar, Paragraf ve Cümle Çevirileri</b> otomatik olarak ilgili tüm kutulara dağıtılacaktır.
+      </p>
+      <textarea id="pasteGeminiTextarea" style="width:100%;min-height:260px;padding:12px;border-radius:10px;border:1px solid var(--border-strong);background:var(--surface-alt);color:var(--text);font-family:ui-monospace,Consolas,monospace;font-size:12px;line-height:1.45;resize:vertical;" placeholder="===SEVIYE===&#10;B1&#10;===BASLIK===&#10;...&#10;(Gemini çıktısının tamamını buraya Ctrl+V ile yapıştırın)"></textarea>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+        <button type="button" class="btn btn-sm" id="copyPromptInModalBtn">📋 Hazır Prompt'u Kopyala</button>
+        <div style="display:flex;gap:8px;">
+          <button type="button" class="btn" id="cancelPasteGeminiBtn">Vazgeç</button>
+          <button type="button" class="btn btn-success" id="applyPasteGeminiBtn" style="font-weight:700;">⚡ Otomatik İşle ve Doldur</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

@@ -1829,6 +1829,35 @@ try {
                 $imgRes = Invoke-GeminiGenerateImage $body
                 Send-Response -Response $res -StatusCode $imgRes.StatusCode -Body $imgRes.Body -ContentType "application/json; charset=utf-8"
             }
+            elseif ($method -eq "POST" -and $path -eq "/api/ai/upload-image") {
+                $body = Read-RequestBody $req
+                $reqObj = $body | ConvertFrom-Json
+                $rawId = if ($reqObj.id) { ([string]$reqObj.id).Trim() } else { "article-$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())" }
+                $safeId = [regex]::Replace($rawId.ToLowerInvariant(), '[^a-z0-9_-]+', '-').Trim('-')
+                if ([string]::IsNullOrWhiteSpace($safeId)) { $safeId = "article-cover" }
+                $dataUrl = [string]$reqObj.data_url
+                if ($dataUrl -match '^data:image/([a-zA-Z0-9+.-]+);base64,(.+)$') {
+                    $mimeSub = $Matches[1].ToLowerInvariant()
+                    $b64 = $Matches[2]
+                    $ext = if ($mimeSub -like "*png*") { ".png" } elseif ($mimeSub -like "*webp*") { ".webp" } else { ".jpg" }
+                    $imgBytes = [Convert]::FromBase64String($b64)
+                    if (-not (Test-Path $ContentImagesDir)) { New-Item -ItemType Directory -Path $ContentImagesDir -Force | Out-Null }
+                    if (-not (Test-Path $RootImagesDir)) { New-Item -ItemType Directory -Path $RootImagesDir -Force | Out-Null }
+                    $fileName = "$safeId$ext"
+                    [System.IO.File]::WriteAllBytes((Join-Path $ContentImagesDir $fileName), $imgBytes)
+                    [System.IO.File]::WriteAllBytes((Join-Path $RootImagesDir $fileName), $imgBytes)
+                    $sizeKb = [int][math]::Round($imgBytes.Length / 1024.0)
+                    Write-Host "[Kapak Yukle] Kaydedildi: $fileName ($sizeKb KB)" -ForegroundColor Green
+                    Send-JsonObject -Response $res -StatusCode 200 -Payload @{
+                        ok                = $true
+                        image_url         = "https://getlinereader.com/images/$fileName"
+                        local_preview_url = "/images/$fileName"
+                        size_kb           = $sizeKb
+                    }
+                } else {
+                    Send-JsonObject -Response $res -StatusCode 400 -Payload @{ ok = $false; message = "Geçersiz görsel formatı." }
+                }
+            }
             elseif ($method -eq "GET" -and $path.StartsWith("/images/")) {
                 $rawName = [System.IO.Path]::GetFileName($req.Url.AbsolutePath)
                 $safeName = [regex]::Replace($rawName, '[^a-zA-Z0-9._-]', '')

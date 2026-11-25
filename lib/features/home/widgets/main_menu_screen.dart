@@ -187,9 +187,10 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
             Container(
               padding: const EdgeInsets.fromLTRB(28, 20, 28, 16),
               decoration: BoxDecoration(
+                color: visuals.hasBackdrop ? visuals.appBarColor : null,
                 border: Border(
                   bottom: BorderSide(
-                    color: colorScheme.outlineVariant.withAlpha(40),
+                    color: colorScheme.outlineVariant.withAlpha(55),
                   ),
                 ),
               ),
@@ -201,12 +202,10 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                       height: 42,
                       constraints: const BoxConstraints(maxWidth: 380),
                       decoration: BoxDecoration(
-                        color: isDark
-                            ? const Color(0xFF161B22)
-                            : colorScheme.surfaceContainerHighest,
+                        color: colorScheme.surfaceContainerHigh,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: colorScheme.outlineVariant.withAlpha(50),
+                          color: colorScheme.outlineVariant.withAlpha(65),
                         ),
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -471,9 +470,9 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                                   gridDelegate:
                                       SliverGridDelegateWithFixedCrossAxisCount(
                                     crossAxisCount: columns,
-                                    mainAxisSpacing: 16,
-                                    crossAxisSpacing: 16,
-                                    childAspectRatio: 1.4,
+                                    mainAxisSpacing: 18,
+                                    crossAxisSpacing: 18,
+                                    mainAxisExtent: 332,
                                   ),
                                   itemBuilder: (context, index) {
                                     final art = gridArticles[index];
@@ -551,7 +550,11 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     return Scaffold(
       backgroundColor: visuals.hasBackdrop ? Colors.transparent : null,
       appBar: AppBar(
-        backgroundColor: isDark ? const Color(0xFF0B0F17) : colorScheme.surface,
+        backgroundColor: visuals.hasBackdrop
+            ? visuals.appBarColor
+            : colorScheme.surface,
+        foregroundColor: colorScheme.onSurface,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
         titleSpacing: 16,
@@ -636,7 +639,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                     Container(
                       height: 44,
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF141923) : colorScheme.surfaceContainerHighest,
+                        color: colorScheme.surfaceContainerHigh,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
                           color: colorScheme.outlineVariant.withAlpha(50),
@@ -896,7 +899,6 @@ class _MobileLevelPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     return Material(
       color: Colors.transparent,
@@ -910,7 +912,7 @@ class _MobileLevelPill extends StatelessWidget {
           decoration: BoxDecoration(
             color: isSelected
                 ? accentColor.withAlpha(35)
-                : (isDark ? const Color(0xFF141923) : theme.colorScheme.surfaceContainerHighest),
+                : theme.colorScheme.surfaceContainerHigh,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: isSelected ? accentColor : theme.colorScheme.outlineVariant.withAlpha(50),
@@ -957,7 +959,7 @@ class _MobileHeroCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         child: Container(
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF141924) : colorScheme.surfaceContainerLow,
+            color: colorScheme.surfaceContainerLow,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: accent.withAlpha(70),
@@ -1132,7 +1134,6 @@ class _MobileArticleFeedCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
     final accent = level?.accentColor ?? colorScheme.primary;
 
     return Material(
@@ -1142,7 +1143,7 @@ class _MobileArticleFeedCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         child: Container(
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF141923) : colorScheme.surfaceContainerLow,
+            color: colorScheme.surfaceContainerLow,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: colorScheme.outlineVariant.withAlpha(50),
@@ -1270,13 +1271,12 @@ class _DesktopHeroBanner extends StatelessWidget {
         gradient: LinearGradient(
           colors: isDark
               ? [
-                  const Color(0xFF141F32),
-                  const Color(0xFF0F172A),
-                  const Color(0xFF0A0F1D),
+                  colorScheme.surfaceContainerHigh,
+                  colorScheme.surfaceContainerLow,
                 ]
               : [
-                  colorScheme.primaryContainer.withAlpha(140),
-                  colorScheme.surfaceContainerHighest,
+                  colorScheme.primaryContainer.withAlpha(165),
+                  colorScheme.surfaceContainerLow,
                 ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -1458,121 +1458,251 @@ class _DesktopArticleCard extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final accent = level?.accentColor ?? colorScheme.primary;
+    final s = context.l10n;
+    final accentOnColor =
+        ThemeData.estimateBrightnessForColor(accent) == Brightness.dark
+            ? Colors.white
+            : const Color(0xFF0B1220);
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(18),
-        hoverColor: accent.withAlpha(20),
+        hoverColor: accent.withAlpha(22),
         child: Container(
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF141922) : colorScheme.surfaceContainerLow,
+            color: colorScheme.surfaceContainerLow,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: colorScheme.outlineVariant.withAlpha(50),
+              color: colorScheme.outlineVariant.withAlpha(70),
             ),
-          ),
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Top Meta Row
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: accent.withAlpha(30),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      level?.code ?? 'B1',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: accent,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    article.readingTimeMinutes > 0
-                        ? '${article.readingTimeMinutes} dk'
-                        : '3 dk',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const Spacer(),
-                  if (article.hasPodcastAudio)
-                    const Icon(
-                      Icons.mic_rounded,
-                      size: 16,
-                      color: Color(0xFFFBBF24),
-                    ),
-                ],
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha(isDark ? 36 : 12),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
               ),
-              const SizedBox(height: 12),
-              // Body row with compact side thumbnail
-              Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Full-width Editorial Cover Image with Overlay Badges
+              SizedBox(
+                height: 146,
+                child: Stack(
+                  fit: StackFit.expand,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            article.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              height: 1.3,
-                              letterSpacing: -0.2,
-                            ),
+                    Image.network(
+                      article.displayImageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, _, __) => Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [accent.withAlpha(75), accent.withAlpha(28)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
-                          const SizedBox(height: 8),
-                          Expanded(
-                            child: Text(
-                              article.description.isNotEmpty
-                                  ? article.description
-                                  : article.summary,
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                                height: 1.4,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.network(
-                        article.displayImageUrl,
-                        width: 80,
-                        height: 80,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, _, __) => Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [accent.withAlpha(60), accent.withAlpha(25)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                          ),
-                          alignment: Alignment.center,
-                          child: Icon(Icons.auto_stories_rounded, size: 28, color: accent),
+                        ),
+                        alignment: Alignment.center,
+                        child: Icon(
+                          Icons.auto_stories_rounded,
+                          size: 40,
+                          color: accent,
                         ),
                       ),
                     ),
+                    // Subtle top/bottom gradient scrim for crisp badge readability
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withAlpha(90),
+                            Colors.transparent,
+                            Colors.black.withAlpha(110),
+                          ],
+                          stops: const [0.0, 0.45, 1.0],
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 10,
+                      left: 12,
+                      right: 12,
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 9,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: accent,
+                              borderRadius: BorderRadius.circular(7),
+                            ),
+                            child: Text(
+                              level?.code ?? 'B1',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: accentOnColor,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          if (article.category.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withAlpha(155),
+                                  borderRadius: BorderRadius.circular(7),
+                                ),
+                                child: Text(
+                                  article.category,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                          const Spacer(),
+                          if (article.hasPodcastAudio)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withAlpha(175),
+                                borderRadius: BorderRadius.circular(7),
+                                border: Border.all(
+                                  color: const Color(0xFFFBBF24).withAlpha(140),
+                                ),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.mic_rounded,
+                                    size: 13,
+                                    color: Color(0xFFFBBF24),
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Podcast',
+                                    style: TextStyle(
+                                      color: Color(0xFFFBBF24),
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   ],
+                ),
+              ),
+              // Card Content Body
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        article.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: colorScheme.onSurface,
+                          fontWeight: FontWeight.w800,
+                          height: 1.28,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: Text(
+                          article.description.isNotEmpty
+                              ? article.description
+                              : article.summary,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            fontSize: 13,
+                            height: 1.45,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      // Bottom Footer Row
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.schedule_rounded,
+                            size: 14,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            article.formattedReadingTime,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          if (article.author.isNotEmpty) ...[
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                '• ${article.author}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant
+                                      .withAlpha(190),
+                                ),
+                              ),
+                            ),
+                          ] else
+                            const Spacer(),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                s.t('Oku', 'Read'),
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color: colorScheme.primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(width: 3),
+                              Icon(
+                                Icons.arrow_forward_rounded,
+                                size: 14,
+                                color: colorScheme.primary,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -1603,12 +1733,15 @@ class _FilterChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
 
     final bg = isSelected
         ? (accentColor ?? colorScheme.primary)
-        : (isDark ? const Color(0xFF161B22) : colorScheme.surfaceContainerHighest);
-    final fg = isSelected ? Colors.white : colorScheme.onSurfaceVariant;
+        : colorScheme.surfaceContainerHigh;
+    final fg = isSelected
+        ? (ThemeData.estimateBrightnessForColor(bg) == Brightness.dark
+            ? Colors.white
+            : const Color(0xFF0B1220))
+        : colorScheme.onSurface;
 
     return Material(
       color: Colors.transparent,

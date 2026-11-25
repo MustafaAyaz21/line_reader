@@ -665,13 +665,16 @@ class _DesktopSidebar extends StatelessWidget {
     final isBrowserActive = isBrowserOpen;
     final isWordsActive = selectedIndex == 1 && !isBrowserOpen;
 
+    final visuals = AppThemeVisuals.of(context);
     return Container(
       width: 250,
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0F1218) : colorScheme.surface,
+        color: visuals.hasBackdrop
+            ? visuals.navBarColor
+            : colorScheme.surfaceContainerLowest,
         border: Border(
           right: BorderSide(
-            color: colorScheme.outlineVariant.withAlpha(50),
+            color: colorScheme.outlineVariant.withAlpha(65),
             width: 1,
           ),
         ),
@@ -830,9 +833,7 @@ class _DesktopSidebar extends StatelessWidget {
                       child: Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: isDark
-                              ? const Color(0xFF161B22)
-                              : colorScheme.surfaceContainerHighest,
+                          color: colorScheme.surfaceContainerHigh,
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
                             color: colorScheme.outlineVariant.withAlpha(60),

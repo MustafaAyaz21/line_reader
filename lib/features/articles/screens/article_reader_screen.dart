@@ -1423,32 +1423,53 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
           children: <Widget>[
             SafeArea(
               top: false,
-              child: SingleChildScrollView(
-                controller: _scrollController,
-                padding: EdgeInsets.fromLTRB(
-                  palette.paperCardColor != null ? 14 : 24,
-                  palette.paperCardColor != null ? 16 : 24,
-                  palette.paperCardColor != null ? 14 : 24,
-                  hasFloatingSelection ? 104 : 56,
-                ),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 680),
-                    child: palette.paperCardColor != null
-                        ? Container(
-                            padding: const EdgeInsets.fromLTRB(18, 20, 18, 28),
-                            decoration: BoxDecoration(
-                              color: palette.paperCardColor,
-                              borderRadius: BorderRadius.circular(22),
-                              border: Border.all(
-                                color: palette.dividerColor,
-                              ),
-                            ),
-                            child: readerColumn,
-                          )
-                        : readerColumn,
-                  ),
-                ),
+              child: LayoutBuilder(
+                builder: (context, viewportConstraints) {
+                  final isDesktop = viewportConstraints.maxWidth >= 920;
+                  final double contentMaxWidth = isDesktop ? 900 : 680;
+                  final EdgeInsets scrollPadding = isDesktop
+                      ? EdgeInsets.fromLTRB(
+                          40,
+                          28,
+                          40,
+                          hasFloatingSelection ? 116 : 72,
+                        )
+                      : EdgeInsets.fromLTRB(
+                          palette.paperCardColor != null ? 14 : 24,
+                          palette.paperCardColor != null ? 16 : 24,
+                          palette.paperCardColor != null ? 14 : 24,
+                          hasFloatingSelection ? 104 : 56,
+                        );
+                  final Color? cardBg = palette.paperCardColor ??
+                      (isDesktop ? palette.surfaceColor.withAlpha(150) : null);
+
+                  return SingleChildScrollView(
+                    controller: _scrollController,
+                    padding: scrollPadding,
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: contentMaxWidth),
+                        child: cardBg != null
+                            ? Container(
+                                padding: isDesktop
+                                    ? const EdgeInsets.fromLTRB(44, 34, 44, 44)
+                                    : const EdgeInsets.fromLTRB(18, 20, 18, 28),
+                                decoration: BoxDecoration(
+                                  color: cardBg,
+                                  borderRadius: BorderRadius.circular(
+                                    isDesktop ? 24 : 22,
+                                  ),
+                                  border: Border.all(
+                                    color: palette.dividerColor,
+                                  ),
+                                ),
+                                child: readerColumn,
+                              )
+                            : readerColumn,
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
             if (hasFloatingSelection)
@@ -1512,152 +1533,229 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
     final article = widget.article;
     final accentColor = parsedLevel?.accentColor ?? palette.underlineColor;
 
+    final metaChips = Wrap(
+      spacing: 10,
+      runSpacing: 6,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: <Widget>[
+        if (parsedLevel != null)
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 3,
+            ),
+            decoration: BoxDecoration(
+              color: parsedLevel.accentColor.withAlpha(28),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              '${parsedLevel.code} • ${context.l10n.levelLabel(parsedLevel.code)}',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.25,
+                color: parsedLevel.accentColor,
+              ),
+            ),
+          ),
+        if (article.category.isNotEmpty)
+          Text(
+            article.category,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: palette.secondaryTextColor,
+            ),
+          ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Icon(
+              Icons.schedule_rounded,
+              size: 14,
+              color: palette.secondaryTextColor,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              article.formattedReadingTime,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w500,
+                color: palette.secondaryTextColor,
+              ),
+            ),
+          ],
+        ),
+        if (article.hasPodcastAudio)
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 3,
+            ),
+            decoration: BoxDecoration(
+              color: palette.underlineColor.withAlpha(28),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Icon(
+                  Icons.podcasts_rounded,
+                  size: 13,
+                  color: palette.underlineColor,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  context.l10n.podcastAiLabel,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: palette.underlineColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+
+    final bool isWideHeader = MediaQuery.sizeOf(context).width >= 820;
+
     // Başlık, açıklama ve yazar alanları sabit boyutlarda tutulur;
     // yazı boyutu (A- / A+) ayarı yalnızca okuma metnini etkiler.
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      padding: isWideHeader
+          ? const EdgeInsets.fromLTRB(26, 24, 26, 22)
+          : const EdgeInsets.fromLTRB(18, 16, 18, 16),
       decoration: BoxDecoration(
         color: palette.surfaceColor,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(isWideHeader ? 20 : 16),
         border: Border.all(color: palette.dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Wrap(
-            spacing: 10,
-            runSpacing: 6,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: <Widget>[
-              if (parsedLevel != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: parsedLevel.accentColor.withAlpha(28),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    '${parsedLevel.code} • ${context.l10n.levelLabel(parsedLevel.code)}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.25,
-                      color: parsedLevel.accentColor,
-                    ),
-                  ),
-                ),
-              if (article.category.isNotEmpty)
-                Text(
-                  article.category,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                    color: palette.secondaryTextColor,
-                  ),
-                ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  Icon(
-                    Icons.schedule_rounded,
-                    size: 14,
-                    color: palette.secondaryTextColor,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    article.formattedReadingTime,
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w500,
-                      color: palette.secondaryTextColor,
-                    ),
-                  ),
-                ],
-              ),
-              if (article.hasPodcastAudio)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: palette.underlineColor.withAlpha(28),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+          if (isWideHeader)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: <Widget>[
+                Expanded(
+                  flex: 6,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      Icon(
-                        Icons.podcasts_rounded,
-                        size: 13,
-                        color: palette.underlineColor,
-                      ),
-                      const SizedBox(width: 4),
+                      metaChips,
+                      const SizedBox(height: 16),
                       Text(
-                        context.l10n.podcastAiLabel,
+                        article.title,
+                        key: const ValueKey<String>('reader_article_title'),
                         style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          color: palette.underlineColor,
+                          fontSize: 28,
+                          fontWeight: FontWeight.w800,
+                          height: 1.24,
+                          letterSpacing: -0.4,
+                          color: palette.textColor,
                         ),
                       ),
+                      if (article.description.isNotEmpty &&
+                          article.content.trim().isNotEmpty) ...<Widget>[
+                        const SizedBox(height: 14),
+                        Container(
+                          padding: const EdgeInsets.only(
+                            left: 14,
+                            top: 3,
+                            bottom: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            border: Border(
+                              left: BorderSide(
+                                color: accentColor.withAlpha(170),
+                                width: 3.5,
+                              ),
+                            ),
+                          ),
+                          child: Text(
+                            article.description,
+                            key: const ValueKey<String>(
+                              'reader_article_description',
+                            ),
+                            style: TextStyle(
+                              fontSize: 15.5,
+                              height: 1.55,
+                              color: palette.secondaryTextColor,
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
-            ],
-          ),
-          if (article.imageUrl != null && article.imageUrl!.isNotEmpty) ...<Widget>[
+                const SizedBox(width: 26),
+                Expanded(
+                  flex: 5,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Image.network(
+                      article.displayImageUrl,
+                      height: 220,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    ),
+                  ),
+                ),
+              ],
+            )
+          else ...<Widget>[
+            metaChips,
             const SizedBox(height: 14),
             ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: Image.network(
-                article.imageUrl!,
+                article.displayImageUrl,
                 height: 180,
                 width: double.infinity,
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => const SizedBox.shrink(),
               ),
             ),
-          ],
-          const SizedBox(height: 14),
-          Text(
-            article.title,
-            key: const ValueKey<String>('reader_article_title'),
-            style: TextStyle(
-              fontSize: 23,
-              fontWeight: FontWeight.w800,
-              height: 1.28,
-              letterSpacing: -0.25,
-              color: palette.textColor,
+            const SizedBox(height: 14),
+            Text(
+              article.title,
+              key: const ValueKey<String>('reader_article_title'),
+              style: TextStyle(
+                fontSize: 23,
+                fontWeight: FontWeight.w800,
+                height: 1.28,
+                letterSpacing: -0.25,
+                color: palette.textColor,
+              ),
             ),
-          ),
-          if (article.description.isNotEmpty &&
-              article.content.trim().isNotEmpty) ...<Widget>[
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.only(left: 12, top: 2, bottom: 2),
-              decoration: BoxDecoration(
-                border: Border(
-                  left: BorderSide(
-                    color: accentColor.withAlpha(160),
-                    width: 3,
+            if (article.description.isNotEmpty &&
+                article.content.trim().isNotEmpty) ...<Widget>[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.only(left: 12, top: 2, bottom: 2),
+                decoration: BoxDecoration(
+                  border: Border(
+                    left: BorderSide(
+                      color: accentColor.withAlpha(160),
+                      width: 3,
+                    ),
+                  ),
+                ),
+                child: Text(
+                  article.description,
+                  key: const ValueKey<String>('reader_article_description'),
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    height: 1.55,
+                    color: palette.secondaryTextColor,
                   ),
                 ),
               ),
-              child: Text(
-                article.description,
-                key: const ValueKey<String>('reader_article_description'),
-                style: TextStyle(
-                  fontSize: 14.5,
-                  height: 1.55,
-                  color: palette.secondaryTextColor,
-                ),
-              ),
-            ),
+            ],
           ],
           if (article.author.isNotEmpty) ...<Widget>[
             const SizedBox(height: 14),
