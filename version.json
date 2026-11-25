@@ -1,7 +1,7 @@
 {
-    "latest_version":  "0.1.38",
-    "version_code":  39,
+    "latest_version":  "0.1.39",
+    "version_code":  40,
     "min_version_code":  0,
-    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.38/app-release.apk",
-    "release_notes":  "Anlık çift yönlü tema, kelime ve okuma senkronizasyonu düzeltmeleri."
+    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.39/app-release.apk",
+    "release_notes":  "Canlı Cloudflare D1 bulut senkronizasyonu ve anlık tema/kelime eşitlemesi."
 }
