@@ -1140,9 +1140,6 @@
 
     <div class="topbar-spacer"></div>
 
-    <button class="btn btn-sm" id="scheduleModalBtn" title="Otomatik Günlük Yayın Planlayıcı (A1-C2 İki Aşamalı)">
-      📅 Günlük Yayın Planı
-    </button>
     <button class="btn" id="saveDraftBtn" title="Yalnızca bilgisayardaki dosyaya kaydeder (Ctrl+S)">
       Taslak Kaydet
     </button>
@@ -1210,6 +1207,20 @@
             <option value="C1">C1 • İleri</option>
             <option value="C2">C2 • Uzman</option>
           </select>
+          <div style="display:inline-flex;align-items:center;gap:4px;" title="Oluşturulacak makalenin hedef kelime sayısı (100 - 1200 arası)">
+            <input
+              type="number"
+              id="aiWordCountInput"
+              class="ai-input"
+              value="350"
+              min="100"
+              max="1200"
+              step="50"
+              style="width:82px;text-align:center;font-weight:700;"
+              placeholder="350"
+            />
+            <span style="font-size:12px;color:var(--text-muted);font-weight:600;white-space:nowrap;">kelime</span>
+          </div>
           <input
             type="text"
             id="aiTopicInput"
@@ -1217,15 +1228,16 @@
             style="flex:1; min-width:170px;"
             placeholder="Konu (opsiyonel — boş bırakırsan rastgele seçer)"
           />
-          <button type="button" class="btn btn-ai" id="aiGenerateBtn" title="Seçili seviyede ~350 kelimelik İngilizce makale + kelime anlamlarını otomatik üretir">
+          <button type="button" class="btn btn-ai" id="aiGenerateBtn" title="Seçili seviyede ve belirlediğiniz kelime sayısında İngilizce makale + kelime anlamlarını otomatik üretir">
             ✨ Gemini ile Oluştur
-          </button>
-          <button type="button" class="btn btn-warning" id="quickPublishBtn" style="font-weight:700;" title="Seçili seviyede merak uyandıran makaleyi bulur, CEFR analizini yapar, Podcast AI sesini oluşturur ve anında canlıya alır">
-            ⚡ Tek Tıkla Yayınla
           </button>
           <label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer;user-select:none;" title="Makale üretildiğinde insan sesli Podcast AI sesini de otomatik oluşturur">
             <input type="checkbox" id="aiAutoPodcastCheck" checked />
             🎙 Podcast sesi
+          </label>
+          <label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer;user-select:none;" title="Makale üretildiğinde başlığına ve konusuna özel kapak fotoğrafını da otomatik oluşturur">
+            <input type="checkbox" id="aiAutoImageCheck" />
+            🖼️ Fotoğraf üret
           </label>
           <button type="button" class="btn btn-sm" id="newFromTemplateBtn" title="Seçili seviyede kendi yazacağınız makale için hazır şablon açar">
             📄 Şablon ile Ekle
@@ -1374,66 +1386,6 @@
       </div>
     </div>
   </section>
-
-  <!-- Otomatik Günlük Yayın Planlayıcı Modalı -->
-  <div id="scheduleModal" class="modal-backdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:9999;place-items:center;padding:20px;">
-    <div class="modal-dialog" style="background:var(--surface);border:1px solid var(--border-strong);border-radius:16px;max-width:540px;width:100%;padding:22px;box-shadow:var(--shadow);">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-        <h3 style="margin:0;display:flex;align-items:center;gap:8px;">
-          📅 Otomatik Günlük Yayın Planlayıcı
-        </h3>
-        <button type="button" id="closeScheduleModalBtn" class="btn btn-sm" style="padding:4px 8px;">✕</button>
-      </div>
-      <p style="margin:0 0 16px 0;font-size:13px;color:var(--text-muted);line-height:1.45;">
-        A1'den C2'ye 6 seviyenin tamamı için önceden hazırlanan, 0 gecikmeli iki aşamalı otomatik yayınlama sistemi.
-      </p>
-
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;padding:12px;border-radius:10px;background:var(--surface-alt);border:1px solid var(--border);">
-        <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer;">
-          <input type="checkbox" id="schedEnableCheck" checked style="width:16px;height:16px;" />
-          Otomatik Günlük Yayınlama Aktif
-        </label>
-      </div>
-
-      <div style="margin-bottom:16px;">
-        <label style="display:block;font-size:12px;font-weight:700;margin-bottom:6px;">Yayın Saati (Türkiye Saati / UTC+3):</label>
-        <select id="schedHourSelect" class="ai-select" style="width:100%;font-size:14px;font-weight:700;">
-          <option value="6">06:00 (Sabah)</option>
-          <option value="7">07:00</option>
-          <option value="8">08:00</option>
-          <option value="9" selected>09:00 (Önerilen)</option>
-          <option value="10">10:00</option>
-          <option value="11">11:00</option>
-          <option value="12">12:00 (Öğle)</option>
-          <option value="14">14:00</option>
-          <option value="16">16:00</option>
-          <option value="18">18:00 (Akşam)</option>
-          <option value="20">20:00</option>
-          <option value="21">21:00</option>
-        </select>
-      </div>
-
-      <div style="padding:12px;border-radius:10px;background:rgba(59,130,246,0.12);border:1px solid rgba(59,130,246,0.3);margin-bottom:18px;">
-        <div style="font-size:12px;font-weight:700;color:#93c5fd;margin-bottom:4px;">⚡ İki Aşamalı Kusursuz Çalışma Prensibi:</div>
-        <div id="schedInfoText" style="font-size:12px;color:var(--text);line-height:1.5;">
-          1. Hazırlık (Saat 08:15): Sistem A1, A2, B1, B2, C1, C2 seviyeleri için 6 makale + Podcast AI seslerini hazırlar ve gizli yükler.<br/>
-          2. Canlıya Alma (Saat 09:00): Hedef saatte 0 saniye gecikmeyle tüm makaleler tek saniyede yayına açılır.
-        </div>
-        <div id="schedLastRunText" style="margin-top:6px;font-size:11px;font-weight:600;color:#60a5fa;">
-          Durum kontrol ediliyor...
-        </div>
-      </div>
-
-      <div style="display:flex;gap:10px;justify-content:flex-end;">
-        <button type="button" class="btn" id="schedRunNowBtn" title="6 seviyeyi şimdi üretir ve canlıya alır">
-          ▶ Şimdi Test Et (6 Seviye)
-        </button>
-        <button type="button" class="btn btn-primary" id="saveScheduleBtn">
-          Planı Kaydet
-        </button>
-      </div>
-    </div>
-  </div>
 
   <div id="toast" class="toast"></div>
   <input type="file" id="hiddenFileInput" accept=".txt,.md,text/plain" style="display:none;" />
@@ -1678,81 +1630,12 @@
       return lines.join("\n");
     }
 
-    function resolveTopicImageUrl(title, category, content) {
-      const text = `${title || ""} ${category || ""} ${content ? content.slice(0, 300) : ""}`.toLowerCase();
-      if (text.includes("cycl") || text.includes("bike") || text.includes("bicycle")) {
-        return "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=720&q=75";
-      }
-      if (text.includes("marathon") || text.includes("sahara") || text.includes("desert") || text.includes("running") || text.includes("runner")) {
-        return "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?auto=format&fit=crop&w=720&q=75";
-      }
-      if (text.includes("otter") || text.includes("kelp") || text.includes("coral") || text.includes("reef") || text.includes("marine")) {
-        return "https://images.unsplash.com/photo-1546026423-cc4642628d2b?auto=format&fit=crop&w=720&q=75";
-      }
-      if (text.includes("seal") || text.includes("arctic") || text.includes("antarctic") || text.includes("polar") || text.includes("glacier") || text.includes("shackleton")) {
-        return "https://images.unsplash.com/photo-1517411032315-54ef2cb783bb?auto=format&fit=crop&w=720&q=75";
-      }
-      if (text.includes("sculpture") || text.includes("bottle") || text.includes("trash") || text.includes("craft") || text.includes("recycle")) {
-        return "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=720&q=75";
-      }
-      if (text.includes("floating cit") || text.includes("architecture") || text.includes("urban") || text.includes("skyscraper") || text.includes("building")) {
-        return "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=720&q=75";
-      }
-      if (text.includes("sunlight") || text.includes("morning sun") || text.includes("circadian") || text.includes("sunrise")) {
-        return "https://images.unsplash.com/photo-1470240731273-7821a6eeb6bd?auto=format&fit=crop&w=720&q=75";
-      }
-      if (text.includes("paint") || text.includes("art") || text.includes("color") || text.includes("canvas")) {
-        return "https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=720&q=75";
-      }
-      if (text.includes("psychol") || text.includes("mind") || text.includes("neuro") || text.includes("deja vu") || text.includes("unfinished") || text.includes("zeigarnik") || text.includes("brain")) {
-        return "https://images.unsplash.com/photo-1507413245164-6160d8298b31?auto=format&fit=crop&w=720&q=75";
-      }
-      if (text.includes("aluminum") || text.includes("metal") || text.includes("industrial") || text.includes("factory") || text.includes("manufacturing")) {
-        return "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=720&q=75";
-      }
-      if (text.includes("love") || text.includes("negative feeling") || text.includes("relationship") || text.includes("emotion") || text.includes("friendship")) {
-        return "https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=720&q=75";
-      }
-      if (text.includes("space") || text.includes("galaxy") || text.includes("telescope") || text.includes("star") || text.includes("planet") || text.includes("cosmos") || text.includes("universe")) {
-        return "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=720&q=75";
-      }
-      if (text.includes("black hole") || text.includes("physics") || text.includes("neutron") || text.includes("relativity") || text.includes("einstein")) {
-        return "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=720&q=75";
-      }
-      if (text.includes("ocean") || text.includes("sea") || text.includes("deep-sea") || text.includes("octopus") || text.includes("abyss") || text.includes("mariana")) {
-        return "https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&w=720&q=75";
-      }
-      if (text.includes("forest") || text.includes("tree") || text.includes("fungal") || text.includes("wood wide") || text.includes("nature") || text.includes("plant")) {
-        return "https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=720&q=75";
-      }
-      if (text.includes("butterfly") || text.includes("bird") || text.includes("migration") || text.includes("wildlife") || text.includes("animal")) {
-        return "https://images.unsplash.com/photo-1535083783855-76ae62b2914e?auto=format&fit=crop&w=720&q=75";
-      }
-      if (text.includes("ai") || text.includes("artificial intelligence") || text.includes("robot") || text.includes("interface") || text.includes("computer") || text.includes("tech")) {
-        return "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=720&q=75";
-      }
-      if (text.includes("roman") || text.includes("alexandria") || text.includes("ancient") || text.includes("history") || text.includes("manuscript")) {
-        return "https://images.unsplash.com/photo-1552832230-c0197dd311b5?auto=format&fit=crop&w=720&q=75";
-      }
-      if (text.includes("book") || text.includes("reading") || text.includes("library") || text.includes("literature") || text.includes("language")) {
-        return "https://images.unsplash.com/photo-1457369804613-52c61a468e7d?auto=format&fit=crop&w=720&q=75";
-      }
-      if (text.includes("music") || text.includes("song") || text.includes("melody")) {
-        return "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=720&q=75";
-      }
-      if (text.includes("sleep") || text.includes("dream") || text.includes("rest")) {
-        return "https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?auto=format&fit=crop&w=720&q=75";
-      }
-      return "https://images.unsplash.com/photo-1499750310107-5fef28a66643?auto=format&fit=crop&w=720&q=75";
-    }
-
     function normalizeArticle(raw, idx) {
       const level = levelMeta(raw.level || "A1").code;
       const title = (raw.title || "").trim();
       const description = (raw.description || raw.summary || "").trim();
       const content = (raw.content || "").replace(/\r\n/g, "\n");
       const readingTime = (raw.reading_time || raw.reading_time_label || "").trim() || estimateReadingTime(content);
-      const imageUrl = (raw.image_url || raw.imageUrl || raw.cover_url || "").trim();
       const wordMeaningsRaw = formatWordMeaningsMap(raw.word_meanings);
       const wordRelationsRaw = formatWordRelationsMap(raw.word_relations || raw.wordRelations);
       const rawParaTr = Array.isArray(raw.paragraph_translations)
@@ -1766,6 +1649,7 @@
         raw.sentence_translations || raw.sentenceTranslations
       );
       const audioUrl = (raw.audio_url || raw.audioUrl || "").trim();
+      const imageUrl = (raw.image_url || raw.imageUrl || raw.cover_url || "").trim();
       const audioSegments = Array.isArray(raw.audio_segments)
         ? raw.audio_segments
         : (Array.isArray(raw.audioSegments) ? raw.audioSegments : []);
@@ -1776,7 +1660,6 @@
         level,
         title,
         description,
-        image_url: imageUrl,
         reading_time: readingTime,
         category: (raw.category || "").trim(),
         author: (raw.author || "").trim(),
@@ -1789,6 +1672,8 @@
         audio_url: audioUrl,
         audio_segments: audioSegments,
         _local_audio_preview: audioUrl ? `/audio/${audioUrl.split("/").pop()}` : "",
+        image_url: imageUrl,
+        _local_image_preview: imageUrl.includes("/images/") ? `/images/${imageUrl.split("/").pop()}` : imageUrl,
         is_hidden: isHidden,
         publish_at: publishAt,
         published_at: raw.published_at || new Date().toISOString(),
@@ -1867,13 +1752,12 @@
         };
         if ((a.category || "").trim()) obj.category = a.category.trim();
         if ((a.author || "").trim()) obj.author = a.author.trim();
-        const imageUrl = (a.image_url || "").trim() || resolveTopicImageUrl(a.title, a.category, a.content);
-        if (imageUrl) obj.image_url = imageUrl;
         if (parsedMeanings.count > 0) obj.word_meanings = parsedMeanings.map;
         if (parsedRelations.count > 0) obj.word_relations = parsedRelations.map;
         if (parsedParaTr.length > 0) obj.paragraph_translations = parsedParaTr;
         if (parsedSentTr.count > 0) obj.sentence_translations = parsedSentTr.map;
         if ((a.audio_url || "").trim()) obj.audio_url = a.audio_url.trim();
+        if ((a.image_url || "").trim()) obj.image_url = a.image_url.trim();
         if (Array.isArray(a.audio_segments) && a.audio_segments.length > 0) {
           obj.audio_segments = a.audio_segments;
         }
@@ -2227,25 +2111,6 @@
             <textarea id="fieldDesc" rows="2" placeholder="Makale listesinde başlığın altında görünecek 1-2 cümlelik özet...">${escapeHtml(article.description)}</textarea>
           </div>
 
-          <div class="field">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-              <label style="margin-bottom:0;">Öne Çıkan Görsel (Kapak Fotoğrafı URL'si)</label>
-              <button type="button" class="mini-btn" id="fieldAutoImageBtn" title="Konu ve başlığa göre ücretsiz telifsiz fotoğraf seçer">
-                ✨ Konuya Göre Görsel Seç
-              </button>
-            </div>
-            <div style="display:flex;gap:10px;align-items:center;">
-              <input type="text" id="fieldImageUrl" value="${escapeHtml(article.image_url || "")}" placeholder="https://images.unsplash.com/... (Boş bırakılırsa yayında otomatik eklenir)" style="flex:1;" />
-              ${article.image_url ? `
-                <div style="width:52px;height:36px;border-radius:6px;overflow:hidden;border:1px solid var(--border);flex-shrink:0;background:#000;">
-                  <img src="${escapeHtml(article.image_url)}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.style.display='none'" />
-                </div>
-              ` : `
-                <span style="font-size:11px;color:var(--text-muted);white-space:nowrap;">Görsel yok</span>
-              `}
-            </div>
-          </div>
-
           <div class="row-3">
             <div class="field">
               <label>
@@ -2340,7 +2205,11 @@
                 <button type="button" class="btn btn-ai btn-sm" id="generateAudioBtn">
                   ${article.audio_url ? "🎙 Podcast Sesini Yeniden Üret" : "🎙 Podcast Sesi Üret"}
                 </button>
+                <button type="button" class="btn btn-ai btn-sm" id="generateImageBtn" style="background:linear-gradient(135deg,#0ea5e9,#6366f1);">
+                  ${article.image_url ? "🖼️ Fotoğrafı Yeniden Üret" : "🖼️ Fotoğraf Üret"}
+                </button>
                 ${article.audio_url ? `<button type="button" class="btn btn-danger-ghost btn-sm" id="removeAudioBtn">Sesi Kaldır</button>` : ""}
+                ${article.image_url ? `<button type="button" class="btn btn-danger-ghost btn-sm" id="removeImageBtn">Fotoğrafı Kaldır</button>` : ""}
                 <span class="wm-stats-badge" id="audioStatusBadge" style="${article.audio_url ? "" : "background:rgba(148,163,184,0.14);color:var(--text-muted);border-color:var(--border);"}">
                   ${article.audio_url
                     ? `🎙 Hazır (${Array.isArray(article.audio_segments) ? article.audio_segments.length : 0} cümle eşleşti)`
@@ -2349,6 +2218,15 @@
               </div>
               ${article.audio_url ? `
                 <audio controls preload="metadata" style="width:100%;height:38px;" src="${escapeHtml(article._local_audio_preview || article.audio_url)}${article._audioCacheBust ? `?v=${article._audioCacheBust}` : ""}"></audio>
+              ` : ""}
+              ${article.image_url ? `
+                <div style="display:flex;align-items:center;gap:12px;padding-top:4px;">
+                  <img src="${escapeHtml(article._local_image_preview || article.image_url)}${article._imageCacheBust ? `?v=${article._imageCacheBust}` : ""}" alt="Kapak fotoğrafı" style="width:160px;height:90px;object-fit:cover;border-radius:10px;border:1px solid var(--border);background:var(--surface);" />
+                  <div style="font-size:12px;color:var(--text-muted);line-height:1.45;">
+                    <div style="font-weight:700;color:var(--text);margin-bottom:2px;">🖼️ Makaleye Özel Kapak Fotoğrafı Hazır</div>
+                    <div style="word-break:break-all;font-size:11px;opacity:.85;">${escapeHtml(article.image_url)}</div>
+                  </div>
+                </div>
               ` : ""}
             </div>
           </div>
@@ -2434,8 +2312,6 @@
 
       const titleInput = document.getElementById("fieldTitle");
       const descInput = document.getElementById("fieldDesc");
-      const imgUrlInput = document.getElementById("fieldImageUrl");
-      const autoImgBtn = document.getElementById("fieldAutoImageBtn");
       const readTimeInput = document.getElementById("fieldReadingTime");
       const autoReadCheck = document.getElementById("autoReadTimeCheck");
       const catInput = document.getElementById("fieldCategory");
@@ -2466,27 +2342,6 @@
         renderArticleList();
         renderPreview();
       });
-
-      if (imgUrlInput) {
-        imgUrlInput.addEventListener("input", () => {
-          article.image_url = imgUrlInput.value.trim();
-          state.dirty = true;
-          updateStatusPill();
-          renderPreview();
-        });
-      }
-
-      if (autoImgBtn) {
-        autoImgBtn.addEventListener("click", () => {
-          article.image_url = resolveTopicImageUrl(article.title, article.category, article.content);
-          if (imgUrlInput) imgUrlInput.value = article.image_url;
-          state.dirty = true;
-          updateStatusPill();
-          renderEditor();
-          renderPreview();
-          showToast("✨ Konuya uygun telifsiz görsel seçildi!");
-        });
-      }
 
       readTimeInput.addEventListener("input", () => {
         article.reading_time = readTimeInput.value;
@@ -2666,6 +2521,13 @@
         });
       }
 
+      const generateImageBtn = document.getElementById("generateImageBtn");
+      if (generateImageBtn) {
+        generateImageBtn.addEventListener("click", () => {
+          generateCoverImageForArticle(article, generateImageBtn);
+        });
+      }
+
       const removeAudioBtn = document.getElementById("removeAudioBtn");
       if (removeAudioBtn) {
         removeAudioBtn.addEventListener("click", () => {
@@ -2676,6 +2538,18 @@
           state.dirty = true;
           renderAll();
           showToast("Podcast sesi makaleden kaldırıldı (uygulamada cihaz sesi kullanılır).");
+        });
+      }
+
+      const removeImageBtn = document.getElementById("removeImageBtn");
+      if (removeImageBtn) {
+        removeImageBtn.addEventListener("click", () => {
+          if (!confirm("Bu makalenin özel kapak fotoğrafını kaldırmak istiyor musunuz?")) return;
+          article.image_url = "";
+          article._local_image_preview = "";
+          state.dirty = true;
+          renderAll();
+          showToast("Kapak fotoğrafı makaleden kaldırıldı.");
         });
       }
 
@@ -2740,11 +2614,6 @@
       el.previewScroll.innerHTML = `
         <div class="preview-section-label">Seviye Listesi Kartı</div>
         <div class="phone-card-preview">
-          ${article.image_url ? `
-            <div style="margin-bottom:10px;border-radius:10px;overflow:hidden;height:120px;background:#000;">
-              <img src="${escapeHtml(article.image_url)}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.style.display='none'" />
-            </div>
-          ` : ""}
           <h4>${escapeHtml(article.title || "Makale Başlığı")}</h4>
           <p>${escapeHtml(article.description || "Kısa açıklama burada görünecek.")}</p>
           <span class="reading-pill" style="background:${meta.color}1c;color:${meta.color};">
@@ -2754,11 +2623,6 @@
 
         <div class="preview-section-label">Kitap Okuma Ekranı (Mobil Görünüm)</div>
         <div class="book-preview tone-${state.previewTone}">
-          ${article.image_url ? `
-            <div style="margin-bottom:14px;border-radius:12px;overflow:hidden;height:150px;background:#000;">
-              <img src="${escapeHtml(article.image_url)}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.style.display='none'" />
-            </div>
-          ` : ""}
           <div class="book-meta">
             <span style="color:${meta.color};">${meta.code} • ${meta.label}</span>
             ${article.category ? `<span>• ${escapeHtml(article.category)}</span>` : ""}
@@ -3046,6 +2910,8 @@
 
       const chosenLevel = levelMeta(aiEl.levelSelect.value || "B1").code;
       const customTopic = aiEl.topicInput.value.trim();
+      const rawWc = parseInt(document.getElementById("aiWordCountInput")?.value || "350", 10);
+      const targetWordCount = Number.isFinite(rawWc) ? Math.max(100, Math.min(1200, rawWc)) : 350;
       const existingTitles = state.articles.map(a => a.title).filter(Boolean).slice(0, 40);
 
       isGeneratingArticle = true;
@@ -3097,6 +2963,7 @@
           body: JSON.stringify({
             level: chosenLevel,
             topic: customTopic,
+            wordCount: targetWordCount,
             existingTitles
           })
         });
@@ -3122,7 +2989,6 @@
           level: chosenLevel,
           title: (gen.title || "").trim(),
           description: (gen.description || "").trim(),
-          image_url: String(gen.image_url || gen.imageUrl || "").trim() || resolveTopicImageUrl(gen.title, gen.category, contentText),
           reading_time: estimateReadingTime(contentText),
           category: (gen.category || "General").trim(),
           author: "Line Reader",
@@ -3135,6 +3001,8 @@
           audio_url: "",
           audio_segments: [],
           _local_audio_preview: "",
+          image_url: "",
+          _local_image_preview: "",
           _voiceName: "Kore",
           published_at: new Date().toISOString(),
           _autoId: true,
@@ -3153,18 +3021,24 @@
         const wc = countWords(fresh.content);
         const wmCount = parseWordMeaningsText(fresh.word_meanings_text).count;
         const autoPodcast = Boolean(document.getElementById("aiAutoPodcastCheck")?.checked);
+        const autoImage = Boolean(document.getElementById("aiAutoImageCheck")?.checked);
+        let audioOk = false;
+        let imageOk = false;
         if (autoPodcast) {
           genPhase = "podcast";
           aiEl.generateBtn.textContent = `🎙 Podcast sesi (${genElapsed} sn)...`;
-          const audioOk = await generatePodcastAudioForArticle(fresh, null, true);
-          if (audioOk) {
-            showToast(`✨ ${chosenLevel} makale + 🎙 Podcast sesi hazır (${wc} kelime • ${wmCount} anlam).`, "success");
-          } else {
-            showToast(`✨ ${chosenLevel} makale oluşturuldu (${wc} kelime). Podcast sesi daha sonra tekrar denenebilir.`, "success");
-          }
-        } else {
-          showToast(`✨ ${chosenLevel} makale oluşturuldu (${wc} kelime • ${wmCount} kelime anlamı).`, "success");
+          audioOk = await generatePodcastAudioForArticle(fresh, null, true);
         }
+        if (autoImage) {
+          aiEl.generateBtn.textContent = `🖼️ Kapak fotoğrafı (${genElapsed} sn)...`;
+          if (stageEl) stageEl.textContent = "Makaleye özel kapak fotoğrafı hazırlanıyor...";
+          imageOk = await generateCoverImageForArticle(fresh, null, true);
+        }
+        const extras = [];
+        if (audioOk) extras.push("🎙 Podcast");
+        if (imageOk) extras.push("🖼️ Fotoğraf");
+        const extraLabel = extras.length > 0 ? ` + ${extras.join(" + ")}` : "";
+        showToast(`✨ ${chosenLevel} makale${extraLabel} hazır (${wc} kelime • ${wmCount} anlam).`, "success");
       } catch (err) {
         showToast(err.message || "Gemini makale oluşturma hatası.", "error");
       } finally {
@@ -3225,6 +3099,58 @@
       } catch (err) {
         if (!silentFail) {
           showToast(err.message || "Podcast sesi oluşturulamadı.", "error");
+        }
+        return false;
+      } finally {
+        if (triggerBtn) {
+          triggerBtn.disabled = false;
+          triggerBtn.textContent = prevBtnText;
+        }
+      }
+    }
+
+    async function generateCoverImageForArticle(article, triggerBtn = null, silentFail = false) {
+      if (!(article.title || "").trim()) {
+        showToast("Fotoğraf üretmek için önce makale başlığı yazın veya oluşturun.", "error");
+        return false;
+      }
+
+      const prevBtnText = triggerBtn ? triggerBtn.textContent : "";
+      if (triggerBtn) {
+        triggerBtn.disabled = true;
+        triggerBtn.textContent = "⏳ Fotoğraf üretiliyor...";
+      }
+
+      try {
+        const res = await fetch("/api/ai/generate-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json; charset=utf-8" },
+          body: JSON.stringify({
+            id: article.id || uniqueIdFor(article.title || "article", article.level),
+            title: article.title,
+            description: article.description || "",
+            category: article.category || "General",
+            content: (article.content || "").slice(0, 300)
+          })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok || !data.image_url) {
+          throw new Error((data && (data.message || data.error)) || "Kapak fotoğrafı üretilemedi.");
+        }
+
+        article.image_url = data.image_url;
+        article._local_image_preview = data.local_preview_url || data.image_url;
+        article._imageCacheBust = Date.now();
+        state.dirty = true;
+        renderAll();
+
+        if (!silentFail) {
+          showToast(`🖼️ Makaleye özel kapak fotoğrafı hazır (${data.size_kb || "?"} KB • ${data.provider || "AI"}).`, "success");
+        }
+        return true;
+      } catch (err) {
+        if (!silentFail) {
+          showToast(err.message || "Kapak fotoğrafı oluşturulamadı.", "error");
         }
         return false;
       } finally {
@@ -3861,254 +3787,6 @@
         showToast(err.message, "error");
       }
     });
-
-    // ⚡ Tek Tıkla Kaynaktan Çek & Canlı Yayınla (PC Paneli)
-    function setupQuickPublish() {
-      const qpBtn = document.getElementById("quickPublishBtn");
-      if (!qpBtn) return;
-
-      qpBtn.addEventListener("click", async () => {
-        if (state.busy || isGeneratingArticle) return;
-        const chosenLevel = (aiEl.levelSelect?.value || "B1").trim().toUpperCase();
-        const customTopic = (aiEl.topicInput?.value || "").trim();
-
-        const progressBox = document.getElementById("aiGenProgressBox");
-        const stageEl = document.getElementById("aiGenStageLabel");
-        const timingEl = document.getElementById("aiGenTimingLabel");
-        const fillEl = document.getElementById("aiGenProgressFill");
-
-        qpBtn.disabled = true;
-        state.busy = true;
-        updateStatusPill();
-
-        if (progressBox) progressBox.style.display = "block";
-        if (stageEl) stageEl.textContent = "🔍 1/4: İlgi çekici kaynaklar ve konular taranıyor...";
-        if (timingEl) timingEl.textContent = "0 sn • Canlı yayın hazırlanıyor";
-        if (fillEl) fillEl.style.width = "15%";
-
-        let elapsed = 0;
-        const timer = setInterval(() => {
-          elapsed++;
-          if (elapsed === 3 && stageEl) {
-            stageEl.textContent = "📄 2/4: Makale bulundu, CEFR kelime & cümle analizleri yapılıyor...";
-            if (fillEl) fillEl.style.width = "40%";
-          } else if (elapsed === 8 && stageEl) {
-            stageEl.textContent = "🎙️ 3/4: Podcast AI stüdyo sesi üretiliyor ve senkron yapılıyor...";
-            if (fillEl) fillEl.style.width = "75%";
-          } else if (elapsed === 15 && stageEl) {
-            stageEl.textContent = "🚀 4/4: Cloudflare D1 ve GitHub akışına anında yükleniyor...";
-            if (fillEl) fillEl.style.width = "90%";
-          }
-          if (timingEl) timingEl.textContent = `${elapsed} sn geçti • İşleniyor...`;
-        }, 1000);
-
-        try {
-          // 1. Önce Cloudflare Worker admin uç noktasına dene
-          let res = await fetch("/api/admin/quick-publish", {
-            method: "POST",
-            headers: { "Content-Type": "application/json; charset=utf-8" },
-            body: JSON.stringify({
-              level: chosenLevel,
-              topic: customTopic,
-              voice: "Kore"
-            })
-          });
-
-          // Eğer worker admin secret yapılandırılmamışsa yerel motorla üretip yayınla
-          if (!res.ok) {
-            if (stageEl) stageEl.textContent = "📄 Yerel motorla makale üretiliyor...";
-            const genRes = await fetch("/api/ai/generate-article", {
-              method: "POST",
-              headers: { "Content-Type": "application/json; charset=utf-8" },
-              body: JSON.stringify({ level: chosenLevel, topic: customTopic, existingTitles: [] })
-            });
-            const genData = await genRes.json();
-            if (!genRes.ok || !genData.ok || !genData.article) {
-              throw new Error(genData.message || "Makale üretilemedi.");
-            }
-
-            const genArt = genData.article;
-            const contentText = (genArt.content || "").replace(/\r\n/g, "\n").trim();
-            const fresh = {
-              id: uniqueIdFor(genArt.title || "article", chosenLevel),
-              level: chosenLevel,
-              title: (genArt.title || "").trim(),
-              description: (genArt.description || "").trim(),
-              image_url: String(genArt.image_url || genArt.imageUrl || "").trim() || resolveTopicImageUrl(genArt.title, genArt.category, contentText),
-              reading_time: estimateReadingTime(contentText),
-              category: (genArt.category || "General").trim(),
-              author: "Line Reader",
-              language: "en",
-              content: contentText,
-              word_meanings_text: formatWordMeaningsMap(genArt.word_meanings || {}),
-              word_relations_text: formatWordRelationsMap(genArt.word_relations || {}),
-              sentence_translations_text: formatSentenceTranslationsMap(genArt.sentence_translations || {}),
-              audio_url: "",
-              audio_segments: [],
-              published_at: new Date().toISOString()
-            };
-
-            // Podcast sesi
-            if (stageEl) stageEl.textContent = "🎙️ Podcast AI sesi üretiliyor...";
-            try {
-              const audRes = await fetch("/api/ai/generate-audio", {
-                method: "POST",
-                headers: { "Content-Type": "application/json; charset=utf-8" },
-                body: JSON.stringify({
-                  id: fresh.id,
-                  title: fresh.title,
-                  content: fresh.content,
-                  voiceName: "Kore"
-                })
-              });
-              const audData = await audRes.json();
-              if (audData.ok && audData.audio_url) {
-                fresh.audio_url = audData.audio_url;
-                if (audData.audio_segments) fresh.audio_segments = audData.audio_segments;
-              }
-            } catch (_) {}
-
-            state.articles.unshift(fresh);
-            state.selectedIndex = 0;
-            state.dirty = true;
-
-            // GitHub & D1'e Kaydet ve Yayınla
-            if (stageEl) stageEl.textContent = "🚀 Canlıya yayınlanıyor...";
-            await publishLive();
-            res = { ok: true, json: async () => ({ ok: true, message: `"${fresh.title}" başarıyla yayınlandı!` }) };
-          }
-
-          clearInterval(timer);
-          const data = await res.json();
-          if (fillEl) fillEl.style.width = "100%";
-          if (stageEl) stageEl.textContent = "✅ Başarıyla Yayınlandı!";
-          if (timingEl) timingEl.textContent = `Toplam ${elapsed} saniyede canlıya alındı!`;
-
-          showToast(data.message || "Makale başarıyla yayınlandı!", "success");
-          setTimeout(() => {
-            if (progressBox) progressBox.style.display = "none";
-          }, 3500);
-
-          await loadInitial();
-        } catch (err) {
-          clearInterval(timer);
-          if (stageEl) stageEl.textContent = "❌ İşlem Başarısız";
-          showToast(err.message || "Yayınlama başarısız oldu.", "error");
-        } finally {
-          qpBtn.disabled = false;
-          state.busy = false;
-          updateStatusPill();
-        }
-      });
-    }
-
-    // 📅 Otomatik Günlük Yayın Planlayıcı Modalı (PC Paneli)
-    function setupScheduleModal() {
-      const modalBtn = document.getElementById("scheduleModalBtn");
-      const modal = document.getElementById("scheduleModal");
-      const closeBtn = document.getElementById("closeScheduleModalBtn");
-      const saveBtn = document.getElementById("saveScheduleBtn");
-      const runNowBtn = document.getElementById("schedRunNowBtn");
-      const enableCheck = document.getElementById("schedEnableCheck");
-      const hourSelect = document.getElementById("schedHourSelect");
-      const infoText = document.getElementById("schedInfoText");
-      const lastRunText = document.getElementById("schedLastRunText");
-
-      if (!modalBtn || !modal) return;
-
-      async function openModal() {
-        modal.style.display = "grid";
-        if (lastRunText) lastRunText.textContent = "Cloudflare Worker'dan plan kontrol ediliyor...";
-
-        try {
-          const res = await fetch("/api/admin/schedule");
-          const data = await res.json();
-          if (res.ok && data.ok && data.config) {
-            const cfg = data.config;
-            if (enableCheck) enableCheck.checked = Boolean(cfg.is_enabled);
-            if (hourSelect) hourSelect.value = String(cfg.publish_hour || 9);
-            const pubH = Number(cfg.publish_hour || 9);
-            const preH = (pubH - 1 + 24) % 24;
-
-            if (infoText) {
-              infoText.innerHTML = `1. Hazırlık (Saat ${String(preH).padStart(2, "0")}:15): Sistem A1-C2 tüm 6 seviye için makale + Podcast AI seslerini hazırlar ve gizli yükler.<br/>` +
-                `2. Canlıya Alma (Saat ${String(pubH).padStart(2, "0")}:00): Hedef saatte 0 saniye gecikmeyle tüm makaleler tek saniyede yayına açılır.`;
-            }
-            if (lastRunText) {
-              lastRunText.textContent = `Sunucu Saati (TR): ${data.server_time_tr || "-"} | Son Hazırlık: ${cfg.last_prepared_date || "-"} | Son Yayın: ${cfg.last_published_date || "-"}`;
-            }
-          }
-        } catch (_) {
-          if (lastRunText) lastRunText.textContent = "Planlayıcı durumuna ulaşılamadı (Yönetici şifrenizi kontrol edin).";
-        }
-      }
-
-      function closeModal() {
-        modal.style.display = "none";
-      }
-
-      modalBtn.addEventListener("click", openModal);
-      closeBtn?.addEventListener("click", closeModal);
-      modal.addEventListener("click", (e) => {
-        if (e.target === modal) closeModal();
-      });
-
-      hourSelect?.addEventListener("change", () => {
-        const pubH = parseInt(hourSelect.value, 10) || 9;
-        const preH = (pubH - 1 + 24) % 24;
-        if (infoText) {
-          infoText.innerHTML = `1. Hazırlık (Saat ${String(preH).padStart(2, "0")}:15): Sistem A1-C2 tüm 6 seviye için makale + Podcast AI seslerini hazırlar ve gizli yükler.<br/>` +
-            `2. Canlıya Alma (Saat ${String(pubH).padStart(2, "0")}:00): Hedef saatte 0 saniye gecikmeyle tüm makaleler tek saniyede yayına açılır.`;
-        }
-      });
-
-      saveBtn?.addEventListener("click", async () => {
-        saveBtn.disabled = true;
-        try {
-          const res = await fetch("/api/admin/schedule", {
-            method: "POST",
-            headers: { "Content-Type": "application/json; charset=utf-8" },
-            body: JSON.stringify({
-              is_enabled: Boolean(enableCheck?.checked),
-              publish_hour: parseInt(hourSelect?.value || "9", 10),
-              timezone_offset: 3
-            })
-          });
-          const data = await res.json();
-          showToast(data.message || "Yayın planı kaydedildi.", res.ok ? "success" : "error");
-          if (res.ok) closeModal();
-        } catch (err) {
-          showToast(err.message, "error");
-        } finally {
-          saveBtn.disabled = false;
-        }
-      });
-
-      runNowBtn?.addEventListener("click", async () => {
-        if (!confirm("A1'den C2'ye 6 seviyenin tamamı için makale ve Podcast AI sesleri üretilip canlıya alınacak. Başlatılsın mı?")) return;
-        runNowBtn.disabled = true;
-        runNowBtn.textContent = "⏳ Üretiliyor...";
-        try {
-          const res = await fetch("/api/admin/schedule/run-now", {
-            method: "POST",
-            headers: { "Content-Type": "application/json; charset=utf-8" },
-            body: JSON.stringify({ mode: "full_pipeline" })
-          });
-          const data = await res.json();
-          showToast(data.message || "Test çalışması tamamlandı!", res.ok ? "success" : "error");
-          closeModal();
-          await loadInitial();
-        } catch (err) {
-          showToast(err.message, "error");
-        } finally {
-          runNowBtn.disabled = false;
-          runNowBtn.textContent = "▶ Şimdi Test Et (6 Seviye)";
-        }
-      });
-    }
-
-    setupQuickPublish();
-    setupScheduleModal();
 
     loadInitial();
     loadAiConfig();

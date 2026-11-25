@@ -13,6 +13,8 @@ $ContentArticlesPath = Join-Path $ContentDir "articles.json"
 $RootArticlesPath = Join-Path $ProjectRoot "articles.json"
 $ContentAudioDir = Join-Path $ContentDir "audio"
 $RootAudioDir = Join-Path $ProjectRoot "audio"
+$ContentImagesDir = Join-Path $ContentDir "images"
+$RootImagesDir = Join-Path $ProjectRoot "images"
 $IndexHtmlPath = Join-Path $StudioDir "index.html"
 $AdminConfigPath = Join-Path $StudioDir "admin_config.local.json"
 $FirebaseServiceAccountPath = Join-Path $StudioDir "firebase_service_account.local.json"
@@ -293,7 +295,7 @@ function Invoke-GitInRepo([string[]]$Arguments) {
 function Get-RepoStatus {
     $branchRes = Invoke-GitInRepo @("rev-parse", "--abbrev-ref", "HEAD")
     $remoteRes = Invoke-GitInRepo @("remote", "get-url", "origin")
-    $diffRes = Invoke-GitInRepo @("status", "--porcelain", "--", "content/articles.json", "articles.json", "content/audio", "audio")
+    $diffRes = Invoke-GitInRepo @("status", "--porcelain", "--", "content/articles.json", "articles.json", "content/audio", "audio", "content/images", "images")
 
     return @{
         ok                = $true
@@ -345,6 +347,8 @@ function Publish-ArticlesToGitHub([int]$ArticleCount) {
     $pathsToStage = @("content/articles.json", "articles.json")
     if (Test-Path $ContentAudioDir) { $pathsToStage += "content/audio" }
     if (Test-Path $RootAudioDir) { $pathsToStage += "audio" }
+    if (Test-Path $ContentImagesDir) { $pathsToStage += "content/images" }
+    if (Test-Path $RootImagesDir) { $pathsToStage += "images" }
 
     $addArgs = @("add", "--") + $pathsToStage
     $addRes = Invoke-GitInRepo $addArgs
@@ -488,6 +492,27 @@ function Invoke-GeminiGenerateArticle([string]$RawJson) {
         $topic = ([string]$reqData.topic).Trim()
     }
 
+    $targetWords = 350
+    if ($null -ne $reqData -and $null -ne $reqData.PSObject.Properties["wordCount"] -and $null -ne $reqData.wordCount) {
+        $parsedWc = 0
+        if ([int]::TryParse([string]$reqData.wordCount, [ref]$parsedWc)) {
+            $targetWords = [math]::Max(100, [math]::Min(1500, $parsedWc))
+        }
+    }
+    $minWords = [math]::Max(90, [int][math]::Round($targetWords * 0.90))
+    $maxWords = [int][math]::Round($targetWords * 1.12)
+    $paraGuide = if ($targetWords -lt 200) {
+        "3 well-structured paragraphs"
+    } elseif ($targetWords -le 420) {
+        "4 to 5 well-structured paragraphs"
+    } elseif ($targetWords -le 700) {
+        "5 to 6 well-structured paragraphs"
+    } else {
+        "6 to 8 well-structured paragraphs"
+    }
+    $vocabMin = [math]::Max(20, [math]::Min(45, [int][math]::Round($targetWords * 0.09)))
+    $vocabMax = [math]::Max(30, [math]::Min(65, [int][math]::Round($targetWords * 0.13)))
+
     $avoidTitles = @()
     if ($null -ne $reqData -and $null -ne $reqData.PSObject.Properties["existingTitles"] -and $null -ne $reqData.existingTitles) {
         $avoidTitles = @($reqData.existingTitles | Select-Object -First 40)
@@ -537,9 +562,9 @@ You are a senior English reading editor for the Line Reader language-learning ap
 Create ONE original English reading article and return ONLY a valid JSON object matching this exact schema:
 {
   "title": "Engaging English title (4-9 words)",
-  "description": "Concise English summary for the article card (1-2 sentences, 18-32 words).",
+  "description": "Rich, engaging English summary for the article card (strictly 2 full sentences, 32 to 48 words). Must hook the reader and clearly preview what the article explores—never a single short sentence.",
   "category": "Single clear English category (e.g. Science, History, Culture, Psychology, Technology, Nature, Travel, Society, Health, Daily Life)",
-  "content": "Full English article text with 4 to 5 well-structured paragraphs separated by double newlines (\n\n). Target length: approximately 350 words (strictly between 320 and 385 words).",
+  "content": "Full English article text with $paraGuide separated by double newlines (\n\n). MANDATORY target length: approximately $targetWords words (strictly between $minWords and $maxWords words — NEVER write fewer than $minWords words).",
   "word_meanings": {
     "example_word": "contextual Turkish meaning (concise, 1-5 Turkish words)"
   },
@@ -562,9 +587,9 @@ Strict requirements:
 1. Level: $($levelGuides[$level])
 2. Topic: $topicInstruction
 3. $avoidBlock
-4. Title, description, category, and content MUST all be in natural, well-edited English.
-5. Word count of "content" MUST be close to 350 words (320-385 words), split into 4-5 clear paragraphs separated by \n\n. Do NOT include the title inside "content".
-6. "word_meanings" MUST contain 35 to 45 important English words or short phrases that ACTUALLY appear verbatim in "content", with lowercase keys and accurate, natural Turkish meanings suited to the exact context of the article (no English explanations, just concise Turkish equivalents).
+4. Title, description, category, and content MUST all be in natural, well-edited English. "description" MUST be strictly 2 complete, engaging sentences totaling 32-48 words (never a short 10-word fragment).
+5. CRITICAL WORD COUNT RULE: The word count of "content" MUST be close to $targetWords words (strictly between $minWords and $maxWords words), split into $paraGuide separated by \n\n. Do NOT summarize or cut it short, and do NOT include the title inside "content".
+6. "word_meanings" MUST contain $vocabMin to $vocabMax important English words or short phrases that ACTUALLY appear verbatim in "content", with lowercase keys and accurate, natural Turkish meanings suited to the exact context of the article (no English explanations, just concise Turkish equivalents).
 7. "word_relations" MUST cover the same key words from "word_meanings" with lowercase keys. For each word, provide 2 to 3 natural English synonyms ("syn") and 1 to 2 natural English antonyms ("ant") that STRICTLY match the exact sense/meaning of the word inside THIS article's sentence context (never unrelated dictionary senses; use an empty array [] for "ant" only when a concrete noun has no natural opposite).
 8. "paragraph_translations" MUST be a JSON array with the exact same number of elements as the paragraphs in "content", providing fluent Turkish translations in order.
 9. "sentence_translations" MUST map every sentence of "content" (verbatim English sentence as key) to its fluent, contextual Turkish translation.
@@ -581,7 +606,8 @@ Strict requirements:
             }
         )
         generationConfig = @{
-            temperature      = 0.9
+            temperature      = 0.85
+            maxOutputTokens  = 8192
             responseMimeType = "application/json"
         }
     }
@@ -614,8 +640,8 @@ Strict requirements:
         }
     } catch {}
 
-    $flashCandidates = (@($cfg.geminiModel, "gemini-flash-latest", "gemini-3.8-flash", "gemini-3-flash-preview") + $discoveredFlashModels | Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and ($_ -notlike "*2.5*") } | Select-Object -Unique | Select-Object -First 4)
-    $proCandidates = (@("gemini-pro-latest") + $discoveredProModels | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique | Select-Object -First 2)
+    $flashCandidates = (@($cfg.geminiModel, "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-flash-latest") + $discoveredFlashModels | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique | Select-Object -First 5)
+    $proCandidates = (@("gemini-2.5-pro", "gemini-pro-latest") + $discoveredProModels | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique | Select-Object -First 2)
     $modelsToTry = @($flashCandidates + $proCandidates) | Select-Object -Unique
     [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
 
@@ -629,8 +655,8 @@ Strict requirements:
             $modelsToTry
         } else {
             if (-not $hadTransientOverload) { break }
-            Start-Sleep -Milliseconds 1800
-            @("gemini-flash-latest", "gemini-3.8-flash", "gemini-3-flash-preview") + $discoveredFlashModels | Select-Object -Unique
+            Start-Sleep -Milliseconds 1500
+            @("gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash") + $discoveredFlashModels | Select-Object -Unique
         }
 
         $abortAll = $false
@@ -696,6 +722,14 @@ Strict requirements:
 
                 if ([string]::IsNullOrWhiteSpace($genTitle) -or [string]::IsNullOrWhiteSpace($genContent)) {
                     $lastErrorMsg = "Gemini çıktısında başlık veya içerik eksikti ($modelName)."
+                    continue
+                }
+
+                $actualWordCount = @($genContent -split '\s+' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count
+                $minAcceptableWords = [int][math]::Round($targetWords * 0.65)
+                if ($actualWordCount -lt $minAcceptableWords) {
+                    Write-Host "[Gemini] $modelName cok kisa makale uretti ($actualWordCount / $targetWords kelime); sonraki model deneniyor..." -ForegroundColor Yellow
+                    $lastErrorMsg = "Makale hedef uzunluktan kısa geldi ($actualWordCount / $targetWords kelime)."
                     continue
                 }
 
@@ -839,8 +873,8 @@ Strict requirements:
     # 3. Katman Yedek: Google Gemini yoğun/503 ise Cloudflare Workers AI (Llama 3.3 70B) üzerinden üret!
     if (-not [string]::IsNullOrWhiteSpace($cfg.workerUrl) -and -not [string]::IsNullOrWhiteSpace($cfg.adminSecret)) {
         try {
-            Write-Host "[Cloudflare AI] Gemini yanit vermedi; Llama 3.3 70B yedegi deneniyor..." -ForegroundColor Cyan
-            $wfBody = (@{ level = $level; topic = $topic } | ConvertTo-Json -Compress)
+            Write-Host "[Cloudflare AI] Gemini yanit vermedi; Llama 3.3 70B yedegi deneniyor ($targetWords kelime)..." -ForegroundColor Cyan
+            $wfBody = (@{ level = $level; topic = $topic; wordCount = $targetWords } | ConvertTo-Json -Compress)
             $wfUrl = "$($cfg.workerUrl.TrimEnd('/'))/admin/generate-article"
             $wfReq = [System.Net.HttpWebRequest]::Create($wfUrl)
             $wfReq.Method = "POST"
@@ -1348,6 +1382,189 @@ function Try-AlignAudioSegmentsViaWorker {
     return $null
 }
 
+function Invoke-GeminiGenerateImage([string]$RawJson) {
+    $cfg = Get-AdminConfig
+    $reqData = @{}
+    if (-not [string]::IsNullOrWhiteSpace($RawJson)) {
+        $reqData = $RawJson | ConvertFrom-Json
+    }
+
+    $rawId = if ($reqData.id) { ([string]$reqData.id).Trim() } else { "article-$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())" }
+    $safeId = [regex]::Replace($rawId.ToLowerInvariant(), '[^a-z0-9_-]+', '-').Trim('-')
+    if ([string]::IsNullOrWhiteSpace($safeId)) { $safeId = "article-cover" }
+
+    $title = if ($reqData.title) { ([string]$reqData.title).Trim() } else { "" }
+    $description = if ($reqData.description) { ([string]$reqData.description).Trim() } else { "" }
+    $category = if ($reqData.category) { ([string]$reqData.category).Trim() } else { "General" }
+    $contentSnippet = if ($reqData.content) { ([string]$reqData.content).Replace("`r`n", " ").Replace("`n", " ").Trim() } else { "" }
+    if ($contentSnippet.Length -gt 240) { $contentSnippet = $contentSnippet.Substring(0, 240) }
+
+    if ([string]::IsNullOrWhiteSpace($title)) {
+        return @{
+            StatusCode = 400
+            Body       = (@{ ok = $false; message = "Fotoğraf üretmek için önce makale başlığı yazın veya oluşturun." } | ConvertTo-Json -Compress)
+        }
+    }
+
+    $imagePrompt = "Create a stunning, photorealistic editorial magazine cover photograph representing the article titled `"$title`" (Category: $category). $(if ($description) { "Concept: $description " } elseif ($contentSnippet) { "Context: $contentSnippet " })Cinematic natural lighting, crisp focus, National Geographic editorial photography aesthetic, 16:9 widescreen composition. Strictly NO text, NO words, NO letters, NO numbers, NO watermarks, NO logos anywhere in the image."
+
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
+    $imgBytes = $null
+    $ext = ".jpg"
+    $providerUsed = ""
+    $lastErrorMsg = "Fotoğraf üretilemedi."
+
+    # 1. Katman: Gemini Image Generation modelleri
+    if (-not [string]::IsNullOrWhiteSpace($cfg.geminiApiKey)) {
+        $imgModels = @("gemini-2.5-flash-image", "gemini-2.0-flash-exp-image-generation")
+        $reqObj = @{
+            contents = @(
+                @{
+                    role  = "user"
+                    parts = @(@{ text = $imagePrompt })
+                }
+            )
+            generationConfig = @{
+                responseModalities = @("IMAGE", "TEXT")
+            }
+        }
+        $reqBody = $reqObj | ConvertTo-Json -Depth 8 -Compress
+
+        foreach ($mName in $imgModels) {
+            try {
+                Write-Host "[Kapak AI] Gemini ile fotograf uretiliyor: $mName -> $safeId ..." -ForegroundColor Cyan
+                $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/${mName}:generateContent?key=$([System.Uri]::EscapeDataString($cfg.geminiApiKey))"
+                $webReq = [System.Net.HttpWebRequest]::Create($endpoint)
+                $webReq.Method = "POST"
+                $webReq.Timeout = 45000
+                $webReq.Accept = "application/json"
+                $webReq.ContentType = "application/json; charset=utf-8"
+                $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($reqBody)
+                $webReq.ContentLength = $bodyBytes.Length
+                $reqStream = $webReq.GetRequestStream()
+                try { $reqStream.Write($bodyBytes, 0, $bodyBytes.Length) } finally { $reqStream.Dispose() }
+
+                $webRes = $webReq.GetResponse()
+                $reader = New-Object System.IO.StreamReader($webRes.GetResponseStream(), [System.Text.Encoding]::UTF8)
+                try { $resText = $reader.ReadToEnd() } finally { $reader.Dispose(); $webRes.Close() }
+
+                $parsed = $resText | ConvertFrom-Json
+                if ($null -ne $parsed.candidates -and $parsed.candidates.Count -gt 0) {
+                    foreach ($part in $parsed.candidates[0].content.parts) {
+                        if ($null -ne $part.PSObject.Properties["inlineData"] -and $null -ne $part.inlineData -and $part.inlineData.data) {
+                            $imgBytes = [Convert]::FromBase64String([string]$part.inlineData.data)
+                            $mime = [string]$part.inlineData.mimeType
+                            $ext = if ($mime -like "*png*") { ".png" } elseif ($mime -like "*webp*") { ".webp" } else { ".jpg" }
+                            $providerUsed = $mName
+                            break
+                        }
+                    }
+                }
+                if ($null -ne $imgBytes -and $imgBytes.Length -gt 2000) { break }
+            }
+            catch {
+                $lastErrorMsg = "Gemini görsel hatası ($mName): $($_.Exception.Message)"
+                Write-Host "[Kapak AI] $lastErrorMsg" -ForegroundColor Yellow
+            }
+        }
+    }
+
+    # 2. Katman: Cloudflare Workers AI (FLUX.1 Schnell)
+    if (($null -eq $imgBytes -or $imgBytes.Length -le 2000) -and -not [string]::IsNullOrWhiteSpace($cfg.workerUrl) -and -not [string]::IsNullOrWhiteSpace($cfg.adminSecret)) {
+        try {
+            Write-Host "[Kapak AI] Cloudflare FLUX.1 Schnell deneniyor -> $safeId ..." -ForegroundColor Cyan
+            $wfBody = (@{ title = $title; description = $description; category = $category } | ConvertTo-Json -Compress)
+            $wfUrl = "$($cfg.workerUrl.TrimEnd('/'))/admin/generate-image"
+            $wfReq = [System.Net.HttpWebRequest]::Create($wfUrl)
+            $wfReq.Method = "POST"
+            $wfReq.Timeout = 45000
+            $wfReq.Accept = "application/json"
+            $wfReq.ContentType = "application/json; charset=utf-8"
+            $wfReq.Headers.Add("X-Admin-Secret", $cfg.adminSecret)
+            $wfBytes = [System.Text.Encoding]::UTF8.GetBytes($wfBody)
+            $wfReq.ContentLength = $wfBytes.Length
+            $wfStream = $wfReq.GetRequestStream()
+            try { $wfStream.Write($wfBytes, 0, $wfBytes.Length) } finally { $wfStream.Dispose() }
+            $wfRes = $wfReq.GetResponse()
+            $wfReader = New-Object System.IO.StreamReader($wfRes.GetResponseStream(), [System.Text.Encoding]::UTF8)
+            try { $wfText = $wfReader.ReadToEnd() } finally { $wfReader.Dispose(); $wfRes.Close() }
+            $wfJson = $wfText | ConvertFrom-Json
+            if ($wfJson.ok -and $wfJson.image_base64) {
+                $imgBytes = [Convert]::FromBase64String([string]$wfJson.image_base64)
+                $ext = ".jpg"
+                $providerUsed = [string]$wfJson.provider
+            }
+        }
+        catch {
+            $lastErrorMsg = "Cloudflare FLUX hatası: $($_.Exception.Message)"
+            Write-Host "[Kapak AI] $lastErrorMsg" -ForegroundColor Yellow
+        }
+    }
+
+    # 3. Katman: Ücretsiz Pollinations Flux yedeği
+    if ($null -eq $imgBytes -or $imgBytes.Length -le 2000) {
+        try {
+            Write-Host "[Kapak AI] Pollinations Flux yedegi deneniyor -> $safeId ..." -ForegroundColor Cyan
+            $shortPrompt = "Editorial magazine photograph of $title, $category, cinematic lighting, photorealistic, no text"
+            $seed = Get-Random -Minimum 1000 -Maximum 999999
+            $pUrl = "https://image.pollinations.ai/prompt/$([System.Uri]::EscapeDataString($shortPrompt))?width=1024&height=576&nologo=true&seed=$seed"
+            $pReq = [System.Net.HttpWebRequest]::Create($pUrl)
+            $pReq.Method = "GET"
+            $pReq.Timeout = 45000
+            $pReq.UserAgent = "LineReaderStudio/1.0"
+            $pRes = $pReq.GetResponse()
+            $ms = New-Object System.IO.MemoryStream
+            try {
+                $pRes.GetResponseStream().CopyTo($ms)
+                $candidateBytes = $ms.ToArray()
+                if ($candidateBytes.Length -gt 4000) {
+                    $imgBytes = $candidateBytes
+                    $ext = ".jpg"
+                    $providerUsed = "pollinations-flux"
+                }
+            }
+            finally {
+                $ms.Dispose()
+                $pRes.Close()
+            }
+        }
+        catch {
+            $lastErrorMsg = "Yedek görsel servisi yanıt vermedi: $($_.Exception.Message)"
+            Write-Host "[Kapak AI] $lastErrorMsg" -ForegroundColor Yellow
+        }
+    }
+
+    if ($null -eq $imgBytes -or $imgBytes.Length -le 2000) {
+        return @{
+            StatusCode = 502
+            Body       = (@{ ok = $false; message = $lastErrorMsg } | ConvertTo-Json -Compress)
+        }
+    }
+
+    if (-not (Test-Path $ContentImagesDir)) { New-Item -ItemType Directory -Path $ContentImagesDir -Force | Out-Null }
+    if (-not (Test-Path $RootImagesDir)) { New-Item -ItemType Directory -Path $RootImagesDir -Force | Out-Null }
+
+    $fileName = "$safeId$ext"
+    $contentImgPath = Join-Path $ContentImagesDir $fileName
+    $rootImgPath = Join-Path $RootImagesDir $fileName
+    [System.IO.File]::WriteAllBytes($contentImgPath, $imgBytes)
+    [System.IO.File]::WriteAllBytes($rootImgPath, $imgBytes)
+
+    $sizeKb = [int][math]::Round($imgBytes.Length / 1024.0)
+    Write-Host "[Kapak AI] Hazir ($providerUsed): $fileName ($sizeKb KB)" -ForegroundColor Green
+
+    return @{
+        StatusCode = 200
+        Body       = (@{
+            ok                = $true
+            image_url         = "https://getlinereader.com/images/$fileName"
+            local_preview_url = "/images/$fileName"
+            size_kb           = $sizeKb
+            provider          = $providerUsed
+        } | ConvertTo-Json -Compress)
+    }
+}
+
 function Forward-WorkerAdminRequest {
     param(
         [string]$RemotePath,
@@ -1594,21 +1811,6 @@ try {
                 $fwd = Forward-WorkerAdminRequest -RemotePath "/admin/users" -HttpMethod $method -BodyText $body
                 Send-Response -Response $res -StatusCode $fwd.StatusCode -Body $fwd.Body -ContentType "application/json; charset=utf-8"
             }
-            elseif ($path -eq "/api/admin/schedule" -and ($method -in @("GET", "POST"))) {
-                $body = if ($method -eq "GET") { "" } else { Read-RequestBody $req }
-                $fwd = Forward-WorkerAdminRequest -RemotePath "/admin/schedule" -HttpMethod $method -BodyText $body
-                Send-Response -Response $res -StatusCode $fwd.StatusCode -Body $fwd.Body -ContentType "application/json; charset=utf-8"
-            }
-            elseif ($path -eq "/api/admin/schedule/run-now" -and $method -eq "POST") {
-                $body = Read-RequestBody $req
-                $fwd = Forward-WorkerAdminRequest -RemotePath "/admin/schedule/run-now" -HttpMethod $method -BodyText $body
-                Send-Response -Response $res -StatusCode $fwd.StatusCode -Body $fwd.Body -ContentType "application/json; charset=utf-8"
-            }
-            elseif ($path -eq "/api/admin/quick-publish" -and $method -eq "POST") {
-                $body = Read-RequestBody $req
-                $fwd = Forward-WorkerAdminRequest -RemotePath "/admin/quick-publish" -HttpMethod $method -BodyText $body
-                Send-Response -Response $res -StatusCode $fwd.StatusCode -Body $fwd.Body -ContentType "application/json; charset=utf-8"
-            }
             elseif ($method -eq "GET" -and $path -eq "/api/ai/config") {
                 $cfg = Get-AdminConfig
                 Send-JsonObject -Response $res -StatusCode 200 -Payload @{
@@ -1631,6 +1833,30 @@ try {
                 $body = Read-RequestBody $req
                 $audioRes = Invoke-GeminiGenerateAudio $body
                 Send-Response -Response $res -StatusCode $audioRes.StatusCode -Body $audioRes.Body -ContentType "application/json; charset=utf-8"
+            }
+            elseif ($method -eq "POST" -and $path -eq "/api/ai/generate-image") {
+                $body = Read-RequestBody $req
+                $imgRes = Invoke-GeminiGenerateImage $body
+                Send-Response -Response $res -StatusCode $imgRes.StatusCode -Body $imgRes.Body -ContentType "application/json; charset=utf-8"
+            }
+            elseif ($method -eq "GET" -and $path.StartsWith("/images/")) {
+                $rawName = [System.IO.Path]::GetFileName($req.Url.AbsolutePath)
+                $safeName = [regex]::Replace($rawName, '[^a-zA-Z0-9._-]', '')
+                $targetPath = Join-Path $ContentImagesDir $safeName
+                if (-not (Test-Path $targetPath)) {
+                    $targetPath = Join-Path $RootImagesDir $safeName
+                }
+                if (-not [string]::IsNullOrWhiteSpace($safeName) -and (Test-Path $targetPath)) {
+                    $bytes = [System.IO.File]::ReadAllBytes($targetPath)
+                    $res.StatusCode = 200
+                    $res.ContentType = if ($safeName.EndsWith(".png")) { "image/png" } elseif ($safeName.EndsWith(".webp")) { "image/webp" } else { "image/jpeg" }
+                    $res.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+                    $res.ContentLength64 = $bytes.Length
+                    $res.OutputStream.Write($bytes, 0, $bytes.Length)
+                    $res.OutputStream.Close()
+                } else {
+                    Send-JsonObject -Response $res -StatusCode 404 -Payload @{ ok = $false; error = "Görsel dosyası bulunamadı." }
+                }
             }
             elseif ($method -eq "GET" -and $path.StartsWith("/audio/")) {
                 $rawName = [System.IO.Path]::GetFileName($req.Url.AbsolutePath)

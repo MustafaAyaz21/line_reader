@@ -1650,74 +1650,16 @@ async function handleDeveloperPanelRequest(request, env, verifiedUser, path, met
     });
   }
 
-  // 6) Tek Tıkla Kaynaktan Çek, Analiz Et, Seslendir & Yayınla (Anında Canlı Akış)
+  // 6) Yapay zekaya sıfırdan makale yazdırma kapatıldı
   if (path === "/dev/articles/quick-publish" && method === "POST") {
-    const startTime = Date.now();
-    const body = await safeReadJson(request);
-    const rawLevel = String(body?.level || "B1").trim().toUpperCase();
-    const level = ["A1", "A2", "B1", "B2", "C1", "C2"].includes(rawLevel) ? rawLevel : "B1";
-    let topic = String(body?.topic || "").trim();
-    if (!topic) {
-      topic = pickEngagingTopic(level);
-    }
-    const voice = String(body?.voice || "Kore").trim() || "Kore";
-
-    const t0 = Date.now();
-    const article = await generateArticleResilient(env, level, topic);
-    const tArticle = Date.now() - t0;
-
-    let tAudio = 0;
-    let audioGenerated = false;
-    if (env.GEMINI_API_KEY && env.GITHUB_TOKEN) {
-      const tAudioStart = Date.now();
-      try {
-        const audioRes = await generatePodcastAudioWithGemini(
-          env,
-          article.id,
-          article.title,
-          article.content,
-          voice
-        );
-        article.audio_url = audioRes.audio_url;
-        article.audio_voice = audioRes.audio_voice;
-        article.audio_duration_sec = audioRes.audio_duration_sec;
-        if (audioRes.audio_segments) {
-          article.audio_segments = audioRes.audio_segments;
-        }
-        audioGenerated = true;
-      } catch (audioErr) {
-        // Ses hatası makalenin yayına girmesini engellemez
-      }
-      tAudio = Date.now() - tAudioStart;
-    }
-
-    const tPubStart = Date.now();
-    const list = await loadArticlesList(env);
-    const existingIdx = list.findIndex((a) => String(a?.id || "") === article.id);
-    if (existingIdx >= 0) {
-      list[existingIdx] = article;
-    } else {
-      list.unshift(article);
-    }
-    const syncInfo = await saveArticlesList(env, list, `Quick publish article ${article.id}`);
-    const tPub = Date.now() - tPubStart;
-    const totalMs = Date.now() - startTime;
-    const totalSec = (totalMs / 1000).toFixed(1);
-
-    return jsonResponse({
-      ok: true,
-      article,
-      audio_generated: audioGenerated,
-      github_synced: syncInfo.githubSynced,
-      timing: {
-        total_ms: totalMs,
-        total_sec: totalSec,
-        article_ms: tArticle,
-        audio_ms: tAudio,
-        publish_ms: tPub,
+    return jsonResponse(
+      {
+        ok: false,
+        error: "ai_generation_disabled",
+        message: "Yapay zekaya sıfırdan makale yazdırma sistemi kapatıldı. Lütfen Manuel Makale Ekle arayüzünü kullanın.",
       },
-      message: `"${article.title}" (${article.level}) başarıyla oluşturuldu, ${audioGenerated ? "seslendirildi ve " : ""}yayına alındı! (${totalSec} sn)`,
-    });
+      410
+    );
   }
 
   return jsonResponse({ ok: false, error: "not_found" }, 404);
@@ -1863,41 +1805,60 @@ function pickEngagingTopic(level) {
   return CURATED_ENGAGING_TOPICS[seed];
 }
 
-function buildArticleGenerationPrompt(level, topic) {
+function buildArticleGenerationPrompt(level, topic, targetWordCount = null) {
   const chosenTopic = topic || pickEngagingTopic(level);
   const topicInstruction = `Write the article specifically about this captivating topic: "${chosenTopic}".`;
 
-  const levelWordTarget = {
-    A1: "140 to 190 words in 3 short paragraphs using simple everyday vocabulary and short clear sentences",
-    A2: "180 to 240 words in 3 to 4 paragraphs using clear pre-intermediate vocabulary",
-    B1: "230 to 300 words in 4 paragraphs using natural intermediate English",
-    B2: "270 to 350 words in 4 paragraphs using rich upper-intermediate English",
-    C1: "300 to 390 words in 4 to 5 paragraphs using sophisticated advanced English",
-    C2: "320 to 420 words in 4 to 5 paragraphs using nuanced, idiomatic mastery-level English",
-  }[level] || "230 to 300 words in 4 paragraphs";
+  const parsedTarget = Number(targetWordCount);
+  const effectiveWords =
+    Number.isFinite(parsedTarget) && parsedTarget >= 100 && parsedTarget <= 1500
+      ? Math.round(parsedTarget)
+      : ({ A1: 180, A2: 230, B1: 300, B2: 350, C1: 380, C2: 400 }[level] || 320);
+
+  const minWords = Math.max(90, Math.round(effectiveWords * 0.9));
+  const maxWords = Math.round(effectiveWords * 1.12);
+  const paraCount =
+    effectiveWords < 200
+      ? "3 well-developed paragraphs"
+      : effectiveWords <= 420
+        ? "4 to 5 well-developed paragraphs"
+        : effectiveWords <= 700
+          ? "5 to 6 well-developed paragraphs"
+          : "6 to 8 well-developed paragraphs";
+
+  const levelStyle = {
+    A1: "simple everyday vocabulary and short clear sentences",
+    A2: "clear pre-intermediate vocabulary and straightforward connected sentences",
+    B1: "natural intermediate English with clear flow",
+    B2: "rich upper-intermediate English with vivid details",
+    C1: "sophisticated advanced English with nuanced arguments",
+    C2: "nuanced, idiomatic mastery-level English",
+  }[level] || "natural intermediate English";
 
   return [
     `You are an expert English curriculum author creating a CEFR ${level} reading article for Turkish learners of English.`,
     topicInstruction,
-    `Length & style: ${levelWordTarget}. Separate paragraphs with \\n\\n.`,
+    `MANDATORY LENGTH & STYLE: Write approximately ${effectiveWords} words (STRICTLY between ${minWords} and ${maxWords} words — NEVER write fewer than ${minWords} words!) across ${paraCount} separated by \\n\\n, using ${levelStyle}.`,
     "Tone & Quality Requirements:",
     "- The opening sentence MUST be a compelling hook (a curious question, striking scientific phenomenon, or immersive story). Never start with dry textbook definitions.",
     "- Keep the reader genuinely captivated and eager to read the next sentence.",
     "- Avoid dry academic jargon unless explained in context.",
     "Return ONLY one valid JSON object (no markdown fences) with these EXACT keys:",
     "{",
-    '  "title": "Engaging English title",',
-    '  "description": "1 concise engaging English summary sentence (15-28 words)",',
+    '  "title": "Engaging English title (4-9 words)",',
+    '  "description": "Rich, engaging English summary for the article card (STRICTLY 2 complete sentences, 32 to 48 words — never a single short phrase)",',
     '  "category": "Single category word (e.g. Science, Psychology, Culture, Technology, History, Nature, Art, Health, Daily Life)",',
-    '  "content": "Full English article text with paragraphs separated by \\n\\n",',
+    `  "content": "Full English article text of ${minWords}-${maxWords} words with ${paraCount} separated by \\n\\n",`,
     '  "word_meanings": { "lowercase_word": "exact contextual Turkish meaning in this article (for verbs use -mak/-mek)" },',
     '  "sentence_translations": { "Exact English sentence from content": "Natural, fluent Turkish translation" },',
     '  "word_relations": { "lowercase_word": { "syn": ["1-3 exact contextual English synonyms"], "ant": ["1-2 exact contextual English antonyms"] } }',
     "}",
     "Rules:",
-    "1. Include 30 to 55 key content words from the article in word_meanings (lowercase base/appeared forms) with their EXACT contextual Turkish meaning in this article.",
-    "2. Include EVERY sentence from content in sentence_translations with exact punctuation.",
-    "3. Include 15 to 30 key content words in word_relations with ONLY synonyms and antonyms that match the EXACT sense used in this article's sentences.",
+    `1. CRITICAL: "content" MUST have at least ${minWords} words (target ${effectiveWords} words). Do NOT cut the article short!`,
+    '2. CRITICAL: "description" MUST be 2 full, compelling sentences (32-48 words).',
+    "3. Include 30 to 50 key content words from the article in word_meanings (lowercase base/appeared forms) with their EXACT contextual Turkish meaning in this article.",
+    "4. Include EVERY sentence from content in sentence_translations with exact punctuation.",
+    "5. Include 15 to 25 key content words in word_relations with ONLY synonyms and antonyms that match the EXACT sense used in this article's sentences.",
   ].join("\n");
 }
 
@@ -2007,8 +1968,14 @@ function finalizeGeneratedArticle(parsed, level, providerName) {
   };
 }
 
-async function generateArticleWithWorkersAi(ai, level, topic) {
-  const prompt = buildArticleGenerationPrompt(level, topic);
+async function generateArticleWithWorkersAi(ai, level, topic, targetWordCount = null) {
+  const prompt = buildArticleGenerationPrompt(level, topic, targetWordCount);
+  const parsedTarget = Number(targetWordCount);
+  const effectiveWords =
+    Number.isFinite(parsedTarget) && parsedTarget >= 100 && parsedTarget <= 1500
+      ? Math.round(parsedTarget)
+      : 350;
+  const dynamicMaxTokens = Math.min(8192, Math.max(5200, effectiveWords * 14));
   const cfModels = [
     "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
     "@cf/meta/llama-3.1-8b-instruct",
@@ -2020,12 +1987,12 @@ async function generateArticleWithWorkersAi(ai, level, topic) {
         messages: [
           {
             role: "system",
-            content: "You are an expert English-Turkish curriculum author. Output ONLY valid JSON with no markdown or commentary.",
+            content: `You are an expert English-Turkish curriculum author. You MUST write the article content at the exact requested word count (~${effectiveWords} words) and a rich 2-sentence description (32-48 words). Output ONLY valid JSON with no markdown or commentary.`,
           },
           { role: "user", content: prompt },
         ],
         temperature: 0.55,
-        max_tokens: 3200,
+        max_tokens: dynamicMaxTokens,
       });
       const text = extractModelText(rawOut);
       const cleaned = String(text).replace(/```json\s*/gi, "").replace(/```/g, "").trim();
@@ -2378,66 +2345,10 @@ async function handleScheduledPublishRun(env, triggerSource = "cron", forceMode 
   const publishHour = Number(cfg.publish_hour ?? 9);
   const prebakeHour = (publishHour - 1 + 24) % 24;
 
-  const results = { prebaked: 0, published: 0, errors: [] };
+  const results = { prebaked: 0, published: 0, ai_generation_disabled: true, errors: [] };
 
-  // 1) ÖN HAZIRLIK AŞAMASI (Pre-bake)
-  const shouldPrebake =
-    forceMode === "prebake" ||
-    forceMode === "full_pipeline" ||
-    (currentHour === prebakeHour && cfg.last_prepared_date !== todayStr);
-
-  if (shouldPrebake) {
-    const levels = ["A1", "A2", "B1", "B2", "C1", "C2"];
-    const targetPublishTime = `${todayStr}T${String(publishHour).padStart(2, "0")}:00:00Z`;
-
-    for (const lvl of levels) {
-      try {
-        const topic = pickEngagingTopic(lvl);
-        const article = await generateArticleResilient(env, lvl, topic);
-        if (article) {
-          article.is_hidden = true;
-          article.publish_at = targetPublishTime;
-
-          if (env.GEMINI_API_KEY && env.GITHUB_TOKEN) {
-            try {
-              const audioRes = await generatePodcastAudioWithGemini(
-                env,
-                article.id,
-                article.title,
-                article.content,
-                "Kore"
-              );
-              article.audio_url = audioRes.audio_url;
-              article.audio_voice = audioRes.audio_voice;
-              article.audio_duration_sec = audioRes.audio_duration_sec;
-              if (audioRes.audio_segments) {
-                article.audio_segments = audioRes.audio_segments;
-              }
-            } catch (audioErr) {
-              results.errors.push(`Audio (${lvl}): ${String(audioErr?.message || audioErr)}`);
-            }
-          }
-
-          const list = await loadArticlesList(env);
-          const existingIdx = list.findIndex((a) => String(a?.id || "") === article.id);
-          if (existingIdx >= 0) {
-            list[existingIdx] = article;
-          } else {
-            list.unshift(article);
-          }
-          await saveArticlesList(env, list, `Prebake scheduled article ${article.id} for ${todayStr}`);
-          results.prebaked++;
-        }
-      } catch (genErr) {
-        results.errors.push(`Generate (${lvl}): ${String(genErr?.message || genErr)}`);
-      }
-    }
-
-    await env.DB
-      .prepare("UPDATE publish_schedule_config SET last_prepared_date = ?, updated_at = ? WHERE id = 1")
-      .bind(todayStr, new Date().toISOString())
-      .run();
-  }
+  // 1) ÖN HAZIRLIK AŞAMASI (AI'ya sıfırdan makale yazdırma kapatıldı)
+  // Yalnızca önceden manuel olarak eklenip zamanlanmış (is_hidden=true, publish_at<=today) makaleler yayına açılır.
 
   // 2) YAYINLAMA AŞAMASI (Publish)
   const shouldPublish =
@@ -2562,12 +2473,46 @@ async function handleAdminRequest(request, env, path, method) {
     const rawLevel = String(body?.level || "B1").trim().toUpperCase();
     const level = ["A1", "A2", "B1", "B2", "C1", "C2"].includes(rawLevel) ? rawLevel : "B1";
     const topic = String(body?.topic || "").trim().slice(0, 160);
+    const wordCount = body?.wordCount ? Number(body.wordCount) : null;
     if (!env.AI) {
       return jsonResponse({ ok: false, message: "Workers AI bağlı değil." }, 503);
     }
     try {
-      const article = await generateArticleWithWorkersAi(env.AI, level, topic);
+      const article = await generateArticleWithWorkersAi(env.AI, level, topic, wordCount);
       return jsonResponse({ ok: true, article, model: article._provider || "cloudflare-llama-3.3" });
+    } catch (err) {
+      return jsonResponse({ ok: false, message: String(err?.message || err) }, 502);
+    }
+  }
+
+  // PC Makale Stüdyosu kapak fotoğrafı üretimi (Cloudflare Workers AI FLUX.1 Schnell)
+  if (path === "/admin/generate-image" && method === "POST") {
+    const body = await safeReadJson(request);
+    const title = String(body?.title || "").trim().slice(0, 140);
+    const description = String(body?.description || "").trim().slice(0, 260);
+    const category = String(body?.category || "General").trim().slice(0, 40);
+    if (!title) {
+      return jsonResponse({ ok: false, message: "Makale başlığı gerekli." }, 400);
+    }
+    if (!env.AI) {
+      return jsonResponse({ ok: false, message: "Workers AI bağlı değil." }, 503);
+    }
+    try {
+      const prompt = `High-resolution editorial magazine cover photograph representing the article "${title}" (${category}). ${description ? `Scene concept: ${description}. ` : ""}Cinematic natural lighting, rich depth of field, National Geographic / The Atlantic editorial photography style, 16:9 widescreen composition. Strictly NO text, NO words, NO letters, NO watermarks, NO logos.`;
+      const aiRes = await env.AI.run("@cf/black-forest-labs/flux-1-schnell", {
+        prompt,
+        steps: 4,
+      });
+      const b64 = aiRes && typeof aiRes.image === "string" ? aiRes.image : "";
+      if (!b64) {
+        throw new Error("FLUX boş görsel döndürdü.");
+      }
+      return jsonResponse({
+        ok: true,
+        image_base64: b64,
+        mime_type: "image/jpeg",
+        provider: "cloudflare-flux-1-schnell",
+      });
     } catch (err) {
       return jsonResponse({ ok: false, message: String(err?.message || err) }, 502);
     }
@@ -2707,72 +2652,16 @@ async function handleAdminRequest(request, env, path, method) {
     });
   }
 
-  // Tek Tıkla Kaynaktan Çek, Analiz Et, Seslendir & Yayınla (PC Paneli)
+  // Yapay zekaya sıfırdan makale yazdırma kapatıldı (PC Paneli)
   if (path === "/admin/quick-publish" && method === "POST") {
-    const startTime = Date.now();
-    const body = await safeReadJson(request);
-    const rawLevel = String(body?.level || "B1").trim().toUpperCase();
-    const level = ["A1", "A2", "B1", "B2", "C1", "C2"].includes(rawLevel) ? rawLevel : "B1";
-    let topic = String(body?.topic || "").trim();
-    if (!topic) {
-      topic = pickEngagingTopic(level);
-    }
-    const voice = String(body?.voice || "Kore").trim() || "Kore";
-
-    const t0 = Date.now();
-    const article = await generateArticleResilient(env, level, topic);
-    const tArticle = Date.now() - t0;
-
-    let tAudio = 0;
-    let audioGenerated = false;
-    if (env.GEMINI_API_KEY && env.GITHUB_TOKEN) {
-      const tAudioStart = Date.now();
-      try {
-        const audioRes = await generatePodcastAudioWithGemini(
-          env,
-          article.id,
-          article.title,
-          article.content,
-          voice
-        );
-        article.audio_url = audioRes.audio_url;
-        article.audio_voice = audioRes.audio_voice;
-        article.audio_duration_sec = audioRes.audio_duration_sec;
-        if (audioRes.audio_segments) {
-          article.audio_segments = audioRes.audio_segments;
-        }
-        audioGenerated = true;
-      } catch (_) {}
-      tAudio = Date.now() - tAudioStart;
-    }
-
-    const tPubStart = Date.now();
-    const list = await loadArticlesList(env);
-    const existingIdx = list.findIndex((a) => String(a?.id || "") === article.id);
-    if (existingIdx >= 0) {
-      list[existingIdx] = article;
-    } else {
-      list.unshift(article);
-    }
-    const syncInfo = await saveArticlesList(env, list, `Quick publish article ${article.id} from PC studio`);
-    const tPub = Date.now() - tPubStart;
-    const totalMs = Date.now() - startTime;
-    const totalSec = (totalMs / 1000).toFixed(1);
-
-    return jsonResponse({
-      ok: true,
-      article,
-      audio_generated: audioGenerated,
-      github_synced: syncInfo.githubSynced,
-      timing: {
-        total_ms: totalMs,
-        total_sec: totalSec,
-        article_ms: tArticle,
-        audio_ms: tAudio,
-        publish_ms: tPub,
+    return jsonResponse(
+      {
+        ok: false,
+        error: "ai_generation_disabled",
+        message: "Yapay zekaya sıfırdan makale yazdırma sistemi kapatıldı. Lütfen Manuel Makale Ekle arayüzünü kullanın.",
       },
-      message: `"${article.title}" (${article.level}) başarıyla oluşturuldu, ${audioGenerated ? "seslendirildi ve " : ""}yayına alındı! (${totalSec} sn)`,
-    });
+      410
+    );
   }
 
   // Kod yönetimi
