@@ -36,6 +36,7 @@ import '../words/data/word_repository.dart';
 import '../words/models/saved_word.dart';
 import '../words/models/word_list.dart';
 import '../words/words_screen.dart';
+import '../settings/screens/settings_screen.dart';
 import 'widgets/main_menu_screen.dart';
 
 /// Uygulamanın iki sekmeli ana gezinme kabuğu ("Ana Menü" ve "Kelimelerim").
@@ -364,23 +365,45 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void _onDestinationSelected(int index) {
     _ensureInitialized();
 
-    if (index == _mainMenuTabIndex) {
-      if (_selectedIndex == _mainMenuTabIndex && _isBrowserOpen) {
-        // Tarayıcı açıkken "Ana Menü" sekmesine tekrar dokunulursa menüye dön.
-        setState(() => _isBrowserOpen = false);
-        return;
-      }
-      if (_selectedIndex != _mainMenuTabIndex) {
-        setState(() => _selectedIndex = _mainMenuTabIndex);
-      }
+    if (index == 0) {
+      // Makaleler / Ana Menü
+      setState(() {
+        _selectedIndex = _mainMenuTabIndex;
+        _isBrowserOpen = false;
+      });
       return;
     }
 
-    if (index == _wordsTabIndex) {
-      if (_selectedIndex != _wordsTabIndex) {
-        setState(() => _selectedIndex = _wordsTabIndex);
-      }
-      _wordsController!.loadLists();
+    if (index == 1) {
+      // Akıllı Tarayıcı
+      _openBrowser();
+      return;
+    }
+
+    if (index == 2) {
+      // Kelimelerim
+      setState(() {
+        _selectedIndex = _wordsTabIndex;
+        _isBrowserOpen = false;
+      });
+      _wordsController?.loadLists();
+      return;
+    }
+
+    if (index == 3) {
+      // Ayarlar
+      final localeController = _resolveLocaleController(context);
+      Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => SettingsScreen(
+            apiKeyController: _apiKeyController!,
+            localeController: localeController,
+            authController: _authController!,
+            onClearCache: _handleClearTranslationCache,
+          ),
+        ),
+      );
+      return;
     }
   }
 
@@ -502,96 +525,488 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               body: isWideScreen
                   ? Row(
                       children: [
-                        NavigationRail(
+                        _DesktopSidebar(
                           selectedIndex: _selectedIndex,
-                          onDestinationSelected: _onDestinationSelected,
-                          extended: MediaQuery.of(context).size.width >= 1100,
-                          minExtendedWidth: 200,
-                          leading: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 20),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  width: 38,
-                                  height: 38,
-                                  decoration: BoxDecoration(
-                                    color: Colors.black,
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: const Text(
-                                    'LR',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 16,
-                                    ),
-                                  ),
+                          isBrowserOpen: _isBrowserOpen,
+                          onSelectMainMenu: () {
+                            setState(() {
+                              _selectedIndex = _mainMenuTabIndex;
+                              _isBrowserOpen = false;
+                            });
+                          },
+                          onOpenBrowser: _openBrowser,
+                          onSelectWords: () {
+                            setState(() {
+                              _selectedIndex = _wordsTabIndex;
+                              _isBrowserOpen = false;
+                            });
+                            _wordsController?.loadLists();
+                          },
+                          onOpenSettings: () {
+                            Navigator.of(context).push<void>(
+                              MaterialPageRoute<void>(
+                                builder: (_) => SettingsScreen(
+                                  apiKeyController: _apiKeyController!,
+                                  localeController: localeController,
+                                  authController: authController,
+                                  onClearCache: _handleClearTranslationCache,
                                 ),
-                                if (MediaQuery.of(context).size.width >= 1100) ...[
-                                  const SizedBox(width: 12),
-                                  const Text(
-                                    'Line Reader',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 16,
-                                      letterSpacing: -0.3,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          destinations: <NavigationRailDestination>[
-                            NavigationRailDestination(
-                              icon: const Icon(Icons.home_outlined),
-                              selectedIcon: const Icon(Icons.home),
-                              label: Text(s.mainMenuTitle),
-                            ),
-                            NavigationRailDestination(
-                              icon: const Icon(Icons.bookmarks_outlined),
-                              selectedIcon: const Icon(Icons.bookmarks),
-                              label: Text(s.myWordsTitle),
-                            ),
-                          ],
+                              ),
+                            );
+                          },
+                          authController: authController,
+                          wordsController: _wordsController,
                         ),
-                        const VerticalDivider(thickness: 1, width: 1),
                         Expanded(child: bodyContent),
                       ],
                     )
                   : bodyContent,
               bottomNavigationBar: isWideScreen
                   ? null
-                  : Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AppBannerAd(
-                          authController: authController,
-                          placement: AppBannerPlacement.bottom,
-                        ),
-                        NavigationBar(
-                          selectedIndex: _selectedIndex,
-                          onDestinationSelected: _onDestinationSelected,
-                          destinations: <NavigationDestination>[
-                            NavigationDestination(
-                              icon: const Icon(Icons.home_outlined),
-                              selectedIcon: const Icon(Icons.home),
-                              label: s.mainMenuTitle,
+                  : Builder(
+                      builder: (context) {
+                        int navIndex = 0;
+                        if (_selectedIndex == _wordsTabIndex) {
+                          navIndex = 2;
+                        } else if (_isBrowserOpen) {
+                          navIndex = 1;
+                        } else {
+                          navIndex = 0;
+                        }
+
+                        final int totalWords = _wordsController?.lists.fold<int>(
+                              0,
+                              (sum, list) => sum + list.wordCount,
+                            ) ??
+                            0;
+
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            AppBannerAd(
+                              authController: authController,
+                              placement: AppBannerPlacement.bottom,
                             ),
-                            NavigationDestination(
-                              icon: const Icon(Icons.bookmarks_outlined),
-                              selectedIcon: const Icon(Icons.bookmarks),
-                              label: s.myWordsTitle,
+                            NavigationBar(
+                              selectedIndex: navIndex,
+                              onDestinationSelected: _onDestinationSelected,
+                              destinations: <NavigationDestination>[
+                                NavigationDestination(
+                                  icon: const Icon(Icons.menu_book_outlined),
+                                  selectedIcon: const Icon(Icons.menu_book_rounded),
+                                  label: s.articlesTitle,
+                                ),
+                                NavigationDestination(
+                                  icon: const Icon(Icons.public_outlined),
+                                  selectedIcon: const Icon(Icons.public_rounded),
+                                  label: s.browserTitle,
+                                ),
+                                NavigationDestination(
+                                  icon: Badge(
+                                    isLabelVisible: totalWords > 0,
+                                    label: Text('$totalWords'),
+                                    child: const Icon(Icons.bookmarks_outlined),
+                                  ),
+                                  selectedIcon: Badge(
+                                    isLabelVisible: totalWords > 0,
+                                    label: Text('$totalWords'),
+                                    child: const Icon(Icons.bookmarks),
+                                  ),
+                                  label: s.myWordsTitle,
+                                ),
+                                NavigationDestination(
+                                  icon: const Icon(Icons.settings_outlined),
+                                  selectedIcon: const Icon(Icons.settings_rounded),
+                                  label: s.t('Ayarlar', 'Settings'),
+                                ),
+                              ],
                             ),
                           ],
-                        ),
-                      ],
+                        );
+                      },
                     ),
             ),
           ),
         );
       },
+    );
+  }
+}
+
+class _DesktopSidebar extends StatelessWidget {
+  const _DesktopSidebar({
+    required this.selectedIndex,
+    required this.isBrowserOpen,
+    required this.onSelectMainMenu,
+    required this.onOpenBrowser,
+    required this.onSelectWords,
+    required this.onOpenSettings,
+    required this.authController,
+    this.wordsController,
+  });
+
+  final int selectedIndex;
+  final bool isBrowserOpen;
+  final VoidCallback onSelectMainMenu;
+  final VoidCallback onOpenBrowser;
+  final VoidCallback onSelectWords;
+  final VoidCallback onOpenSettings;
+  final AuthController authController;
+  final WordsController? wordsController;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.l10n;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    final isArticlesActive = selectedIndex == 0 && !isBrowserOpen;
+    final isBrowserActive = isBrowserOpen;
+    final isWordsActive = selectedIndex == 1 && !isBrowserOpen;
+
+    return Container(
+      width: 250,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F1218) : colorScheme.surface,
+        border: Border(
+          right: BorderSide(
+            color: colorScheme.outlineVariant.withAlpha(50),
+            width: 1,
+          ),
+        ),
+      ),
+      child: SafeArea(
+        right: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Brand Logo & Version
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+              child: Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.black.withAlpha(20),
+                        width: 1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withAlpha(25),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    padding: const EdgeInsets.all(5),
+                    child: Image.asset(
+                      'assets/app_logo.png',
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Line Reader',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.3,
+                            color: colorScheme.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'v0.1.43',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            // Navigation Items
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Column(
+                children: [
+                  _SidebarItem(
+                    icon: Icons.menu_book_rounded,
+                    label: s.articlesTitle,
+                    isSelected: isArticlesActive,
+                    onTap: onSelectMainMenu,
+                  ),
+                  const SizedBox(height: 6),
+                  _SidebarItem(
+                    icon: Icons.travel_explore_rounded,
+                    label: s.t('Akıllı Tarayıcı', 'Smart Browser'),
+                    isSelected: isBrowserActive,
+                    onTap: onOpenBrowser,
+                  ),
+                  const SizedBox(height: 6),
+                  _SidebarItem(
+                    icon: Icons.bookmarks_rounded,
+                    label: s.myWordsTitle,
+                    isSelected: isWordsActive,
+                    onTap: onSelectWords,
+                    badgeCount: wordsController?.lists.fold<int>(
+                      0,
+                      (sum, list) =>
+                          sum + (wordsController?.wordsForList(list.id).length ?? 0),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  _SidebarItem(
+                    icon: Icons.settings_rounded,
+                    label: s.settingsTitle,
+                    isSelected: false,
+                    onTap: onOpenSettings,
+                  ),
+                ],
+              ),
+            ),
+
+            const Spacer(),
+
+            // User Profile Card at Bottom
+            ListenableBuilder(
+              listenable: authController,
+              builder: (context, _) {
+                final isAuth = authController.isAuthenticated;
+                final email = authController.user?.email;
+                final displayName = email != null && email.isNotEmpty
+                    ? email.split('@').first
+                    : s.t('Misafir Öğrenci', 'Guest Student');
+                final isUnlimited = authController.isUnlimited;
+
+                return Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<bool>(
+                            builder: (_) => AuthScreen(
+                              controller: authController,
+                              canPop: true,
+                            ),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? const Color(0xFF161B22)
+                              : colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: colorScheme.outlineVariant.withAlpha(60),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 18,
+                              backgroundColor: colorScheme.primaryContainer,
+                              child: Text(
+                                displayName.isNotEmpty
+                                    ? displayName[0].toUpperCase()
+                                    : 'L',
+                                style: TextStyle(
+                                  color: colorScheme.onPrimaryContainer,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    displayName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Row(
+                                    children: [
+                                      if (isUnlimited) ...[
+                                        const Icon(
+                                          Icons.star_rounded,
+                                          size: 13,
+                                          color: Color(0xFFEAB308),
+                                        ),
+                                        const SizedBox(width: 3),
+                                        Text(
+                                          'Premium',
+                                          style: theme.textTheme.labelSmall
+                                              ?.copyWith(
+                                            color: const Color(0xFFEAB308),
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ] else ...[
+                                        Text(
+                                          isAuth
+                                              ? s.t('Standart', 'Standard')
+                                              : s.t('Giriş Yap', 'Sign In'),
+                                          style: theme.textTheme.labelSmall
+                                              ?.copyWith(
+                                            color: colorScheme.primary,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              size: 18,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SidebarItem extends StatelessWidget {
+  const _SidebarItem({
+    required this.icon,
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+    this.badgeCount,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final int? badgeCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    final bg = isSelected ? colorScheme.primary : Colors.transparent;
+    final fg = isSelected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        hoverColor: colorScheme.primary.withAlpha(20),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: colorScheme.primary.withAlpha(70),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: fg),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: fg,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ),
+              if (badgeCount != null && badgeCount! > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? colorScheme.onPrimary.withAlpha(40)
+                        : colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    badgeCount.toString(),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: isSelected
+                          ? colorScheme.onPrimary
+                          : colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

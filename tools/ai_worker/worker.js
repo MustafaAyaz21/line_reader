@@ -1520,12 +1520,16 @@ async function handleDeveloperPanelRequest(request, env, verifiedUser, path, met
     const author = String(rawArticle.author || "").trim() || "Line Reader";
     const publishedAt =
       String(rawArticle.published_at || "").trim() || new Date().toISOString();
+    const imageUrl =
+      String(rawArticle.image_url || rawArticle.imageUrl || "").trim() ||
+      resolveTopicImageUrl(title, category, content);
 
     const articleObj = {
       id,
       level,
       title,
       description,
+      image_url: imageUrl,
       reading_time: String(rawArticle.reading_time || "").trim() || readingTime,
       reading_time_minutes: Number(rawArticle.reading_time_minutes) || readingMin,
       language: String(rawArticle.language || "en").trim() || "en",
@@ -1897,6 +1901,75 @@ function buildArticleGenerationPrompt(level, topic) {
   ].join("\n");
 }
 
+function resolveTopicImageUrl(title, category, content) {
+  const text = `${title || ""} ${category || ""} ${content ? content.slice(0, 300) : ""}`.toLowerCase();
+  
+  if (text.includes("cycl") || text.includes("bike") || text.includes("bicycle")) {
+    return "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=720&q=75";
+  }
+  if (text.includes("marathon") || text.includes("sahara") || text.includes("desert") || text.includes("running") || text.includes("runner")) {
+    return "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?auto=format&fit=crop&w=720&q=75";
+  }
+  if (text.includes("otter") || text.includes("kelp") || text.includes("coral") || text.includes("reef") || text.includes("marine")) {
+    return "https://images.unsplash.com/photo-1546026423-cc4642628d2b?auto=format&fit=crop&w=720&q=75";
+  }
+  if (text.includes("seal") || text.includes("arctic") || text.includes("antarctic") || text.includes("polar") || text.includes("glacier") || text.includes("shackleton")) {
+    return "https://images.unsplash.com/photo-1517411032315-54ef2cb783bb?auto=format&fit=crop&w=720&q=75";
+  }
+  if (text.includes("sculpture") || text.includes("bottle") || text.includes("trash") || text.includes("craft") || text.includes("recycle")) {
+    return "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=720&q=75";
+  }
+  if (text.includes("floating cit") || text.includes("architecture") || text.includes("urban") || text.includes("skyscraper") || text.includes("building")) {
+    return "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=720&q=75";
+  }
+  if (text.includes("sunlight") || text.includes("morning sun") || text.includes("circadian") || text.includes("sunrise")) {
+    return "https://images.unsplash.com/photo-1470240731273-7821a6eeb6bd?auto=format&fit=crop&w=720&q=75";
+  }
+  if (text.includes("paint") || text.includes("art") || text.includes("color") || text.includes("canvas")) {
+    return "https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=720&q=75";
+  }
+  if (text.includes("psychol") || text.includes("mind") || text.includes("neuro") || text.includes("deja vu") || text.includes("unfinished") || text.includes("zeigarnik") || text.includes("brain")) {
+    return "https://images.unsplash.com/photo-1507413245164-6160d8298b31?auto=format&fit=crop&w=720&q=75";
+  }
+  if (text.includes("aluminum") || text.includes("metal") || text.includes("industrial") || text.includes("factory") || text.includes("manufacturing")) {
+    return "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=720&q=75";
+  }
+  if (text.includes("love") || text.includes("negative feeling") || text.includes("relationship") || text.includes("emotion") || text.includes("friendship")) {
+    return "https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=720&q=75";
+  }
+  if (text.includes("space") || text.includes("galaxy") || text.includes("telescope") || text.includes("star") || text.includes("planet") || text.includes("cosmos") || text.includes("universe")) {
+    return "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=720&q=75";
+  }
+  if (text.includes("black hole") || text.includes("physics") || text.includes("neutron") || text.includes("relativity") || text.includes("einstein")) {
+    return "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=720&q=75";
+  }
+  if (text.includes("ocean") || text.includes("sea") || text.includes("deep-sea") || text.includes("octopus") || text.includes("abyss") || text.includes("mariana")) {
+    return "https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&w=720&q=75";
+  }
+  if (text.includes("forest") || text.includes("tree") || text.includes("fungal") || text.includes("wood wide") || text.includes("nature") || text.includes("plant")) {
+    return "https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=720&q=75";
+  }
+  if (text.includes("butterfly") || text.includes("bird") || text.includes("migration") || text.includes("wildlife") || text.includes("animal")) {
+    return "https://images.unsplash.com/photo-1535083783855-76ae62b2914e?auto=format&fit=crop&w=720&q=75";
+  }
+  if (text.includes("ai") || text.includes("artificial intelligence") || text.includes("robot") || text.includes("interface") || text.includes("computer") || text.includes("tech")) {
+    return "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=720&q=75";
+  }
+  if (text.includes("roman") || text.includes("alexandria") || text.includes("ancient") || text.includes("history") || text.includes("manuscript")) {
+    return "https://images.unsplash.com/photo-1552832230-c0197dd311b5?auto=format&fit=crop&w=720&q=75";
+  }
+  if (text.includes("book") || text.includes("reading") || text.includes("library") || text.includes("literature") || text.includes("language")) {
+    return "https://images.unsplash.com/photo-1457369804613-52c61a468e7d?auto=format&fit=crop&w=720&q=75";
+  }
+  if (text.includes("music") || text.includes("song") || text.includes("melody")) {
+    return "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=720&q=75";
+  }
+  if (text.includes("sleep") || text.includes("dream") || text.includes("rest")) {
+    return "https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?auto=format&fit=crop&w=720&q=75";
+  }
+  return "https://images.unsplash.com/photo-1499750310107-5fef28a66643?auto=format&fit=crop&w=720&q=75";
+}
+
 function finalizeGeneratedArticle(parsed, level, providerName) {
   const title = String(parsed?.title || "").trim();
   const content = String(parsed?.content || "").trim();
@@ -1906,6 +1979,9 @@ function finalizeGeneratedArticle(parsed, level, providerName) {
     String(parsed.description || "").trim() || buildFallbackDescription(content);
   const category =
     String(parsed.category || "").trim() || inferArticleCategory(title, content);
+  const imageUrl =
+    String(parsed.image_url || parsed.imageUrl || "").trim() ||
+    resolveTopicImageUrl(title, category, content);
   const wordCount = content.split(/\s+/).filter(Boolean).length;
   const readingMin = Math.max(1, Math.round(wordCount / 145));
   const readingTime = readingMin <= 1 ? "1 - 2 dk" : `${readingMin} - ${readingMin + 1} dk`;
@@ -1915,6 +1991,7 @@ function finalizeGeneratedArticle(parsed, level, providerName) {
     title,
     description,
     category,
+    image_url: imageUrl,
     author: "Line Reader",
     reading_time: readingTime,
     reading_time_minutes: readingMin,

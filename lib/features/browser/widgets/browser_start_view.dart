@@ -2,11 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../models/favorite_site.dart';
 
-/// Tarayıcı ilk açıldığında hiçbir harici site veya Google sayfası yüklemeden
-/// gösterilen Line Reader başlangıç ekranı:
-/// - Üstte kullanıcının favori siteleri yan yana sıralı durur.
-/// - Ortada kalın "Line Reader" başlığı, altında ekranın sağından çıkıp
-///   solundan devam eden hareketli kesik çizgiler ve sade arama kutusu yer alır.
+/// Tarayıcı ilk açıldığında gösterilen modern Line Reader başlangıç ekranı:
+/// - Üstte kullanıcının favori siteleri.
+/// - Ortada zarif beyaz zeminli cursive LR logosu, arama/URL çubuğu ve hızlı okuma kaynakları.
 class BrowserStartView extends StatefulWidget {
   const BrowserStartView({
     super.key,
@@ -28,6 +26,14 @@ class BrowserStartView extends StatefulWidget {
 class _BrowserStartViewState extends State<BrowserStartView> {
   final TextEditingController _searchController = TextEditingController();
 
+  static const List<({String title, String url, IconData icon})> _popularSites = [
+    (title: 'BBC News', url: 'https://www.bbc.com/news', icon: Icons.newspaper_rounded),
+    (title: 'Wikipedia', url: 'https://en.wikipedia.org', icon: Icons.menu_book_rounded),
+    (title: 'The Guardian', url: 'https://www.theguardian.com', icon: Icons.public_rounded),
+    (title: 'Medium', url: 'https://medium.com', icon: Icons.article_rounded),
+    (title: 'TechCrunch', url: 'https://techcrunch.com', icon: Icons.biotech_rounded),
+  ];
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -45,135 +51,202 @@ class _BrowserStartViewState extends State<BrowserStartView> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     return LayoutBuilder(
       builder: (context, constraints) {
         return SingleChildScrollView(
-          padding: const EdgeInsets.only(top: 12, bottom: 24),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              minHeight: (constraints.maxHeight - 36).clamp(0.0, double.infinity),
+              minHeight: (constraints.maxHeight - 40).clamp(0.0, double.infinity),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // 1) Üst bölüm: Yan yana sıralı Favori Siteler
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: _buildFavoritesSection(theme, colorScheme),
+                // 1) Üst bölüm: Favori Siteler
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1000),
+                    child: _buildFavoritesSection(theme, colorScheme),
+                  ),
                 ),
-                // 2) Orta bölüm: Kalın "Line Reader", ekran boyu akan kesik çizgiler ve arama kutusu
+
+                // 2) Orta bölüm: Modern Arama ve Keşif Alanı
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 28),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
+                  padding: const EdgeInsets.symmetric(vertical: 40),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 580),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Cursive LR Logo Badge (White background, black cursive letters)
+                        Container(
+                          width: 64,
+                          height: 64,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: Colors.black.withAlpha(25),
+                              width: 1,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withAlpha(isDark ? 50 : 15),
+                                blurRadius: 16,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          padding: const EdgeInsets.all(8),
+                          child: Image.asset(
+                            'assets/app_logo.png',
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+
+                        Text(
                           'Line Reader',
                           textAlign: TextAlign.center,
                           style: theme.textTheme.headlineMedium?.copyWith(
-                            fontSize: 30,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.3,
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.4,
                             color: colorScheme.onSurface,
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 10),
-                      // Ekranın sağının sonuna kadar gidip solundan çıkan kesik çizgiler
-                      _WrappingDashedLines(
-                        primaryColor: colorScheme.primary,
-                        secondaryColor: colorScheme.primary.withAlpha(115),
-                      ),
-                      const SizedBox(height: 12),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Center(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 460),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'Okumak istediğiniz konuyu arayın veya yukarıya site adresi yazın.',
-                                  textAlign: TextAlign.center,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                                const SizedBox(height: 18),
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: colorScheme.surfaceContainerLow,
-                                    borderRadius: BorderRadius.circular(18),
-                                    border: Border.all(
-                                      color: colorScheme.outlineVariant,
-                                    ),
-                                  ),
-                                  padding:
-                                      const EdgeInsets.fromLTRB(14, 4, 6, 4),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.search_rounded,
-                                        size: 22,
-                                        color: colorScheme.primary,
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: TextField(
-                                          controller: _searchController,
-                                          keyboardType: TextInputType.text,
-                                          textInputAction:
-                                              TextInputAction.search,
-                                          autocorrect: true,
-                                          enableSuggestions: true,
-                                          onSubmitted: (_) => _submit(),
-                                          style: theme.textTheme.bodyLarge,
-                                          decoration: const InputDecoration(
-                                            hintText:
-                                                'Konu, makale veya kelime ara...',
-                                            border: InputBorder.none,
-                                            isDense: true,
-                                            contentPadding:
-                                                EdgeInsets.symmetric(
-                                              vertical: 12,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      FilledButton(
-                                        onPressed: _submit,
-                                        style: FilledButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 16,
-                                            vertical: 11,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(13),
-                                          ),
-                                        ),
-                                        child: const Text('Ara'),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'İngilizce web sayfalarında okuyun, kelimelere dokunarak anında çevirin.',
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            height: 1.4,
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 24),
+
+                        // Arama / URL Çubuğu
+                        Container(
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? const Color(0xFF141922)
+                                : colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: colorScheme.outlineVariant.withAlpha(60),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withAlpha(isDark ? 40 : 10),
+                                blurRadius: 16,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          padding: const EdgeInsets.fromLTRB(16, 4, 6, 4),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.search_rounded,
+                                size: 22,
+                                color: colorScheme.primary,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextField(
+                                  controller: _searchController,
+                                  keyboardType: TextInputType.url,
+                                  textInputAction: TextInputAction.search,
+                                  autocorrect: false,
+                                  onSubmitted: (_) => _submit(),
+                                  style: theme.textTheme.bodyLarge,
+                                  decoration: InputDecoration(
+                                    hintText: 'Konu, makale veya web adresi (URL) yazın...',
+                                    hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                                      color: colorScheme.onSurfaceVariant.withAlpha(160),
+                                    ),
+                                    border: InputBorder.none,
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      vertical: 14,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              if (_searchController.text.isNotEmpty)
+                                IconButton(
+                                  icon: const Icon(Icons.close_rounded, size: 18),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() {});
+                                  },
+                                ),
+                              const SizedBox(width: 4),
+                              FilledButton(
+                                onPressed: _submit,
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: colorScheme.primary,
+                                  foregroundColor: colorScheme.onPrimary,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                    vertical: 12,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Ara',
+                                  style: TextStyle(fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // Popüler Okuma Kaynakları Çipleri
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          alignment: WrapAlignment.center,
+                          children: _popularSites.map((site) {
+                            return ActionChip(
+                              avatar: Icon(
+                                site.icon,
+                                size: 16,
+                                color: colorScheme.primary,
+                              ),
+                              label: Text(site.title),
+                              labelStyle: theme.textTheme.labelMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                              backgroundColor: isDark
+                                  ? const Color(0xFF161B22)
+                                  : colorScheme.surfaceContainerLow,
+                              side: BorderSide(
+                                color: colorScheme.outlineVariant.withAlpha(50),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              onPressed: () => widget.onSearch(site.url),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                // Dikey denge için alt boşluk
-                const SizedBox(height: 24),
+
+                const SizedBox(height: 20),
               ],
             ),
           ),
@@ -184,6 +257,7 @@ class _BrowserStartViewState extends State<BrowserStartView> {
 
   Widget _buildFavoritesSection(ThemeData theme, ColorScheme colorScheme) {
     final sites = widget.favoriteSites;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -192,15 +266,15 @@ class _BrowserStartViewState extends State<BrowserStartView> {
           children: [
             const Icon(
               Icons.star_rounded,
-              size: 17,
+              size: 18,
               color: Color(0xFFF59E0B),
             ),
             const SizedBox(width: 6),
             Text(
               'Favori Siteler',
               style: theme.textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+                color: colorScheme.onSurface,
               ),
             ),
             const Spacer(),
@@ -219,22 +293,34 @@ class _BrowserStartViewState extends State<BrowserStartView> {
         const SizedBox(height: 8),
         if (sites.isEmpty)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerLow,
+              color: isDark ? const Color(0xFF141922) : colorScheme.surfaceContainerLow,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: colorScheme.outlineVariant),
+              border: Border.all(color: colorScheme.outlineVariant.withAlpha(40)),
             ),
-            child: Text(
-              'Henüz favori site yok. Bir site açtığınızda yıldız ikonuyla buraya ekleyebilirsiniz.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline_rounded,
+                  size: 16,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Henüz favori site eklenmedi. Gezindiğiniz siteleri üstteki yıldız ikonuyla buraya ekleyebilirsiniz.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
             ),
           )
         else
           SizedBox(
-            height: 76,
+            height: 72,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: sites.length,
@@ -242,20 +328,22 @@ class _BrowserStartViewState extends State<BrowserStartView> {
               itemBuilder: (context, index) {
                 final site = sites[index];
                 return Material(
-                  color: colorScheme.surfaceContainerLow,
+                  color: isDark ? const Color(0xFF161B22) : colorScheme.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(14),
                   clipBehavior: Clip.antiAlias,
                   child: InkWell(
                     onTap: () => widget.onSelectFavorite(site),
                     child: Container(
-                      width: 132,
+                      width: 140,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
                         vertical: 10,
                       ),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: colorScheme.outlineVariant),
+                        border: Border.all(
+                          color: colorScheme.outlineVariant.withAlpha(50),
+                        ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -274,20 +362,21 @@ class _BrowserStartViewState extends State<BrowserStartView> {
                                   site.displayTitle,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.labelLarge?.copyWith(
-                                    fontWeight: FontWeight.w600,
+                                  style: theme.textTheme.labelMedium?.copyWith(
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 3),
                           Text(
                             site.displayHost,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: colorScheme.onSurfaceVariant,
+                              fontSize: 11,
                             ),
                           ),
                         ],
@@ -300,160 +389,5 @@ class _BrowserStartViewState extends State<BrowserStartView> {
           ),
       ],
     );
-  }
-}
-
-/// "Line Reader" başlığının altında ekranın sağ kenarına kadar kayıp sol
-/// kenarından kesintisiz devam eden hareketli kesik çizgiler.
-class _WrappingDashedLines extends StatefulWidget {
-  const _WrappingDashedLines({
-    required this.primaryColor,
-    required this.secondaryColor,
-  });
-
-  final Color primaryColor;
-  final Color secondaryColor;
-
-  @override
-  State<_WrappingDashedLines> createState() => _WrappingDashedLinesState();
-}
-
-class _WrappingDashedLinesState extends State<_WrappingDashedLines>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2800),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return RepaintBoundary(
-      child: SizedBox(
-        width: double.infinity,
-        height: 14,
-        child: CustomPaint(
-          painter: _WrappingDashedLinesPainter(
-            animation: _controller,
-            primaryColor: widget.primaryColor,
-            secondaryColor: widget.secondaryColor,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _WrappingDashedLinesPainter extends CustomPainter {
-  _WrappingDashedLinesPainter({
-    required this.animation,
-    required this.primaryColor,
-    required this.secondaryColor,
-  }) : super(repaint: animation);
-
-  final Animation<double> animation;
-  final Color primaryColor;
-  final Color secondaryColor;
-
-  static const List<(double dash, double gap)> _topPattern = <(double, double)>[
-    (26, 12),
-    (12, 10),
-    (36, 14),
-    (16, 12),
-  ];
-
-  static const List<(double dash, double gap)> _bottomPattern =
-      <(double, double)>[
-    (14, 14),
-    (30, 12),
-    (10, 10),
-    (22, 16),
-  ];
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (size.width <= 0) return;
-
-    canvas.save();
-    canvas.clipRect(Offset.zero & size);
-
-    final primaryPaint = Paint()
-      ..color = primaryColor
-      ..strokeWidth = 2.8
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-
-    final secondaryPaint = Paint()
-      ..color = secondaryColor
-      ..strokeWidth = 2.0
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-
-    _paintRow(
-      canvas: canvas,
-      width: size.width,
-      y: size.height * 0.30,
-      pattern: _topPattern,
-      progress: animation.value,
-      paint: primaryPaint,
-    );
-
-    _paintRow(
-      canvas: canvas,
-      width: size.width,
-      y: size.height * 0.78,
-      pattern: _bottomPattern,
-      progress: (animation.value + 0.38) % 1.0,
-      paint: secondaryPaint,
-    );
-
-    canvas.restore();
-  }
-
-  void _paintRow({
-    required Canvas canvas,
-    required double width,
-    required double y,
-    required List<(double dash, double gap)> pattern,
-    required double progress,
-    required Paint paint,
-  }) {
-    double patternLength = 0;
-    for (final (dash, gap) in pattern) {
-      patternLength += dash + gap;
-    }
-    if (patternLength <= 0) return;
-
-    // Soldan sağa sürekli akar; sağ kenarı aşan parça sol kenardan yeniden girer.
-    final double offset = progress * patternLength;
-    double cursor = -patternLength + offset;
-
-    while (cursor < width + patternLength) {
-      for (final (dash, gap) in pattern) {
-        final startX = cursor;
-        final endX = cursor + dash;
-        if (endX >= 0 && startX <= width) {
-          canvas.drawLine(Offset(startX, y), Offset(endX, y), paint);
-        }
-        cursor += dash + gap;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _WrappingDashedLinesPainter oldDelegate) {
-    return oldDelegate.primaryColor != primaryColor ||
-        oldDelegate.secondaryColor != secondaryColor;
   }
 }

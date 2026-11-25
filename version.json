@@ -1,7 +1,7 @@
 {
-    "latest_version":  "0.1.43",
-    "version_code":  44,
+    "latest_version":  "0.1.44",
+    "version_code":  45,
     "min_version_code":  0,
-    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.43/app-release.apk",
-    "release_notes":  "İki aşamalı otomatik makale yayın planlayıcısı (A1-C2 tüm seviyeler), tek tıkla kaynaktan çekme & Podcast AI canlı adım takibi ve PC makale stüdyosu güncellemeleri."
+    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.44/app-release.apk",
+    "release_notes":  "Yeni modern mobil ve web arayüzü, otomatik telifsiz konu görselleri, ergonomik seviye filtreleri ve Android bellek/performans optimizasyonları."
 }

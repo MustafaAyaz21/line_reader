@@ -8,6 +8,7 @@ import '../../core/localization/app_strings.dart';
 import '../../core/settings/api_key_controller.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tts/tts_service.dart';
+import '../../core/widgets/line_loading_indicator.dart';
 import '../../core/widgets/line_refresh_indicator.dart';
 import '../auth/controllers/auth_controller.dart';
 import '../settings/widgets/api_key_dialog.dart';
@@ -697,12 +698,21 @@ class _WordsScreenState extends State<WordsScreen> {
     await tts.toggleSpeak(text: text, target: target);
   }
 
-  Widget _buildTopSearchBar(ThemeData theme, ColorScheme colorScheme) {
+  Widget _buildTopSearchBar(ThemeData theme, ColorScheme colorScheme, bool isWideScreen) {
     final s = context.l10n;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+    final isDark = theme.brightness == Brightness.dark;
+
+    final searchField = Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF161B22) : colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colorScheme.outlineVariant.withAlpha(50)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
         children: [
+          Icon(Icons.search_rounded, size: 20, color: colorScheme.onSurfaceVariant),
+          const SizedBox(width: 8),
           Expanded(
             child: TextField(
               key: const ValueKey<String>('words_top_search_field'),
@@ -714,51 +724,83 @@ class _WordsScreenState extends State<WordsScreen> {
               enableSuggestions: true,
               onChanged: (_) => setState(() {}),
               onSubmitted: (value) => _performTopSearch(value),
+              style: theme.textTheme.bodyMedium,
               decoration: InputDecoration(
                 hintText: s.t(
                   'Kelime Ara (örn. resilient, make)...',
                   'Search Word (e.g. resilient, make)...',
                 ),
-                prefixIcon: const Icon(Icons.search_rounded, size: 20),
-                suffixIcon: (_searchController.text.isNotEmpty ||
-                        _isSearchPanelOpen)
-                    ? IconButton(
-                        key: const ValueKey<String>(
-                          'words_top_search_clear_button',
-                        ),
-                        onPressed: _clearTopSearch,
-                        icon: const Icon(Icons.close_rounded, size: 18),
-                        tooltip: s.t('Temizle', 'Clear'),
-                      )
-                    : null,
-                filled: true,
-                fillColor: colorScheme.surfaceContainerHighest,
+                hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant.withAlpha(160),
+                ),
+                border: InputBorder.none,
                 isDense: true,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
-                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),
           ),
+          if (_searchController.text.isNotEmpty || _isSearchPanelOpen)
+            IconButton(
+              key: const ValueKey<String>('words_top_search_clear_button'),
+              onPressed: _clearTopSearch,
+              icon: const Icon(Icons.close_rounded, size: 18),
+              tooltip: s.t('Temizle', 'Clear'),
+            ),
+        ],
+      ),
+    );
+
+    final searchButton = FilledButton(
+      key: const ValueKey<String>('words_top_search_button'),
+      onPressed: _isSearchingWord
+          ? null
+          : () => _performTopSearch(_searchController.text),
+      style: FilledButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+      ),
+      child: Text(s.t('Ara', 'Search')),
+    );
+
+    if (isWideScreen) {
+      return Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 960),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+            child: Row(
+              children: [
+                Expanded(child: searchField),
+                const SizedBox(width: 10),
+                searchButton,
+                const SizedBox(width: 12),
+                FilledButton.tonalIcon(
+                  onPressed: () => _handleCreateList(context),
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: Text(s.t('Yeni Liste', 'New List')),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+      child: Row(
+        children: [
+          Expanded(child: searchField),
           const SizedBox(width: 8),
-          FilledButton(
-            key: const ValueKey<String>('words_top_search_button'),
-            onPressed: _isSearchingWord
-                ? null
-                : () => _performTopSearch(_searchController.text),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ),
-            child: Text(s.t('Ara', 'Search')),
-          ),
+          searchButton,
         ],
       ),
     );
@@ -1237,66 +1279,80 @@ class _WordsScreenState extends State<WordsScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final visuals = AppThemeVisuals.of(context);
+    final isWideScreen = MediaQuery.of(context).size.width >= 840;
 
     return Scaffold(
       backgroundColor: visuals.hasBackdrop ? Colors.transparent : null,
-      appBar: AppBar(
-        title: Text(s.myWordsTitle),
-        actions: [
-          if (!kIsWeb && widget.updateController != null)
-            UpdateActionButton(controller: widget.updateController!),
-          if (widget.apiKeyController != null &&
-              widget.localeController != null &&
-              widget.authController != null) ...[
-            SettingsActionButton(
-              apiKeyController: widget.apiKeyController!,
-              localeController: widget.localeController!,
-              authController: widget.authController!,
-              onClearCache: widget.onClearCache,
+      appBar: isWideScreen
+          ? null
+          : AppBar(
+              title: Text(s.myWordsTitle),
+              actions: [
+                if (!kIsWeb && widget.updateController != null)
+                  UpdateActionButton(controller: widget.updateController!),
+                if (widget.apiKeyController != null &&
+                    widget.localeController != null &&
+                    widget.authController != null) ...[
+                  SettingsActionButton(
+                    apiKeyController: widget.apiKeyController!,
+                    localeController: widget.localeController!,
+                    authController: widget.authController!,
+                    onClearCache: widget.onClearCache,
+                  ),
+                  const SizedBox(width: 4),
+                ] else if (widget.apiKeyController != null) ...[
+                  ApiKeyActionButton(
+                    controller: widget.apiKeyController!,
+                    onClearCache: widget.onClearCache,
+                  ),
+                  const SizedBox(width: 4),
+                ],
+              ],
             ),
-            const SizedBox(width: 4),
-          ] else if (widget.apiKeyController != null) ...[
-            ApiKeyActionButton(
-              controller: widget.apiKeyController!,
-              onClearCache: widget.onClearCache,
-            ),
-            const SizedBox(width: 4),
-          ],
-        ],
-      ),
-      floatingActionButton: _isSearchPanelOpen
+      floatingActionButton: isWideScreen || _isSearchPanelOpen
           ? null
           : FloatingActionButton(
               onPressed: () => _handleCreateList(context),
               tooltip: s.t('Yeni Liste Oluştur', 'Create New List'),
               child: const Icon(Icons.add_rounded),
             ),
-      body: ListenableBuilder(
-        listenable: widget.controller,
-        builder: (context, _) {
-          final lists = widget.controller.lists;
+      body: SafeArea(
+        top: isWideScreen,
+        child: ListenableBuilder(
+          listenable: widget.controller,
+          builder: (context, _) {
+            final lists = widget.controller.lists;
 
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildTopSearchBar(theme, colorScheme),
-              Divider(height: 1, color: colorScheme.outlineVariant),
-              Expanded(
-                child: _isSearchPanelOpen
-                    ? _buildInlineSearchPanel(theme, colorScheme, lists)
-                    : _buildListsBody(context, lists),
-              ),
-            ],
-          );
-        },
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildTopSearchBar(theme, colorScheme, isWideScreen),
+                // "o çizgileri kaldır oradaki" - Removed divider line
+                Expanded(
+                  child: _isSearchPanelOpen
+                      ? _buildInlineSearchPanel(theme, colorScheme, lists)
+                      : _buildListsBody(context, lists, isWideScreen),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
 
-  Widget _buildListsBody(BuildContext context, List<WordList> lists) {
+  Widget _buildListsBody(
+    BuildContext context,
+    List<WordList> lists,
+    bool isWideScreen,
+  ) {
+    final s = context.l10n;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     if (widget.controller.isLoading && lists.isEmpty) {
       return const Center(
-        child: CircularProgressIndicator(),
+        child: LineLoadingIndicator(message: 'Listeler yükleniyor...'),
       );
     }
 
@@ -1322,22 +1378,77 @@ class _WordsScreenState extends State<WordsScreen> {
       );
     }
 
+    final totalWords = lists.fold<int>(0, (sum, l) => sum + l.wordCount);
+
+    final listView = ListView.builder(
+      padding: const EdgeInsets.fromLTRB(0, 4, 0, 88),
+      itemCount: lists.length,
+      itemBuilder: (context, index) {
+        final list = lists[index];
+        return WordListCard(
+          list: list,
+          onTap: () => _openList(context, list),
+          onEdit: () => _handleEditList(context, list),
+          onDelete:
+              list.isDefault ? null : () => _handleDeleteList(context, list),
+        );
+      },
+    );
+
+    if (isWideScreen) {
+      return Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 960),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+                child: Row(
+                  children: [
+                    Text(
+                      s.myWordsTitle,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '${lists.length} liste • $totalWords kelime',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: LineRefreshIndicator(
+                  onRefresh: widget.controller.loadLists,
+                  child: listView,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return LineRefreshIndicator(
       onRefresh: widget.controller.loadLists,
-      child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(0, 8, 0, 88),
-        itemCount: lists.length,
-        itemBuilder: (context, index) {
-          final list = lists[index];
-          return WordListCard(
-            list: list,
-            onTap: () => _openList(context, list),
-            onEdit: () => _handleEditList(context, list),
-            onDelete:
-                list.isDefault ? null : () => _handleDeleteList(context, list),
-          );
-        },
-      ),
+      child: listView,
     );
   }
 }

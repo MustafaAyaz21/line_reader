@@ -436,16 +436,28 @@ class _AuthScreenState extends State<AuthScreen> with WidgetsBindingObserver {
                     children: <Widget>[
                       Center(
                         child: Container(
-                          width: 60,
-                          height: 60,
+                          width: 64,
+                          height: 64,
                           decoration: BoxDecoration(
-                            color: colorScheme.primaryContainer,
+                            color: Colors.white,
                             borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: Colors.black.withAlpha(20),
+                              width: 1,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withAlpha(20),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                           ),
-                          child: Icon(
-                            Icons.auto_stories_rounded,
-                            size: 32,
-                            color: colorScheme.onPrimaryContainer,
+                          clipBehavior: Clip.antiAlias,
+                          padding: const EdgeInsets.all(8),
+                          child: Image.asset(
+                            'assets/app_logo.png',
+                            fit: BoxFit.contain,
                           ),
                         ),
                       ),

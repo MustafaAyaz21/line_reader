@@ -214,103 +214,133 @@ class HowToUseScreen extends StatelessWidget {
       ),
     ];
 
-    return AppThemeBackdrop(
-      child: Scaffold(
-        backgroundColor: visuals.hasBackdrop ? Colors.transparent : null,
-        appBar: AppBar(
-          title: Text(s.t('Nasıl Kullanılır?', 'How to Use')),
-        ),
-        body: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-          children: <Widget>[
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: colorScheme.primaryContainer.withAlpha(110),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: colorScheme.primary.withAlpha(60),
+    final isWideScreen = MediaQuery.of(context).size.width >= 840;
+
+    final bodyContent = ListView(
+      padding: EdgeInsets.symmetric(
+        horizontal: isWideScreen ? 24 : 16,
+        vertical: 14,
+      ),
+      children: <Widget>[
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: theme.brightness == Brightness.dark
+                ? const Color(0xFF141922)
+                : colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withAlpha(50),
+            ),
+          ),
+          child: Row(
+            children: <Widget>[
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: Colors.black.withAlpha(20),
+                    width: 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(15),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                clipBehavior: Clip.antiAlias,
+                padding: const EdgeInsets.all(6),
+                child: Image.asset(
+                  'assets/app_logo.png',
+                  fit: BoxFit.contain,
                 ),
               ),
-              child: Row(
-                children: <Widget>[
-                  CircleAvatar(
-                    radius: 22,
-                    backgroundColor: colorScheme.primary,
-                    child: Icon(
-                      Icons.lightbulb_outline_rounded,
-                      color: colorScheme.onPrimary,
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      s.t(
+                        'Line Reader Hızlı Rehber',
+                        'Line Reader Quick Guide',
+                      ),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.2,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          s.t(
-                            'Line Reader Hızlı Rehber',
-                            'Line Reader Quick Guide',
-                          ),
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          s.t(
-                            'Merak ettiğin özelliğe dokun, 10 saniyede nasıl kullanıldığını gör.',
-                            'Tap any feature below to see how it works in seconds.',
-                          ),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
+                    const SizedBox(height: 3),
+                    Text(
+                      s.t(
+                        'Merak ettiğin özelliğe dokun, adım adım nasıl kullanıldığını gör.',
+                        'Tap any feature below to see how it works.',
+                      ),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 14),
-            ...sections.asMap().entries.map((entry) {
-              final index = entry.key;
-              final item = entry.value;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Card(
-                  margin: EdgeInsets.zero,
-                  clipBehavior: Clip.antiAlias,
-                  child: Theme(
-                    data: theme.copyWith(dividerColor: Colors.transparent),
-                    child: ExpansionTile(
-                      initiallyExpanded: index == 0,
-                      tilePadding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 6,
-                      ),
-                      childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      leading: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: item.iconBg,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(item.icon, color: item.iconColor, size: 21),
-                      ),
-                      title: Text(
-                        item.title,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      subtitle: Text(
-                        item.summary,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        ...sections.asMap().entries.map((entry) {
+          final index = entry.key;
+          final item = entry.value;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Card(
+              margin: EdgeInsets.zero,
+              elevation: 0,
+              color: theme.brightness == Brightness.dark
+                  ? const Color(0xFF141922)
+                  : colorScheme.surfaceContainerLow,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(
+                  color: colorScheme.outlineVariant.withAlpha(50),
+                ),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Theme(
+                data: theme.copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  initiallyExpanded: index == 0,
+                  tilePadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  leading: Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: item.iconBg,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(item.icon, color: item.iconColor, size: 22),
+                  ),
+                  title: Text(
+                    item.title,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  subtitle: Text(
+                    item.summary,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
                       children: <Widget>[
                         const SizedBox(height: 4),
                         ...item.steps.asMap().entries.map((stepEntry) {
@@ -387,7 +417,22 @@ class HowToUseScreen extends StatelessWidget {
               );
             }),
           ],
+        );
+
+    return AppThemeBackdrop(
+      child: Scaffold(
+        backgroundColor: visuals.hasBackdrop ? Colors.transparent : null,
+        appBar: AppBar(
+          title: Text(s.t('Nasıl Kullanılır?', 'How to Use')),
         ),
+        body: isWideScreen
+            ? Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 820),
+                  child: bodyContent,
+                ),
+              )
+            : bodyContent,
       ),
     );
   }

@@ -334,35 +334,101 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ];
 
-            return LayoutBuilder(
-              builder: (context, constraints) {
-                const verticalPadding = 32.0; // top 14 + bottom 18
-                const cardSpacing = 12.0;
-                const minCardHeight = 88.0;
-                final minContentHeight = (cards.length * minCardHeight) +
-                    ((cards.length - 1) * cardSpacing) +
-                    verticalPadding;
-                final totalHeight = constraints.maxHeight > minContentHeight
-                    ? constraints.maxHeight
-                    : minContentHeight;
+            final isWideScreen = MediaQuery.of(context).size.width >= 840;
 
-                return SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
-                  child: SizedBox(
-                    height: totalHeight - verticalPadding,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: <Widget>[
-                        for (var i = 0; i < cards.length; i++) ...<Widget>[
-                          Expanded(child: cards[i]),
-                          if (i < cards.length - 1)
-                            const SizedBox(height: cardSpacing),
-                        ],
+            final content = Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (isWideScreen) ...[
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 20),
+                    padding: const EdgeInsets.all(22),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0xFF141922)
+                          : colorScheme.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: colorScheme.outlineVariant.withAlpha(50),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: Colors.black.withAlpha(20),
+                              width: 1,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withAlpha(20),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          padding: const EdgeInsets.all(6),
+                          child: Image.asset(
+                            'assets/app_logo.png',
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                s.t('Ayarlar ve Tercihler', 'Settings & Preferences'),
+                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: -0.3,
+                                    ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                s.t(
+                                  'Hesap yetkilerini, dil seçimini, temayı ve okuma tercihlerini yönetin.',
+                                  'Manage account permissions, language, theme, and reading preferences.',
+                                ),
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                );
-              },
+                ],
+                for (var i = 0; i < cards.length; i++) ...<Widget>[
+                  cards[i],
+                  if (i < cards.length - 1)
+                    const SizedBox(height: 12),
+                ],
+              ],
+            );
+
+            return SingleChildScrollView(
+              padding: EdgeInsets.symmetric(
+                horizontal: isWideScreen ? 24 : 16,
+                vertical: isWideScreen ? 24 : 14,
+              ),
+              child: isWideScreen
+                  ? Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 820),
+                        child: content,
+                      ),
+                    )
+                  : content,
             );
           },
         ),
@@ -1833,67 +1899,75 @@ class _SettingsCategoryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final iconBoxSize = expandFill ? 52.0 : 44.0;
-    final iconSize = expandFill ? 26.0 : 22.0;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Card(
       margin: EdgeInsets.zero,
+      elevation: 0,
+      color: isDark ? const Color(0xFF141922) : colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: colorScheme.outlineVariant.withAlpha(50),
+          width: 1,
+        ),
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        child: Center(
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: expandFill ? 18 : 16,
-              vertical: expandFill ? 14 : 16,
-            ),
-            child: Row(
-              children: <Widget>[
-                Container(
-                  width: iconBoxSize,
-                  height: iconBoxSize,
-                  decoration: BoxDecoration(
-                    color: iconBg,
-                    borderRadius: BorderRadius.circular(expandFill ? 16 : 14),
-                  ),
-                  child: Icon(icon, color: iconColor, size: iconSize),
+        borderRadius: BorderRadius.circular(16),
+        hoverColor: colorScheme.primary.withAlpha(15),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 18,
+            vertical: 18,
+          ),
+          child: Row(
+            children: <Widget>[
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: iconBg,
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontSize: expandFill ? 17 : null,
-                          fontWeight: FontWeight.w700,
-                        ),
+                child: Icon(icon, color: iconColor, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.2,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontSize: expandFill ? 13 : null,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontSize: 13,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  size: expandFill ? 24 : 22,
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 22,
+                color: colorScheme.onSurfaceVariant.withAlpha(160),
+              ),
+            ],
           ),
         ),
       ),
@@ -1926,6 +2000,8 @@ class _SettingsCategorySubPage extends StatelessWidget {
         final theme = Theme.of(context);
         final colorScheme = theme.colorScheme;
         final visuals = AppThemeVisuals.of(context);
+        final isWideScreen = MediaQuery.of(context).size.width >= 840;
+        final content = bodyBuilder(context, theme, colorScheme, s);
 
         return AppThemeBackdrop(
           child: Scaffold(
@@ -1933,7 +2009,14 @@ class _SettingsCategorySubPage extends StatelessWidget {
             appBar: AppBar(
               title: Text(titleBuilder(s)),
             ),
-            body: bodyBuilder(context, theme, colorScheme, s),
+            body: isWideScreen
+                ? Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 820),
+                      child: content,
+                    ),
+                  )
+                : content,
           ),
         );
       },

@@ -13,6 +13,11 @@ import 'features/splash/splash_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  if (!kIsWeb) {
+    // Düşük ve orta segment telefonlarda bellek şişmesini ve takılmayı önleyen RAM tavanı
+    PaintingBinding.instance.imageCache.maximumSize = 100;
+    PaintingBinding.instance.imageCache.maximumSizeBytes = 40 << 20; // 40 MB
+  }
   if (kIsWeb) {
     databaseFactory = databaseFactoryFfiWeb;
   }

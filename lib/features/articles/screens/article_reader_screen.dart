@@ -1610,7 +1610,20 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                 ),
             ],
           ),
-          const SizedBox(height: 12),
+          if (article.imageUrl != null && article.imageUrl!.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 14),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.network(
+                article.imageUrl!,
+                height: 180,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              ),
+            ),
+          ],
+          const SizedBox(height: 14),
           Text(
             article.title,
             key: const ValueKey<String>('reader_article_title'),
