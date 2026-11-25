@@ -1,7 +1,7 @@
 {
-    "latest_version":  "0.1.45",
-    "version_code":  46,
+    "latest_version":  "0.1.46",
+    "version_code":  47,
     "min_version_code":  0,
-    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.45/app-release.apk",
-    "release_notes":  "v0.1.45: Yeni modern mobil ve web arayüzü, otomatik telifsiz konu görselleri, profil ve hesap yönetimi düzeltmesi ve Android bellek/performans optimizasyonları."
+    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.46/app-release.apk",
+    "release_notes":  "v0.1.46: Tüm temalarda tam renk/kontrast senkronizasyonu, masaüstü dergi kartları, PC okuma düzeni ve sesli okuma iyileştirmeleri."
 }
