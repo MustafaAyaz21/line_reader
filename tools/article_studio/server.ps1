@@ -1831,12 +1831,14 @@ try {
             }
             elseif ($method -eq "POST" -and $path -eq "/api/ai/upload-image") {
                 $body = Read-RequestBody $req
-                $reqObj = $body | ConvertFrom-Json
-                $rawId = if ($reqObj.id) { ([string]$reqObj.id).Trim() } else { "article-$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())" }
+                # PowerShell 5.1 ConvertFrom-Json 2 MB sınırına takılmamak için id ve data_url alanlarını doğrudan ayıkla
+                $rawId = "article-$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
+                if ($body -match '"id"\s*:\s*"([^"]+)"') {
+                    $rawId = $Matches[1].Trim()
+                }
                 $safeId = [regex]::Replace($rawId.ToLowerInvariant(), '[^a-z0-9_-]+', '-').Trim('-')
                 if ([string]::IsNullOrWhiteSpace($safeId)) { $safeId = "article-cover" }
-                $dataUrl = [string]$reqObj.data_url
-                if ($dataUrl -match '^data:image/([a-zA-Z0-9+.-]+);base64,(.+)$') {
+                if ($body -match 'data:image/([a-zA-Z0-9+.-]+);base64,([A-Za-z0-9+/=]+)') {
                     $mimeSub = $Matches[1].ToLowerInvariant()
                     $b64 = $Matches[2]
                     $ext = if ($mimeSub -like "*png*") { ".png" } elseif ($mimeSub -like "*webp*") { ".webp" } else { ".jpg" }

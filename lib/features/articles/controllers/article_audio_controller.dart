@@ -1022,22 +1022,75 @@ class ArticleAudioController extends ChangeNotifier {
     }
   }
 
+  /// Bir segmentin `_sentences` listesindeki gerçek global cümle indeksini çözer.
+  /// Sunucu segmentleri hem paragraf-içi (`p: 1, s: 0`) hem de global (`s: 7`)
+  /// biçimde üretebildiği için her iki formatı da hatasız eşleştirir.
+  int _globalIndexForSegment(int segPos, ArticleAudioSegment seg) {
+    if (_sentences.isEmpty) return 0;
+
+    // Paragraf içindeki s. cümleyi bul (örn. p: 1, s: 0 -> 2. paragrafın 1. cümlesi)
+    var localCounter = 0;
+    for (var i = 0; i < _sentences.length; i++) {
+      if (_sentences[i].paragraphIndex == seg.paragraphIndex) {
+        if (localCounter == seg.sentenceIndex) {
+          return i;
+        }
+        localCounter++;
+      }
+    }
+
+    // Eski/global format: seg.sentenceIndex doğrudan global indeks olabilir
+    if (seg.sentenceIndex >= 0 &&
+        seg.sentenceIndex < _sentences.length &&
+        _sentences[seg.sentenceIndex].paragraphIndex == seg.paragraphIndex) {
+      return seg.sentenceIndex;
+    }
+
+    return segPos.clamp(0, _sentences.length - 1);
+  }
+
+  ArticleAudioSegment? _segmentForGlobalSentence(int globalIndex) {
+    final segments = article.audioSegments;
+    if (segments.isEmpty || _sentences.isEmpty) return null;
+    final clamped = globalIndex.clamp(0, _sentences.length - 1);
+    final targetSpan = _sentences[clamped];
+
+    var targetLocalIdx = 0;
+    for (var i = 0; i < clamped; i++) {
+      if (_sentences[i].paragraphIndex == targetSpan.paragraphIndex) {
+        targetLocalIdx++;
+      }
+    }
+
+    for (final seg in segments) {
+      if (seg.paragraphIndex == targetSpan.paragraphIndex &&
+          seg.sentenceIndex == targetLocalIdx) {
+        return seg;
+      }
+    }
+
+    for (final seg in segments) {
+      if (seg.paragraphIndex == targetSpan.paragraphIndex &&
+          seg.sentenceIndex == clamped) {
+        return seg;
+      }
+    }
+
+    if (clamped < segments.length) {
+      return segments[clamped];
+    }
+    return null;
+  }
+
   /// Verilen cümle indeksi için Podcast ses dosyasındaki başlangıç milisaniyesini
   /// döndürür (önce `audioSegments`, yoksa karakter uzunluğuna göre orantılı).
   int _startMsForSentence(int sentenceIndex) {
     if (_sentences.isEmpty) return 0;
     final clamped = sentenceIndex.clamp(0, _sentences.length - 1);
 
-    final segments = article.audioSegments;
-    if (segments.isNotEmpty) {
-      for (final seg in segments) {
-        if (seg.sentenceIndex == clamped) {
-          return seg.startMs;
-        }
-      }
-      if (clamped < segments.length) {
-        return segments[clamped].startMs;
-      }
+    final matchedSeg = _segmentForGlobalSentence(clamped);
+    if (matchedSeg != null) {
+      return matchedSeg.startMs;
     }
 
     var totalChars = 0;
@@ -1062,15 +1115,13 @@ class ArticleAudioController extends ChangeNotifier {
   int _seekTargetMsForSentence(int sentenceIndex) {
     final startMs = _startMsForSentence(sentenceIndex);
     if (startMs <= 0) return 0;
-    final segments = article.audioSegments;
-    for (final seg in segments) {
-      if (seg.sentenceIndex == sentenceIndex) {
-        final span = seg.endMs - seg.startMs;
-        if (span > 140) {
-          return seg.startMs + 60;
-        }
-        return seg.startMs;
+    final matchedSeg = _segmentForGlobalSentence(sentenceIndex);
+    if (matchedSeg != null) {
+      final span = matchedSeg.endMs - matchedSeg.startMs;
+      if (span > 140) {
+        return matchedSeg.startMs + 60;
       }
+      return matchedSeg.startMs;
     }
     return startMs + 60;
   }
@@ -1085,10 +1136,10 @@ class ArticleAudioController extends ChangeNotifier {
       for (var i = 0; i < segments.length; i++) {
         final seg = segments[i];
         if (ms >= seg.startMs) {
-          matched = seg.sentenceIndex;
+          matched = _globalIndexForSegment(i, seg);
         }
         if (ms >= seg.startMs && ms < seg.endMs) {
-          return seg.sentenceIndex.clamp(0, _sentences.length - 1);
+          return _globalIndexForSegment(i, seg);
         }
       }
       return matched.clamp(0, _sentences.length - 1);

@@ -2546,12 +2546,7 @@
           triggerBtn.textContent = "⏳ Yükleniyor...";
         }
         try {
-          const dataUrl = await new Promise((resolve, reject) => {
-            const r = new FileReader();
-            r.onload = () => resolve(String(r.result || ""));
-            r.onerror = () => reject(new Error("Görsel okunamadı."));
-            r.readAsDataURL(blob);
-          });
+          const dataUrl = await compressImageBlobToJpegDataUrl(blob);
           const res = await fetch("/api/ai/upload-image", {
             method: "POST",
             headers: { "Content-Type": "application/json; charset=utf-8" },
@@ -4081,6 +4076,35 @@
       });
     }
 
+    async function compressImageBlobToJpegDataUrl(blob, maxWidth = 1280, quality = 0.86) {
+      const rawDataUrl = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result || ""));
+        r.onerror = () => reject(new Error("Görsel okunamadı."));
+        r.readAsDataURL(blob);
+      });
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const scale = img.width > maxWidth ? (maxWidth / img.width) : 1;
+            const w = Math.max(1, Math.round(img.width * scale));
+            const h = Math.max(1, Math.round(img.height * scale));
+            const canvas = document.createElement("canvas");
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL("image/jpeg", quality));
+          } catch (_) {
+            resolve(rawDataUrl);
+          }
+        };
+        img.onerror = () => resolve(rawDataUrl);
+        img.src = rawDataUrl;
+      });
+    }
+
     // Global Ctrl+V ile doğrudan panodaki fotoğrafı aktif makaleye kapak olarak yapıştır
     window.addEventListener("paste", async (e) => {
       const modal = document.getElementById("pasteGeminiModal");
@@ -4094,13 +4118,8 @@
       const blob = imgItem.getAsFile();
       if (!blob) return;
       try {
-        showToast("⏳ Panodaki fotoğraf makaleye işleniyor...", "info");
-        const dataUrl = await new Promise((resolve, reject) => {
-          const r = new FileReader();
-          r.onload = () => resolve(String(r.result || ""));
-          r.onerror = () => reject(new Error("Görsel okunamadı."));
-          r.readAsDataURL(blob);
-        });
+        showToast("⏳ Panodaki fotoğraf optimize edilip kaydediliyor...", "info");
+        const dataUrl = await compressImageBlobToJpegDataUrl(blob);
         const res = await fetch("/api/ai/upload-image", {
           method: "POST",
           headers: { "Content-Type": "application/json; charset=utf-8" },
