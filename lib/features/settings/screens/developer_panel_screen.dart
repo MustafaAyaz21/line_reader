@@ -1102,9 +1102,9 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
       description: desc,
       author: author.isNotEmpty ? author : 'Line Reader',
       category: 'General',
-      sentences: lines,
-      meanings: const {},
-      wordRelations: const {},
+      wordMeanings: const <String, dynamic>{},
+      sentenceTranslations: const <String, dynamic>{},
+      wordRelations: const <String, dynamic>{},
     );
 
     setState(() {

@@ -167,6 +167,7 @@ class DevGeneratedArticle {
     required this.wordMeanings,
     required this.sentenceTranslations,
     required this.wordRelations,
+    this.readingTime,
     this.description,
     this.category,
     this.author,
@@ -184,6 +185,7 @@ class DevGeneratedArticle {
   final Map<String, dynamic> wordMeanings;
   final Map<String, dynamic> sentenceTranslations;
   final Map<String, dynamic> wordRelations;
+  final String? readingTime;
   final String? description;
   final String? category;
   final String? author;
@@ -198,6 +200,7 @@ class DevGeneratedArticle {
   DevGeneratedArticle copyWith({
     String? title,
     String? content,
+    String? readingTime,
     String? description,
     String? category,
     String? author,
@@ -215,6 +218,7 @@ class DevGeneratedArticle {
       wordMeanings: wordMeanings,
       sentenceTranslations: sentenceTranslations,
       wordRelations: wordRelations,
+      readingTime: readingTime ?? this.readingTime,
       description: description ?? this.description,
       category: category ?? this.category,
       author: author ?? this.author,
@@ -231,6 +235,8 @@ class DevGeneratedArticle {
         'level': level,
         'title': title,
         'content': content,
+        if (readingTime != null && readingTime!.trim().isNotEmpty)
+          'reading_time': readingTime,
         if (description != null && description!.trim().isNotEmpty)
           'description': description,
         if (category != null && category!.trim().isNotEmpty)
@@ -254,6 +260,7 @@ class DevGeneratedArticle {
       level: (json['level'] ?? 'B1').toString().trim().toUpperCase(),
       title: (json['title'] ?? '').toString().trim(),
       content: (json['content'] ?? '').toString().trim(),
+      readingTime: json['reading_time']?.toString(),
       description: json['description']?.toString(),
       category: json['category']?.toString(),
       author: json['author']?.toString(),
