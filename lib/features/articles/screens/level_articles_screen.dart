@@ -337,19 +337,29 @@ class _LevelArticleCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  if (article.imageUrl != null && article.imageUrl!.isNotEmpty) ...[
-                    const SizedBox(width: 14),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Image.network(
-                        article.imageUrl!,
+                  const SizedBox(width: 14),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.network(
+                      article.displayImageUrl,
+                      width: 72,
+                      height: 72,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, _, __) => Container(
                         width: 72,
                         height: 72,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [accentColor.withAlpha(60), accentColor.withAlpha(25)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: Icon(Icons.auto_stories_rounded, size: 24, color: accentColor),
                       ),
                     ),
-                  ],
+                  ),
                 ],
               ),
               const SizedBox(height: 14),

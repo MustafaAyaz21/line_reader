@@ -814,14 +814,18 @@ class _DesktopSidebar extends StatelessWidget {
                     child: InkWell(
                       borderRadius: BorderRadius.circular(16),
                       onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<bool>(
-                            builder: (_) => AuthScreen(
-                              controller: authController,
-                              canPop: true,
+                        if (isAuth) {
+                          onOpenSettings();
+                        } else {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<bool>(
+                              builder: (_) => AuthScreen(
+                                controller: authController,
+                                canPop: true,
+                              ),
                             ),
-                          ),
-                        );
+                          );
+                        }
                       },
                       child: Container(
                         padding: const EdgeInsets.all(12),

@@ -974,69 +974,80 @@ class _MobileHeroCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (article.imageUrl != null && article.imageUrl!.isNotEmpty)
-                Stack(
-                  children: [
-                    Image.network(
-                      article.imageUrl!,
+              Stack(
+                children: [
+                  Image.network(
+                    article.displayImageUrl,
+                    height: 135,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, _, __) => Container(
                       height: 135,
                       width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [accent.withAlpha(80), accent.withAlpha(30)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: Icon(Icons.auto_stories_rounded, size: 44, color: accent),
                     ),
-                    Positioned(
-                      top: 10,
-                      left: 10,
-                      child: Row(
-                        children: [
+                  ),
+                  Positioned(
+                    top: 10,
+                    left: 10,
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: accent,
+                            borderRadius: BorderRadius.circular(7),
+                          ),
+                          child: Text(
+                            level?.code ?? 'B1',
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                        if (article.hasPodcastAudio) ...[
+                          const SizedBox(width: 6),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: accent,
+                              color: Colors.black.withAlpha(180),
                               borderRadius: BorderRadius.circular(7),
-                            ),
-                            child: Text(
-                              level?.code ?? 'B1',
-                              style: const TextStyle(
-                                color: Colors.black,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 11,
+                              border: Border.all(
+                                color: const Color(0xFFFBBF24).withAlpha(120),
                               ),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.mic_rounded, size: 12, color: Color(0xFFFBBF24)),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Podcast AI',
+                                  style: TextStyle(
+                                    color: Color(0xFFFBBF24),
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 10.5,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          if (article.hasPodcastAudio) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withAlpha(180),
-                                borderRadius: BorderRadius.circular(7),
-                                border: Border.all(
-                                  color: const Color(0xFFFBBF24).withAlpha(120),
-                                ),
-                              ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.mic_rounded, size: 12, color: Color(0xFFFBBF24)),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    'Podcast AI',
-                                    style: TextStyle(
-                                      color: Color(0xFFFBBF24),
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 10.5,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
                         ],
-                      ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
+              ),
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -1201,19 +1212,29 @@ class _MobileArticleFeedCard extends StatelessWidget {
                   ],
                 ),
               ),
-              if (article.imageUrl != null && article.imageUrl!.isNotEmpty) ...[
-                const SizedBox(width: 12),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
-                    article.imageUrl!,
+              const SizedBox(width: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  article.displayImageUrl,
+                  width: 72,
+                  height: 72,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, _, __) => Container(
                     width: 72,
                     height: 72,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [accent.withAlpha(60), accent.withAlpha(25)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(Icons.auto_stories_rounded, size: 24, color: accent),
                   ),
                 ),
-              ],
+              ),
             ],
           ),
         ),
@@ -1387,21 +1408,30 @@ class _DesktopHeroBanner extends StatelessWidget {
               ],
             ),
           ),
-          if (article.imageUrl != null && article.imageUrl!.isNotEmpty) ...[
-            const SizedBox(width: 24),
-            Expanded(
-              flex: 4,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Image.network(
-                  article.imageUrl!,
+          const SizedBox(width: 24),
+          Expanded(
+            flex: 4,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.network(
+                article.displayImageUrl,
+                height: 180,
+                fit: BoxFit.cover,
+                errorBuilder: (context, _, __) => Container(
                   height: 180,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [accent.withAlpha(80), accent.withAlpha(30)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(Icons.auto_stories_rounded, size: 48, color: accent),
                 ),
               ),
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -1519,19 +1549,29 @@ class _DesktopArticleCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    if (article.imageUrl != null && article.imageUrl!.isNotEmpty) ...[
-                      const SizedBox(width: 14),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.network(
-                          article.imageUrl!,
+                    const SizedBox(width: 14),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.network(
+                        article.displayImageUrl,
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, _, __) => Container(
                           width: 80,
                           height: 80,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [accent.withAlpha(60), accent.withAlpha(25)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: Icon(Icons.auto_stories_rounded, size: 28, color: accent),
                         ),
                       ),
-                    ],
+                    ),
                   ],
                 ),
               ),

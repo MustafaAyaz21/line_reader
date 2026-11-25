@@ -380,6 +380,96 @@ class Article {
     return '3 - 5 dk';
   }
 
+  /// Makale görsel URL'si; boş veya tanımsızsa başlık ve kategoriye göre
+  /// otomatik yüksek çözünürlüklü bağlamsal konu görseli üretir.
+  String get displayImageUrl {
+    final explicit = imageUrl?.trim();
+    if (explicit != null && explicit.isNotEmpty) {
+      return explicit;
+    }
+    return resolveFallbackTopicImageUrl(
+      title: title,
+      category: category,
+      content: content,
+    );
+  }
+
+  /// Makale başlığı, kategorisi ve içeriğine göre Unsplash üzerinden
+  /// yüksek kaliteli, bağlama tam oturan konu görseli URL'si döner.
+  static String resolveFallbackTopicImageUrl({
+    required String title,
+    String? category,
+    String? content,
+  }) {
+    final text = '${title.toLowerCase()} ${(category ?? '').toLowerCase()} ${(content != null && content.length > 300 ? content.substring(0, 300) : content ?? '').toLowerCase()}';
+
+    if (text.contains('cycl') || text.contains('bike') || text.contains('bicycle')) {
+      return 'https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=720&q=75';
+    }
+    if (text.contains('marathon') || text.contains('sahara') || text.contains('desert') || text.contains('running') || text.contains('runner')) {
+      return 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?auto=format&fit=crop&w=720&q=75';
+    }
+    if (text.contains('otter') || text.contains('kelp') || text.contains('coral') || text.contains('reef') || text.contains('marine')) {
+      return 'https://images.unsplash.com/photo-1546026423-cc4642628d2b?auto=format&fit=crop&w=720&q=75';
+    }
+    if (text.contains('seal') || text.contains('arctic') || text.contains('antarctic') || text.contains('polar') || text.contains('glacier') || text.contains('shackleton')) {
+      return 'https://images.unsplash.com/photo-1517411032315-54ef2cb783bb?auto=format&fit=crop&w=720&q=75';
+    }
+    if (text.contains('sculpture') || text.contains('bottle') || text.contains('trash') || text.contains('craft') || text.contains('recycle')) {
+      return 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=720&q=75';
+    }
+    if (text.contains('floating cit') || text.contains('architecture') || text.contains('urban') || text.contains('skyscraper') || text.contains('building')) {
+      return 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=720&q=75';
+    }
+    if (text.contains('sunlight') || text.contains('morning sun') || text.contains('circadian') || text.contains('sunrise')) {
+      return 'https://images.unsplash.com/photo-1470240731273-7821a6eeb6bd?auto=format&fit=crop&w=720&q=75';
+    }
+    if (text.contains('paint') || text.contains('art') || text.contains('color') || text.contains('canvas')) {
+      return 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=720&q=75';
+    }
+    if (text.contains('psychol') || text.contains('mind') || text.contains('neuro') || text.contains('deja vu') || text.contains('unfinished') || text.contains('zeigarnik') || text.contains('brain')) {
+      return 'https://images.unsplash.com/photo-1507413245164-6160d8298b31?auto=format&fit=crop&w=720&q=75';
+    }
+    if (text.contains('aluminum') || text.contains('metal') || text.contains('industrial') || text.contains('factory') || text.contains('manufacturing')) {
+      return 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=720&q=75';
+    }
+    if (text.contains('love') || text.contains('negative feeling') || text.contains('relationship') || text.contains('emotion') || text.contains('friendship')) {
+      return 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=720&q=75';
+    }
+    if (text.contains('space') || text.contains('galaxy') || text.contains('telescope') || text.contains('star') || text.contains('planet') || text.contains('cosmos') || text.contains('universe')) {
+      return 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=720&q=75';
+    }
+    if (text.contains('black hole') || text.contains('physics') || text.contains('neutron') || text.contains('relativity') || text.contains('einstein')) {
+      return 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=720&q=75';
+    }
+    if (text.contains('ocean') || text.contains('sea') || text.contains('deep-sea') || text.contains('octopus') || text.contains('abyss') || text.contains('mariana')) {
+      return 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&w=720&q=75';
+    }
+    if (text.contains('forest') || text.contains('tree') || text.contains('fungal') || text.contains('wood wide') || text.contains('nature') || text.contains('plant')) {
+      return 'https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=720&q=75';
+    }
+    if (text.contains('butterfly') || text.contains('bird') || text.contains('migration') || text.contains('wildlife') || text.contains('animal')) {
+      return 'https://images.unsplash.com/photo-1535083783855-76ae62b2914e?auto=format&fit=crop&w=720&q=75';
+    }
+    if (text.contains('ai') || text.contains('artificial intelligence') || text.contains('robot') || text.contains('interface') || text.contains('computer') || text.contains('tech')) {
+      return 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=720&q=75';
+    }
+    if (text.contains('roman') || text.contains('alexandria') || text.contains('ancient') || text.contains('history') || text.contains('manuscript')) {
+      return 'https://images.unsplash.com/photo-1552832230-c0197dd311b5?auto=format&fit=crop&w=720&q=75';
+    }
+    if (text.contains('book') || text.contains('reading') || text.contains('library') || text.contains('literature') || text.contains('language')) {
+      return 'https://images.unsplash.com/photo-1457369804613-52c61a468e7d?auto=format&fit=crop&w=720&q=75';
+    }
+    if (text.contains('music') || text.contains('song') || text.contains('melody')) {
+      return 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=720&q=75';
+    }
+    if (text.contains('sleep') || text.contains('dream') || text.contains('rest')) {
+      return 'https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?auto=format&fit=crop&w=720&q=75';
+    }
+
+    return 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?auto=format&fit=crop&w=720&q=75';
+  }
+
   /// Esnek JSON ayrıştırıcı (`snake_case` ve `camelCase` alan adlarını destekler).
   /// Başlığı tamamen boş olan geçersiz kayıtlar için `null` döner.
   static Article? tryFromJson(
