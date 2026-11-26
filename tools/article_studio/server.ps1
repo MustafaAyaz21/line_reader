@@ -1801,6 +1801,11 @@ try {
                 $fwd = Forward-WorkerAdminRequest -RemotePath "/admin/users" -HttpMethod $method -BodyText $body
                 Send-Response -Response $res -StatusCode $fwd.StatusCode -Body $fwd.Body -ContentType "application/json; charset=utf-8"
             }
+            elseif ($path -eq "/api/admin/missing-words" -and ($method -in @("GET", "DELETE"))) {
+                $body = if ($method -eq "GET") { "" } else { Read-RequestBody $req }
+                $fwd = Forward-WorkerAdminRequest -RemotePath "/admin/missing-words" -HttpMethod $method -BodyText $body
+                Send-Response -Response $res -StatusCode $fwd.StatusCode -Body $fwd.Body -ContentType "application/json; charset=utf-8"
+            }
             elseif ($method -eq "GET" -and $path -eq "/api/ai/config") {
                 $cfg = Get-AdminConfig
                 Send-JsonObject -Response $res -StatusCode 200 -Payload @{

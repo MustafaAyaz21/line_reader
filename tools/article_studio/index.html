@@ -1386,6 +1386,17 @@
             <div class="empty-list">Yetkili kullanıcıları görmek için yönetici bağlantısını kaydedin.</div>
           </div>
         </div>
+
+        <!-- Alt: Kullanıcıların Bildirdiği Eksik Kelimeler -->
+        <div class="admin-card" style="grid-column: 1 / -1;">
+          <div>
+            <h3>Bildirilen Eksik Kelimeler</h3>
+            <p class="admin-sub">Kullanıcıların "Sözlükte bulunamadı" ekranından bildirdiği kelimeler en çok bildirilenden aza doğru listelenir.</p>
+          </div>
+          <div class="admin-table" id="adminMissingWordsList">
+            <div class="empty-list">Bildirilen kelimeleri görmek için yönetici bağlantısını kaydedin.</div>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -3454,7 +3465,8 @@
       grantEmailInput: document.getElementById("grantUserEmailInput"),
       grantUserBtn: document.getElementById("grantUserBtn"),
       grantAdminBtn: document.getElementById("grantAdminBtn"),
-      usersList: document.getElementById("adminUsersList")
+      usersList: document.getElementById("adminUsersList"),
+      missingWordsList: document.getElementById("adminMissingWordsList")
     };
 
     let adminLoadedOnce = false;
@@ -3496,7 +3508,60 @@
     }
 
     async function refreshAdminLists() {
-      await Promise.all([loadAdminCodes(), loadAdminUsers()]);
+      await Promise.all([loadAdminCodes(), loadAdminUsers(), loadAdminMissingWords()]);
+    }
+
+    async function loadAdminMissingWords() {
+      if (!accessEl.missingWordsList) return;
+      try {
+        const res = await fetch("/api/admin/missing-words");
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          accessEl.missingWordsList.innerHTML = `<div class="empty-list">${escapeHtml(data.message || data.error || "Liste alınamadı.")}</div>`;
+          return;
+        }
+        const words = data.words || [];
+        if (words.length === 0) {
+          accessEl.missingWordsList.innerHTML = `<div class="empty-list">Henüz bildirilmiş eksik kelime yok.</div>`;
+          return;
+        }
+        accessEl.missingWordsList.innerHTML = words.map(w => {
+          const word = String(w.word || "");
+          const count = Number(w.report_count) || 1;
+          return `
+            <div class="admin-row">
+              <span class="code-badge">${escapeHtml(word)}</span>
+              <span class="usage-pill">${count} bildirim</span>
+              <div style="margin-left:auto;display:flex;gap:6px;">
+                <button class="mini-btn" data-mw-act="copy" data-word="${escapeHtml(word)}">Kopyala</button>
+                <button class="mini-btn del" data-mw-act="delete" data-word="${escapeHtml(word)}">Sil</button>
+              </div>
+            </div>
+          `;
+        }).join("");
+
+        accessEl.missingWordsList.querySelectorAll("button[data-mw-act]").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const word = btn.dataset.word;
+            const act = btn.dataset.mwAct;
+            if (act === "copy") {
+              navigator.clipboard?.writeText(word);
+              showToast(`"${word}" panoya kopyalandı.`, "success");
+            } else if (act === "delete") {
+              const r = await fetch("/api/admin/missing-words", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ word })
+              });
+              const d = await r.json();
+              showToast(d.message || "Silindi.", r.ok ? "success" : "error");
+              loadAdminMissingWords();
+            }
+          });
+        });
+      } catch (err) {
+        accessEl.missingWordsList.innerHTML = `<div class="empty-list">Hata: ${escapeHtml(err.message)}</div>`;
+      }
     }
 
     async function loadAdminCodes() {

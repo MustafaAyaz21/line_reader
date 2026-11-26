@@ -47,6 +47,7 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
   List<DevEntitlementUser> _users = const <DevEntitlementUser>[];
   List<DevAccessCode> _codes = const <DevAccessCode>[];
   List<DevArticleSummary> _articles = const <DevArticleSummary>[];
+  List<DevMissingWordReport> _missingWords = const <DevMissingWordReport>[];
   String _selectedLevel = 'B1';
   String _selectedVoice = 'Kore';
   String _articleSortMode = 'date_desc';
@@ -110,7 +111,7 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _ownsService = widget.service == null;
     _service = widget.service ?? DeveloperPanelService();
     _loadAll();
@@ -181,6 +182,9 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
         _service
             .fetchScheduleConfig(token)
             .catchError((_) => null),
+        _service
+            .fetchMissingWords(token)
+            .catchError((_) => const <DevMissingWordReport>[]),
       ]);
       if (!mounted) return;
       final sched = results[3] as DevScheduleConfig?;
@@ -188,6 +192,7 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
         _users = results[0] as List<DevEntitlementUser>;
         _codes = results[1] as List<DevAccessCode>;
         _articles = results[2] as List<DevArticleSummary>;
+        _missingWords = results[4] as List<DevMissingWordReport>;
         if (sched != null) {
           _scheduleConfig = sched;
           _isScheduleEnabled = sched.isEnabled;
@@ -481,6 +486,10 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
                 icon: const Icon(Icons.auto_stories_outlined, size: 18),
                 text: s.t('Makaleler', 'Articles'),
               ),
+              Tab(
+                icon: const Icon(Icons.flag_outlined, size: 18),
+                text: s.t('Eksik Kelimeler', 'Missing'),
+              ),
             ],
           ),
         ),
@@ -520,9 +529,113 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen>
                       _buildUsersTab(theme, colorScheme, s),
                       _buildCodesTab(theme, colorScheme, s),
                       _buildArticlesTab(theme, colorScheme, s),
+                      _buildMissingWordsTab(theme, colorScheme, s),
                     ],
                   ),
       ),
+    );
+  }
+
+  Widget _buildMissingWordsTab(
+    ThemeData theme,
+    ColorScheme colorScheme,
+    AppStrings s,
+  ) {
+    if (_missingWords.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            s.t(
+              'Henüz kullanıcılar tarafından bildirilmiş eksik kelime yok.',
+              'No missing words reported yet.',
+            ),
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      itemCount: _missingWords.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final item = _missingWords[index];
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withAlpha(120),
+            ),
+          ),
+          child: Row(
+            children: <Widget>[
+              Icon(
+                Icons.flag_outlined,
+                size: 18,
+                color: colorScheme.primary,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      item.word,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      s.t(
+                        '${item.reportCount} bildirim',
+                        '${item.reportCount} reports',
+                      ),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: _isSubmitting
+                    ? null
+                    : () async {
+                        final token = await _requireToken();
+                        if (token == null) return;
+                        setState(() => _isSubmitting = true);
+                        final res = await _service.deleteMissingWord(
+                          token,
+                          item.word,
+                        );
+                        if (!mounted) return;
+                        setState(() {
+                          _isSubmitting = false;
+                          if (res.ok) {
+                            _missingWords = _missingWords
+                                .where((w) => w.word != item.word)
+                                .toList(growable: false);
+                          }
+                        });
+                        _showSnack(res.message, isError: !res.ok);
+                      },
+                icon: Icon(
+                  Icons.delete_outline_rounded,
+                  color: colorScheme.error,
+                ),
+                tooltip: s.t('Listeden Kaldır', 'Remove'),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

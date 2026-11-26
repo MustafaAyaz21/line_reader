@@ -679,6 +679,41 @@ class DeveloperPanelService {
     );
   }
 
+  Future<List<DevMissingWordReport>> fetchMissingWords(String idToken) async {
+    final res = await _request('GET', '/dev/missing-words', idToken: idToken);
+    final data = _decodeJsonMap(res.body);
+    if (res.statusCode != 200 || data['ok'] != true) {
+      throw Exception(
+        data['message']?.toString() ??
+            'Eksik kelime listesi alınamadı (HTTP ${res.statusCode}).',
+      );
+    }
+    final raw = data['words'];
+    if (raw is! List<dynamic>) return const <DevMissingWordReport>[];
+    return raw
+        .whereType<Map<String, dynamic>>()
+        .map(DevMissingWordReport.fromJson)
+        .where((w) => w.word.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  Future<DevActionResult> deleteMissingWord(String idToken, String word) async {
+    final res = await _request(
+      'DELETE',
+      '/dev/missing-words',
+      idToken: idToken,
+      jsonBody: <String, Object?>{'word': word.trim().toLowerCase()},
+    );
+    final data = _decodeJsonMap(res.body);
+    return DevActionResult(
+      ok: res.statusCode == 200 && data['ok'] == true,
+      message: data['message']?.toString() ??
+          (res.statusCode == 200
+              ? 'Kelime listeden kaldırıldı.'
+              : 'İşlem başarısız (HTTP ${res.statusCode}).'),
+    );
+  }
+
   Future<List<DevArticleSummary>> fetchArticles(String idToken) async {
     final res = await _request('GET', '/dev/articles', idToken: idToken);
     final data = _decodeJsonMap(res.body);
@@ -933,5 +968,25 @@ class DeveloperPanelService {
     if (_ownsClient) {
       _httpClient.close();
     }
+  }
+}
+
+class DevMissingWordReport {
+  const DevMissingWordReport({
+    required this.word,
+    required this.reportCount,
+    required this.lastReportedAt,
+  });
+
+  final String word;
+  final int reportCount;
+  final String lastReportedAt;
+
+  factory DevMissingWordReport.fromJson(Map<String, dynamic> json) {
+    return DevMissingWordReport(
+      word: (json['word'] ?? '').toString().trim(),
+      reportCount: (json['report_count'] as num?)?.toInt() ?? 1,
+      lastReportedAt: (json['last_reported_at'] ?? '').toString(),
+    );
   }
 }
