@@ -764,34 +764,39 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
             ? SafeArea(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
-                  child: Center(
+                  child: Align(
+                    alignment: Alignment.center,
+                    heightFactor: 1.0,
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 860),
-                      child: FilledButton.icon(
-                        key: const ValueKey<String>('add_word_save_button'),
-                        onPressed: _isSaving ? null : _handleSaveSelected,
-                        icon: _isSaving
-                            ? SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: colorScheme.onPrimary,
-                                ),
-                              )
-                            : const Icon(Icons.bookmark_add_rounded),
-                        label: Text(
-                          _isSaving
-                              ? 'Kaydediliyor...'
-                              : (list != null
-                                  ? '"${list.name}" Listesine Kaydet ($selectedCount Anlam)'
-                                  : 'Listeye Kaydet ($selectedCount Anlam)'),
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          key: const ValueKey<String>('add_word_save_button'),
+                          onPressed: _isSaving ? null : _handleSaveSelected,
+                          icon: _isSaving
+                              ? SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: colorScheme.onPrimary,
+                                  ),
+                                )
+                              : const Icon(Icons.bookmark_add_rounded),
+                          label: Text(
+                            _isSaving
+                                ? 'Kaydediliyor...'
+                                : (list != null
+                                    ? '"${list.name}" Listesine Kaydet ($selectedCount Anlam)'
+                                    : 'Listeye Kaydet ($selectedCount Anlam)'),
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
                           ),
                         ),
                       ),
