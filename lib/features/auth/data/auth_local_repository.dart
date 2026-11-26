@@ -43,8 +43,22 @@ class AuthLocalRepository implements AuthLocalStore {
   static const String _entitlementSpecialThemesKey =
       'auth_entitlement_special_themes';
   static const String _verifiedEmailUidKey = 'auth_d1_verified_email_uid';
+  static const String _customDisplayNameKey = 'auth_user_custom_display_name';
 
   final SettingsRepository _settingsRepository;
+
+  Future<String?> loadCustomDisplayName() async {
+    final val = await _settingsRepository.getString(_customDisplayNameKey);
+    if (val == null || val.trim().isEmpty) return null;
+    return val.trim();
+  }
+
+  Future<void> saveCustomDisplayName(String? name) async {
+    await _settingsRepository.saveString(
+      _customDisplayNameKey,
+      (name ?? '').trim(),
+    );
+  }
 
   Future<String?> loadVerifiedEmailUid() async {
     final val = await _settingsRepository.getString(_verifiedEmailUidKey);

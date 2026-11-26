@@ -323,12 +323,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<({WordList? list, String? error})> _handleCreateWordList(
     String name,
-    int colorValue,
-  ) {
+    int colorValue, [
+    String? icon,
+  ]) {
     _ensureInitialized();
     return _wordsController!.createListWithResult(
       name: name,
       colorValue: colorValue,
+      icon: icon,
     );
   }
 
@@ -804,9 +806,9 @@ class _DesktopSidebar extends StatelessWidget {
               listenable: authController,
               builder: (context, _) {
                 final isAuth = authController.isAuthenticated;
-                final email = authController.user?.email;
-                final displayName = email != null && email.isNotEmpty
-                    ? email.split('@').first
+                final user = authController.user;
+                final displayName = isAuth && user != null
+                    ? user.effectiveName
                     : s.t('Misafir Öğrenci', 'Guest Student');
                 final isUnlimited = authController.isUnlimited;
 

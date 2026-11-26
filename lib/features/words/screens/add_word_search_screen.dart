@@ -68,6 +68,7 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
   final Set<int> _selectedIndices = <int>{};
   final Set<String> _selectedSynonyms = <String>{};
   final Set<String> _selectedAntonyms = <String>{};
+  bool _showAllMeanings = false;
 
   bool get _hasInitialWord =>
       widget.initialWord != null && widget.initialWord!.trim().isNotEmpty;
@@ -159,6 +160,7 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
       _selectedIndices.clear();
       _selectedSynonyms.clear();
       _selectedAntonyms.clear();
+      _showAllMeanings = false;
     });
 
     try {
@@ -328,10 +330,11 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
     WordList? createdList;
     final created = await WordListEditorDialog.show(
       context,
-      onSubmit: (name, colorValue) async {
+      onSubmit: (name, colorValue, icon) async {
         final result = await widget.controller.createListWithResult(
           name: name,
           colorValue: colorValue,
+          icon: icon,
         );
         if (result.error != null) {
           return result.error;
@@ -714,234 +717,261 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
         (_selectedListId == widget.listId ? widget.wordList : null);
     final selectedCount = _selectedIndices.length;
     final visuals = AppThemeVisuals.of(context);
+    final detail = _detail;
+    final hasValidDetail = detail != null && !detail.isMisspelled;
 
     return AppThemeBackdrop(
       child: Scaffold(
         backgroundColor: visuals.hasBackdrop ? Colors.transparent : null,
         appBar: AppBar(
-        title: Row(
-          children: [
-            if (list != null) ...[
-              Container(
-                width: 8,
-                height: 20,
-                decoration: BoxDecoration(
-                  color: list.color,
-                  borderRadius: BorderRadius.circular(4),
+          title: Row(
+            children: [
+              if (list != null) ...[
+                Container(
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    color: list.color.withOpacity(0.18),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: list.color.withOpacity(0.4),
+                      width: 1,
+                    ),
+                  ),
+                  alignment: Alignment.center,
+                  child: list.icon != null && list.icon!.isNotEmpty
+                      ? Text(list.icon!, style: const TextStyle(fontSize: 14))
+                      : Icon(
+                          list.isDefault
+                              ? Icons.star_rounded
+                              : Icons.folder_rounded,
+                          color: list.color,
+                          size: 16,
+                        ),
+                ),
+                const SizedBox(width: 10),
+              ],
+              Expanded(
+                child: Text(
+                  list != null ? 'Kelime Ekle • ${list.name}' : 'Kelime Ekle',
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(width: 10),
             ],
-            Expanded(
-              child: Text(
-                list != null ? 'Kelime Ekle • ${list.name}' : 'Kelime Ekle',
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
+          ),
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _isSaving ? null : _handleSaveSelected,
-        tooltip: 'Seçilen Anlamlarla Kaydet',
-        child: _isSaving
-            ? SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.4,
-                  color: colorScheme.onPrimaryContainer,
+        bottomNavigationBar: hasValidDetail
+            ? SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 860),
+                      child: FilledButton.icon(
+                        key: const ValueKey<String>('add_word_save_button'),
+                        onPressed: _isSaving ? null : _handleSaveSelected,
+                        icon: _isSaving
+                            ? SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: colorScheme.onPrimary,
+                                ),
+                              )
+                            : const Icon(Icons.bookmark_add_rounded),
+                        label: Text(
+                          _isSaving
+                              ? 'Kaydediliyor...'
+                              : (list != null
+                                  ? '"${list.name}" Listesine Kaydet ($selectedCount Anlam)'
+                                  : 'Listeye Kaydet ($selectedCount Anlam)'),
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               )
-            : Stack(
-                clipBehavior: Clip.none,
-                alignment: Alignment.center,
-                children: [
-                  const Icon(Icons.add_rounded, size: 28),
-                  if (selectedCount > 0)
-                    Positioned(
-                      right: -12,
-                      top: -12,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primary,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: colorScheme.surface,
-                            width: 1.5,
-                          ),
-                        ),
-                        child: Text(
-                          '$selectedCount',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: colorScheme.onPrimary,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 10,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-      ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Üst Arama Çubuğu
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
-            child: Row(
+            : null,
+        body: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 860),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    focusNode: _searchFocusNode,
-                    autofocus: !_hasInitialWord,
-                    keyboardType: TextInputType.text,
-                    textInputAction: TextInputAction.search,
-                    autocorrect: true,
-                    enableSuggestions: true,
-                    onChanged: _onSearchChanged,
-                    onSubmitted: (value) => _performSearch(value),
-                    decoration: InputDecoration(
-                      hintText: 'İngilizce kelime yazın (örn. make, run)...',
-                      prefixIcon: const Icon(Icons.search_rounded, size: 20),
-                      suffixIcon: _searchController.text.isNotEmpty
-                          ? IconButton(
-                              onPressed: () {
-                                _debounceTimer?.cancel();
-                                _searchController.clear();
-                                setState(() {
-                                  _detail = null;
-                                  _matchedExistingWord = null;
-                                  _errorMessage = null;
-                                  _selectedIndices.clear();
-                                });
-                                _searchFocusNode.requestFocus();
-                              },
-                              icon: const Icon(Icons.close_rounded, size: 18),
-                              tooltip: 'Temizle',
-                            )
-                          : null,
-                      filled: true,
-                      fillColor: colorScheme.surfaceContainerHighest,
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
+                // Üst Arama Çubuğu
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          focusNode: _searchFocusNode,
+                          autofocus: !_hasInitialWord,
+                          keyboardType: TextInputType.text,
+                          textInputAction: TextInputAction.search,
+                          autocorrect: true,
+                          enableSuggestions: true,
+                          onChanged: _onSearchChanged,
+                          onSubmitted: (value) => _performSearch(value),
+                          decoration: InputDecoration(
+                            hintText: 'İngilizce kelime yazın (örn. make, run)...',
+                            prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                            suffixIcon: _searchController.text.isNotEmpty
+                                ? IconButton(
+                                    onPressed: () {
+                                      _debounceTimer?.cancel();
+                                      _searchController.clear();
+                                      setState(() {
+                                        _detail = null;
+                                        _matchedExistingWord = null;
+                                        _errorMessage = null;
+                                        _selectedIndices.clear();
+                                        _selectedSynonyms.clear();
+                                        _selectedAntonyms.clear();
+                                        _showAllMeanings = false;
+                                      });
+                                      _searchFocusNode.requestFocus();
+                                    },
+                                    icon: const Icon(Icons.close_rounded, size: 18),
+                                    tooltip: 'Temizle',
+                                  )
+                                : null,
+                            filled: true,
+                            fillColor: colorScheme.surfaceContainerHighest,
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
+                        ),
                       ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide.none,
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        onPressed: _isLoading
+                            ? null
+                            : () => _performSearch(_searchController.text),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: const Text('Ara'),
                       ),
-                    ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                FilledButton(
-                  onPressed: _isLoading
-                      ? null
-                      : () => _performSearch(_searchController.text),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                if (widget.editingWord == null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: Row(
+                      children: [
+                        if (allLists.isNotEmpty) ...[
+                          Expanded(
+                            child: DropdownButtonFormField<int>(
+                              key: const ValueKey<String>('add_word_list_dropdown'),
+                              value: allLists.any((item) => item.id == _selectedListId)
+                                  ? _selectedListId
+                                  : allLists.first.id,
+                              isExpanded: true,
+                              decoration: InputDecoration(
+                                labelText: 'Hedef Liste',
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              items: allLists.map((item) {
+                                return DropdownMenuItem<int>(
+                                  value: item.id,
+                                  child: Row(
+                                    children: [
+                                      if (item.icon != null && item.icon!.isNotEmpty) ...[
+                                        Text(item.icon!, style: const TextStyle(fontSize: 14)),
+                                        const SizedBox(width: 6),
+                                      ] else ...[
+                                        Container(
+                                          width: 6,
+                                          height: 15,
+                                          decoration: BoxDecoration(
+                                            color: item.color,
+                                            borderRadius: BorderRadius.circular(3),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                      ],
+                                      Expanded(
+                                        child: Text(
+                                          item.name,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                if (value != null) {
+                                  _handleTargetListChanged(value);
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                        OutlinedButton.icon(
+                          key: const ValueKey<String>('add_word_create_list_button'),
+                          onPressed: _handleCreateNewList,
+                          icon: const Icon(Icons.add_rounded, size: 18),
+                          label: const Text('Yeni Liste'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 11,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  child: const Text('Ara'),
+                Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: colorScheme.outlineVariant.withOpacity(0.3),
+                ),
+                // İçerik Alanı: Tek parça, akıcı kaydırılabilir görünüm
+                Expanded(
+                  child: _buildBody(theme, colorScheme),
                 ),
               ],
             ),
           ),
-          if (widget.editingWord == null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-              child: Row(
-                children: [
-                  if (allLists.isNotEmpty) ...[
-                    Expanded(
-                      child: DropdownButtonFormField<int>(
-                        key: const ValueKey<String>('add_word_list_dropdown'),
-                        value: allLists.any((item) => item.id == _selectedListId)
-                            ? _selectedListId
-                            : allLists.first.id,
-                        isExpanded: true,
-                        decoration: InputDecoration(
-                          labelText: 'Hedef Liste',
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        items: allLists.map((item) {
-                          return DropdownMenuItem<int>(
-                            value: item.id,
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 6,
-                                  height: 15,
-                                  decoration: BoxDecoration(
-                                    color: item.color,
-                                    borderRadius: BorderRadius.circular(3),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    item.name,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          if (value != null) {
-                            _handleTargetListChanged(value);
-                          }
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                  OutlinedButton.icon(
-                    key: const ValueKey<String>('add_word_create_list_button'),
-                    onPressed: _handleCreateNewList,
-                    icon: const Icon(Icons.add_rounded, size: 18),
-                    label: const Text('Yeni Liste'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 11,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          Divider(height: 1, color: colorScheme.outlineVariant),
-          // İçerik Alanı: Yükleniyor / Hata / Boş / İkiye Bölünmüş Düzen
-          Expanded(
-            child: _buildBody(theme, colorScheme),
-          ),
-        ],
-      ),
+        ),
       ),
     );
   }
@@ -1017,7 +1047,7 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Üstteki arama çubuğuna bir kelime yazın; 10–15 farklı anlam arasından istediklerinizi tikleyip sağ alttaki + butonuyla listenize kaydedin.',
+                'Yukarıdaki arama çubuğuna bir kelime yazın; anlamlarını, eş ve zıt anlamlarını tek dokunuşla seçip listenize kaydedin.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: colorScheme.onSurfaceVariant,
@@ -1045,429 +1075,447 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
     }
 
     final isExisting = _matchedExistingWord != null;
+    final totalMeanings = detail.meanings.length;
+    final displayedCount = _showAllMeanings
+        ? totalMeanings
+        : (totalMeanings > 6 ? 6 : totalMeanings);
 
-    // İkiye Bölünmüş Düzen:
-    // - Üst Bölüm (flex: 6): 10–15 Anlam Seçimi (mevcutlar otomatik tikli)
-    // - Alt Bölüm (flex: 4): 3 Kısa Örnek Cümle
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // ÜST BÖLÜM: Anlam Seçimi
-        Expanded(
-          flex: 6,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 1) Kelime Başlığı, Telaffuz & Ses
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Container(
-                padding: const EdgeInsets.fromLTRB(16, 10, 12, 8),
-                color: colorScheme.surfaceContainerLowest,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+              Expanded(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Row(
-                      children: [
-                        Text(
-                          detail.word,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: colorScheme.primary,
-                          ),
-                        ),
-                        if (widget.ttsService != null) ...[
-                          const SizedBox(width: 4),
-                          IconButton(
-                            onPressed: () => _handleSpeak(
-                              detail.word,
-                              TtsSpeakingTarget.word,
-                            ),
-                            icon: Icon(
-                              Icons.volume_up_rounded,
-                              size: 19,
-                              color: colorScheme.primary,
-                            ),
-                            tooltip: 'Kelimeyi Dinle',
-                            visualDensity: VisualDensity.compact,
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(
-                              minWidth: 32,
-                              minHeight: 32,
-                            ),
-                          ),
-                        ],
-                        const Spacer(),
-                        if (_selectedIndices.isNotEmpty)
-                          TextButton(
-                            onPressed: _clearAllSelections,
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            child: const Text('Temizle'),
-                          ),
-                        const SizedBox(width: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _selectedIndices.isNotEmpty
-                                ? colorScheme.primaryContainer
-                                : colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            '${_selectedIndices.length}/${detail.meanings.length} seçili',
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: _selectedIndices.isNotEmpty
-                                  ? colorScheme.onPrimaryContainer
-                                  : colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (isExisting) ...[
-                      const SizedBox(height: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colorScheme.secondaryContainer.withAlpha(140),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.check_circle_outline_rounded,
-                              size: 15,
-                              color: colorScheme.onSecondaryContainer,
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                'Listede kayıtlı • mevcut anlamlar tikli getirildi (+ ile Üstüne ekle / Yeni ekle)',
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: colorScheme.onSecondaryContainer,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                    Text(
+                      detail.word,
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
                       ),
-                    ],
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        if (detail.lexiconInfo != null &&
-                            detail.lexiconInfo!.hasAnyIpa)
-                          WordIpaBadge(lexiconInfo: detail.lexiconInfo),
-                        OutlinedButton.icon(
-                          onPressed: _showAddCustomMeaningDialog,
-                          icon: const Icon(Icons.add_rounded, size: 17),
-                          label: const Text('Kendi Anlamını Ekle'),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                        ),
-                      ],
+                    ),
+                    if (detail.lexiconInfo != null &&
+                        detail.lexiconInfo!.hasAnyIpa)
+                      WordIpaBadge(lexiconInfo: detail.lexiconInfo, compact: true),
+                  ],
+                ),
+              ),
+              if (widget.ttsService != null)
+                Container(
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: IconButton(
+                    onPressed: () => _handleSpeak(
+                      detail.word,
+                      TtsSpeakingTarget.word,
+                    ),
+                    icon: Icon(
+                      Icons.volume_up_rounded,
+                      size: 20,
+                      color: colorScheme.primary,
+                    ),
+                    tooltip: 'Kelimeyi Dinle',
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+            ],
+          ),
+
+          if (isExisting) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: colorScheme.secondaryContainer.withAlpha(140),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.check_circle_outline_rounded,
+                    size: 15,
+                    color: colorScheme.onSecondaryContainer,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Listede kayıtlı • mevcut anlamlar seçili getirildi',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colorScheme.onSecondaryContainer,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 16),
+
+          // 2) Bölüm 1: Türkçe Anlamlar Başlığı & Butonlar
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    'Türkçe Anlamlar',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: _selectedIndices.isNotEmpty
+                          ? colorScheme.primaryContainer
+                          : colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '${_selectedIndices.length}/$totalMeanings seçili',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: _selectedIndices.isNotEmpty
+                            ? colorScheme.onPrimaryContainer
+                            : colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  if (_selectedIndices.isNotEmpty)
+                    TextButton(
+                      onPressed: _clearAllSelections,
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text('Temizle', style: TextStyle(fontSize: 12)),
+                    ),
+                  TextButton.icon(
+                    onPressed: _showAddCustomMeaningDialog,
+                    icon: const Icon(Icons.add_rounded, size: 15),
+                    label: const Text('Anlam Ekle', style: TextStyle(fontSize: 12)),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 10),
+
+          // Akıllı Anlam Hapları (Wrap Chips)
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (var i = 0; i < displayedCount; i++)
+                _buildMeaningChip(
+                  theme: theme,
+                  colorScheme: colorScheme,
+                  index: i,
+                  entry: detail.meanings[i],
+                  isSelected: _selectedIndices.contains(i),
+                ),
+            ],
+          ),
+
+          if (totalMeanings > 6) ...[
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: () => setState(() => _showAllMeanings = !_showAllMeanings),
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: colorScheme.outlineVariant.withOpacity(0.4),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _showAllMeanings
+                          ? 'Daha Az Anlam Göster'
+                          : 'Diğer ${totalMeanings - 6} Anlamı Göster',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      _showAllMeanings
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      size: 18,
+                      color: colorScheme.primary,
                     ),
                   ],
                 ),
               ),
-              Expanded(
-                child: ListView.separated(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  itemCount: detail.meanings.length,
-                  separatorBuilder: (context, index) => Divider(
-                    height: 1,
-                    indent: 52,
-                    color: colorScheme.outlineVariant.withAlpha(140),
-                  ),
-                  itemBuilder: (context, index) {
-                    final entry = detail.meanings[index];
-                    final isChecked = _selectedIndices.contains(index);
+            ),
+          ],
 
-                    return Material(
-                      color: isChecked
-                          ? colorScheme.primaryContainer.withAlpha(110)
-                          : Colors.transparent,
-                      child: InkWell(
-                        onTap: () => _toggleMeaningSelection(index),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 11,
-                          ),
-                          child: Row(
-                            children: [
-                              AnimatedContainer(
-                                duration: const Duration(milliseconds: 140),
-                                width: 24,
-                                height: 24,
-                                decoration: BoxDecoration(
-                                  color: isChecked
-                                      ? colorScheme.primary
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(7),
-                                  border: Border.all(
-                                    color: isChecked
-                                        ? colorScheme.primary
-                                        : colorScheme.outline,
-                                    width: 1.8,
-                                  ),
-                                ),
-                                child: isChecked
-                                    ? Icon(
-                                        Icons.check_rounded,
-                                        size: 16,
-                                        color: colorScheme.onPrimary,
-                                      )
-                                    : null,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text.rich(
-                                  TextSpan(
-                                    children: [
-                                      TextSpan(
-                                        text: entry.translation,
-                                        style:
-                                            theme.textTheme.bodyLarge?.copyWith(
-                                          fontWeight: isChecked
-                                              ? FontWeight.w600
-                                              : FontWeight.w400,
-                                          color: colorScheme.onSurface,
-                                        ),
-                                      ),
-                                      if (entry.partOfSpeech != null)
-                                        TextSpan(
-                                          text:
-                                              '  (${entry.partOfSpeech!.label})',
-                                          style: theme.textTheme.bodySmall
-                                              ?.copyWith(
-                                            color: isChecked
-                                                ? colorScheme.primary
-                                                : colorScheme.onSurfaceVariant,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  },
+          // 3) Bölüm 2: Eş & Zıt Anlamlar (WordRelationsSection)
+          if (detail.lexiconInfo != null && detail.lexiconInfo!.hasRelations) ...[
+            const SizedBox(height: 18),
+            WordRelationsSection(
+              synonyms: detail.lexiconInfo!.synonyms,
+              antonyms: detail.lexiconInfo!.antonyms,
+              selectedSynonyms: _selectedSynonyms,
+              selectedAntonyms: _selectedAntonyms,
+              onToggleSynonym: (term) {
+                setState(() {
+                  if (!_selectedSynonyms.remove(term)) {
+                    _selectedSynonyms.add(term);
+                  }
+                });
+              },
+              onToggleAntonym: (term) {
+                setState(() {
+                  if (!_selectedAntonyms.remove(term)) {
+                    _selectedAntonyms.add(term);
+                  }
+                });
+              },
+              onToggleAll: (selectAll) {
+                setState(() {
+                  _selectedSynonyms.clear();
+                  _selectedAntonyms.clear();
+                  if (selectAll) {
+                    _selectedSynonyms.addAll(detail.lexiconInfo!.synonyms);
+                    _selectedAntonyms.addAll(detail.lexiconInfo!.antonyms);
+                  }
+                });
+              },
+            ),
+          ],
+
+          // 4) Bölüm 3: Örnek Cümleler
+          if (detail.examples.isNotEmpty) ...[
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Icon(
+                  Icons.format_quote_rounded,
+                  size: 18,
+                  color: colorScheme.primary,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Örnek Cümleler (${detail.examples.length})',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            for (var i = 0; i < detail.examples.length; i++) ...[
+              if (i > 0) const SizedBox(height: 8),
+              _buildExampleSentenceCard(
+                theme,
+                colorScheme,
+                i,
+                detail.examples[i],
+                detail.word,
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMeaningChip({
+    required ThemeData theme,
+    required ColorScheme colorScheme,
+    required int index,
+    required MeaningEntry entry,
+    required bool isSelected,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _toggleMeaningSelection(index),
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? colorScheme.primaryContainer
+                : colorScheme.surfaceContainerHigh.withOpacity(0.7),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected
+                  ? colorScheme.primary
+                  : colorScheme.outlineVariant.withAlpha(120),
+              width: isSelected ? 1.5 : 1.0,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                isSelected ? Icons.check_rounded : Icons.add_rounded,
+                size: 15,
+                color: isSelected
+                    ? colorScheme.onPrimaryContainer
+                    : colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 5),
+              Flexible(
+                child: Text(
+                  entry.translation,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: isSelected
+                        ? colorScheme.onPrimaryContainer
+                        : colorScheme.onSurface,
+                  ),
                 ),
               ),
+              if (entry.partOfSpeech != null) ...[
+                const SizedBox(width: 5),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? colorScheme.primary.withOpacity(0.2)
+                        : colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    entry.partOfSpeech!.label,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected
+                          ? colorScheme.primary
+                          : colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
-        // İki bölüm arasındaki belirgin ayırıcı
-        Divider(
-          height: 2,
-          thickness: 2,
-          color: colorScheme.outlineVariant,
+      ),
+    );
+  }
+
+  Widget _buildExampleSentenceCard(
+    ThemeData theme,
+    ColorScheme colorScheme,
+    int index,
+    WordExampleSentence example,
+    String word,
+  ) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withAlpha(140),
         ),
-        // ORTA BÖLÜM: Eş & Zıt Anlamlılar (kaydırmadan doğrudan erişilebilir, tıklayarak tiklenir)
-        if (detail.lexiconInfo != null && detail.lexiconInfo!.hasRelations) ...[
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Container(
-            color: colorScheme.surfaceContainerLow,
-            constraints: const BoxConstraints(maxHeight: 132),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: WordRelationsSection(
-                synonyms: detail.lexiconInfo!.synonyms,
-                antonyms: detail.lexiconInfo!.antonyms,
-                selectedSynonyms: _selectedSynonyms,
-                selectedAntonyms: _selectedAntonyms,
-                onToggleSynonym: (term) {
-                  setState(() {
-                    if (!_selectedSynonyms.remove(term)) {
-                      _selectedSynonyms.add(term);
-                    }
-                  });
-                },
-                onToggleAntonym: (term) {
-                  setState(() {
-                    if (!_selectedAntonyms.remove(term)) {
-                      _selectedAntonyms.add(term);
-                    }
-                  });
-                },
-                onToggleAll: (selectAll) {
-                  setState(() {
-                    _selectedSynonyms.clear();
-                    _selectedAntonyms.clear();
-                    if (selectAll) {
-                      _selectedSynonyms.addAll(detail.lexiconInfo!.synonyms);
-                      _selectedAntonyms.addAll(detail.lexiconInfo!.antonyms);
-                    }
-                  });
-                },
+            width: 20,
+            height: 20,
+            alignment: Alignment.center,
+            margin: const EdgeInsets.only(top: 2),
+            decoration: BoxDecoration(
+              color: colorScheme.secondaryContainer,
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              '${index + 1}',
+              style: theme.textTheme.labelSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: colorScheme.onSecondaryContainer,
+                fontSize: 11,
               ),
             ),
           ),
-          Divider(
-            height: 1,
-            color: colorScheme.outlineVariant,
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _HighlightedSentenceText(
+                  sentence: example.english,
+                  highlightWord: word,
+                  baseStyle: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurface,
+                    height: 1.35,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  highlightColor: colorScheme.primary,
+                ),
+                if (example.turkish != null && example.turkish!.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    example.turkish!,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
+          if (widget.ttsService != null)
+            IconButton(
+              onPressed: () => _handleSpeak(
+                example.english,
+                TtsSpeakingTarget.sentence,
+              ),
+              icon: Icon(
+                Icons.volume_up_outlined,
+                size: 18,
+                color: colorScheme.onSurfaceVariant,
+              ),
+              tooltip: 'Cümleyi Dinle',
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(
+                minWidth: 32,
+                minHeight: 32,
+              ),
+            ),
         ],
-        // ALT BÖLÜM: Tek Örnek Cümle Görünümü (aşağı kaydırınca diğer cümleler görünür)
-        Container(
-          color: colorScheme.surfaceContainerLowest,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.format_quote_rounded,
-                      size: 17,
-                      color: colorScheme.primary,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Örnek Cümleler',
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: colorScheme.onSurface,
-                      ),
-                    ),
-                    const Spacer(),
-                    if (detail.examples.length > 1)
-                      Text(
-                        '${detail.examples.length} cümle • kaydır',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              SizedBox(
-                height: 112,
-                child: ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 2, 76, 16),
-                  itemCount: detail.examples.length,
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(height: 8),
-                  itemBuilder: (context, index) {
-                    final example = detail.examples[index];
-                    return Container(
-                      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-                      decoration: BoxDecoration(
-                        color: colorScheme.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: colorScheme.outlineVariant.withAlpha(160),
-                        ),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 20,
-                            height: 20,
-                            alignment: Alignment.center,
-                            margin: const EdgeInsets.only(top: 1),
-                            decoration: BoxDecoration(
-                              color: colorScheme.secondaryContainer,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Text(
-                              '${index + 1}',
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: colorScheme.onSecondaryContainer,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _HighlightedSentenceText(
-                                  sentence: example.english,
-                                  highlightWord: detail.word,
-                                  baseStyle:
-                                      theme.textTheme.bodyMedium?.copyWith(
-                                    color: colorScheme.onSurface,
-                                    height: 1.32,
-                                  ),
-                                  highlightColor: colorScheme.primary,
-                                ),
-                                if (example.turkish != null &&
-                                    example.turkish!.isNotEmpty) ...[
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    example.turkish!,
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: colorScheme.onSurfaceVariant,
-                                      height: 1.28,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          if (widget.ttsService != null)
-                            IconButton(
-                              onPressed: () => _handleSpeak(
-                                example.english,
-                                TtsSpeakingTarget.sentence,
-                              ),
-                              icon: Icon(
-                                Icons.volume_up_outlined,
-                                size: 18,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                              tooltip: 'Cümleyi Dinle',
-                              visualDensity: VisualDensity.compact,
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 30,
-                                minHeight: 30,
-                              ),
-                            ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

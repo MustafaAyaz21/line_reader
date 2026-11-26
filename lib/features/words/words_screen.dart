@@ -380,10 +380,11 @@ class _WordsScreenState extends State<WordsScreen> {
     WordList? createdList;
     final created = await WordListEditorDialog.show(
       context,
-      onSubmit: (name, colorValue) async {
+      onSubmit: (name, colorValue, icon) async {
         final result = await widget.controller.createListWithResult(
           name: name,
           colorValue: colorValue,
+          icon: icon,
         );
         if (result.error != null) {
           return result.error;
@@ -618,8 +619,12 @@ class _WordsScreenState extends State<WordsScreen> {
   Future<void> _handleCreateList(BuildContext context) async {
     final created = await WordListEditorDialog.show(
       context,
-      onSubmit: (name, colorValue) {
-        return widget.controller.createList(name: name, colorValue: colorValue);
+      onSubmit: (name, colorValue, icon) {
+        return widget.controller.createList(
+          name: name,
+          colorValue: colorValue,
+          icon: icon,
+        );
       },
     );
     if (created == true && context.mounted) {
@@ -631,11 +636,12 @@ class _WordsScreenState extends State<WordsScreen> {
     final updated = await WordListEditorDialog.show(
       context,
       existingList: list,
-      onSubmit: (name, colorValue) {
+      onSubmit: (name, colorValue, icon) {
         return widget.controller.updateList(
           list: list,
           name: name,
           colorValue: colorValue,
+          icon: icon,
         );
       },
     );

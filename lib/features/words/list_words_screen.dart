@@ -8,6 +8,7 @@ import '../../core/widgets/line_refresh_indicator.dart';
 import 'controllers/words_controller.dart';
 import 'models/saved_word.dart';
 import 'models/word_list.dart';
+import 'learning/screens/word_learning_hub_screen.dart';
 import 'screens/add_word_search_screen.dart';
 import 'widgets/empty_words_view.dart';
 import 'widgets/word_list_editor_dialog.dart';
@@ -85,11 +86,12 @@ class _ListWordsScreenState extends State<ListWordsScreen> {
     await WordListEditorDialog.show(
       context,
       existingList: list,
-      onSubmit: (name, colorValue) {
+      onSubmit: (name, colorValue, icon) {
         return widget.controller.updateList(
           list: list,
           name: name,
           colorValue: colorValue,
+          icon: icon,
         );
       },
     );
@@ -125,6 +127,114 @@ class _ListWordsScreenState extends State<ListWordsScreen> {
     }
   }
 
+  void _handleOpenLearningHub(
+    WordList? list,
+    List<SavedWord> words,
+    TtsService ttsService,
+  ) {
+    if (list == null) return;
+    if (words.length < WordLearningHubScreen.minWordsRequired) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              'Öğrenme modları için listede en az ${WordLearningHubScreen.minWordsRequired} kelime olmalıdır (Şu an ${words.length} kelime var).',
+            ),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => WordLearningHubScreen(
+          wordList: list,
+          words: words,
+          ttsService: ttsService,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLearningBanner(
+    BuildContext context,
+    WordList? list,
+    List<SavedWord> words,
+    TtsService ttsService,
+  ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return InkWell(
+      onTap: () => _handleOpenLearningHub(list, words, ttsService),
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: colorScheme.brightness == Brightness.dark
+              ? const Color(0xFF171D28)
+              : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: const Color(0xFFF59E0B).withValues(alpha: 0.35),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text('✨', style: TextStyle(fontSize: 18)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Pekiştirmeye Hazır',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFFF59E0B),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Kelimeleri oyunlarla öğrenmeye başla',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 14,
+              color: Color(0xFFF59E0B),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final ttsService = _resolveTtsService();
@@ -147,12 +257,24 @@ class _ListWordsScreenState extends State<ListWordsScreen> {
               children: [
                 if (list != null) ...[
                   Container(
-                    width: 10,
-                    height: 22,
+                    width: 32,
+                    height: 32,
                     decoration: BoxDecoration(
-                      color: list.color,
-                      borderRadius: BorderRadius.circular(4),
+                      color: list.color.withOpacity(0.20),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: list.color.withOpacity(0.50),
+                        width: 1,
+                      ),
                     ),
+                    alignment: Alignment.center,
+                    child: list.icon != null && list.icon!.isNotEmpty
+                        ? Text(list.icon!, style: const TextStyle(fontSize: 16))
+                        : Icon(
+                            list.isDefault ? Icons.star_rounded : Icons.folder_rounded,
+                            color: list.color,
+                            size: 18,
+                          ),
                   ),
                   const SizedBox(width: 10),
                 ],
@@ -165,14 +287,20 @@ class _ListWordsScreenState extends State<ListWordsScreen> {
               ],
             ),
             actions: [
-              if (list != null)
+              if (list != null) ...[
+                IconButton(
+                  onPressed: () => _handleOpenLearningHub(list, words, ttsService),
+                  icon: const Icon(Icons.school_outlined),
+                  tooltip: 'Öğrenme Alanı',
+                ),
                 IconButton(
                   onPressed: () => _handleEditList(list),
                   icon: const Icon(Icons.palette_outlined),
                   tooltip: list.isDefault
-                      ? 'Rengi Düzenle'
-                      : 'Listeyi / Rengi Düzenle',
+                      ? 'Logoyu ve Rengi Düzenle'
+                      : 'Listeyi Düzenle',
                 ),
+              ],
             ],
           ),
           floatingActionButton: FloatingActionButton(
@@ -235,27 +363,43 @@ class _ListWordsScreenState extends State<ListWordsScreen> {
                     ? const Center(child: CircularProgressIndicator())
                     : words.isEmpty
                         ? const EmptyWordsView()
-                        : LineRefreshIndicator(
-                            onRefresh: () => widget.controller
-                                .loadWordsForList(widget.listId),
-                            child: ListView.separated(
-                              padding: const EdgeInsets.fromLTRB(0, 8, 0, 88),
-                              itemCount: words.length,
-                              separatorBuilder: (context, index) =>
-                                  const Divider(height: 1),
-                              itemBuilder: (context, index) {
-                                final item = words[index];
-                                return WordListTile(
-                                  item: item,
-                                  ttsService: ttsService,
-                                  onEdit: () => _handleOpenAddWord(
-                                    list,
-                                    editingWord: item,
-                                  ),
-                                  onDelete: () =>
-                                      widget.controller.removeWord(item),
-                                );
-                              },
+                        : Align(
+                            alignment: Alignment.topCenter,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 860),
+                              child: LineRefreshIndicator(
+                                onRefresh: () => widget.controller
+                                    .loadWordsForList(widget.listId),
+                                child: ListView.separated(
+                                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+                                  itemCount: words.length + (words.length >= 4 ? 1 : 0),
+                                  separatorBuilder: (context, index) =>
+                                      const SizedBox(height: 10),
+                                  itemBuilder: (context, index) {
+                                    if (words.length >= 4 && index == 0) {
+                                      return _buildLearningBanner(
+                                        context,
+                                        list,
+                                        words,
+                                        ttsService,
+                                      );
+                                    }
+                                    final wordIndex = words.length >= 4 ? index - 1 : index;
+                                    final item = words[wordIndex];
+                                    return WordListTile(
+                                      item: item,
+                                      ttsService: ttsService,
+                                      accentColor: list?.color,
+                                      onEdit: () => _handleOpenAddWord(
+                                        list,
+                                        editingWord: item,
+                                      ),
+                                      onDelete: () =>
+                                          widget.controller.removeWord(item),
+                                    );
+                                  },
+                                ),
+                              ),
                             ),
                           ),
               ),

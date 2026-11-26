@@ -43,6 +43,24 @@ class AppAuthUser {
     final atIndex = email.indexOf('@');
     return atIndex > 0 ? email.substring(0, atIndex) : email;
   }
+
+  AppAuthUser copyWith({
+    String? uid,
+    String? email,
+    String? displayName,
+    String? photoUrl,
+    AuthProviderType? provider,
+    bool? emailVerified,
+  }) {
+    return AppAuthUser(
+      uid: uid ?? this.uid,
+      email: email ?? this.email,
+      displayName: displayName ?? this.displayName,
+      photoUrl: photoUrl ?? this.photoUrl,
+      provider: provider ?? this.provider,
+      emailVerified: emailVerified ?? this.emailVerified,
+    );
+  }
 }
 
 /// Kimlik doğrulama işlemi sonucu.

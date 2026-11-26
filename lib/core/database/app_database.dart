@@ -115,9 +115,17 @@ class AppDatabase {
         name TEXT NOT NULL UNIQUE,
         color_value INTEGER NOT NULL,
         is_default INTEGER NOT NULL DEFAULT 0,
-        created_at INTEGER NOT NULL
+        created_at INTEGER NOT NULL,
+        icon TEXT
       )
     ''');
+
+    // Mevcut tablolarda icon sütununun varlığını garantiye al
+    final listColumns = await db.rawQuery('PRAGMA table_info($wordListsTable)');
+    final hasIcon = listColumns.any((col) => col['name'] == 'icon');
+    if (!hasIcon) {
+      await db.execute('ALTER TABLE $wordListsTable ADD COLUMN icon TEXT');
+    }
 
     final favoritesId = await _ensureDefaultFavoritesRow(db);
 

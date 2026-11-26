@@ -117,10 +117,12 @@ class WordsController extends ChangeNotifier {
   Future<String?> createList({
     required String name,
     required int colorValue,
+    String? icon,
   }) async {
     final result = await createListWithResult(
       name: name,
       colorValue: colorValue,
+      icon: icon,
     );
     return result.error;
   }
@@ -130,11 +132,13 @@ class WordsController extends ChangeNotifier {
   Future<({WordList? list, String? error})> createListWithResult({
     required String name,
     required int colorValue,
+    String? icon,
   }) async {
     try {
       final created = await _repository.createList(
         name: name,
         colorValue: colorValue,
+        icon: icon,
       );
       await CloudSyncService.shared.clearDeletedList(created.name);
       await loadLists();
@@ -151,11 +155,12 @@ class WordsController extends ChangeNotifier {
     }
   }
 
-  /// Mevcut bir listenin rengini (ve özel liste ise adını) günceller.
+  /// Mevcut bir listenin rengini (ve özel liste ise adını ve logosunu) günceller.
   Future<String?> updateList({
     required WordList list,
     required String name,
     required int colorValue,
+    String? icon,
   }) async {
     try {
       await _repository.updateList(
@@ -163,6 +168,7 @@ class WordsController extends ChangeNotifier {
         name: name,
         colorValue: colorValue,
         isDefault: list.isDefault,
+        icon: icon,
       );
       await loadLists();
       CloudSyncService.shared.scheduleSync();

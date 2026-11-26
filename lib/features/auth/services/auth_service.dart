@@ -47,6 +47,9 @@ abstract class AuthBackend {
   Future<List<String>> fetchSignInMethodsForEmail(String email) async =>
       const <String>[];
 
+  /// Kullanıcının profil görünen ismini günceller.
+  Future<void> updateDisplayName(String displayName) async {}
+
   Future<void> signOut();
 }
 
@@ -355,6 +358,19 @@ class FirebaseAuthBackend implements AuthBackend {
         message: 'Doğrulama e-postası gönderilemedi. Biraz sonra tekrar deneyin.',
       );
     }
+  }
+
+  @override
+  Future<void> updateDisplayName(String displayName) async {
+    await initialize();
+    if (!_isConfigured) return;
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await user.updateDisplayName(displayName.trim());
+        await user.reload();
+      }
+    } catch (_) {}
   }
 
   @override

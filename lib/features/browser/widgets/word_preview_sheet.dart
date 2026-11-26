@@ -472,12 +472,14 @@ class _WordPreviewSheetState extends State<WordPreviewSheet> {
 
   Future<({WordList? list, String? error})> _createListFallback(
     String name,
-    int colorValue,
-  ) async {
+    int colorValue, [
+    String? icon,
+  ]) async {
     try {
       final created = await WordRepository(AppDatabase.instance).createList(
         name: name,
         colorValue: colorValue,
+        icon: icon,
       );
       return (list: created, error: null);
     } on FormatException catch (error) {
@@ -497,11 +499,11 @@ class _WordPreviewSheetState extends State<WordPreviewSheet> {
     WordList? createdList;
     final created = await WordListEditorDialog.show(
       context,
-      onSubmit: (name, colorValue) async {
+      onSubmit: (name, colorValue, icon) async {
         final callback = widget.onCreateWordList;
         final result = callback != null
-            ? await callback(name, colorValue)
-            : await _createListFallback(name, colorValue);
+            ? await callback(name, colorValue, icon)
+            : await _createListFallback(name, colorValue, icon);
         if (result.error != null) {
           return result.error;
         }

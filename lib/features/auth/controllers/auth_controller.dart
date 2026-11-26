@@ -156,7 +156,7 @@ class AuthController extends ChangeNotifier {
       final persistedVerifiedUid = await _loadPersistedVerifiedUid();
       final current = _backend.currentUser;
       if (current != null) {
-        _user = current;
+        _user = await _enrichUser(current);
         if (persistedVerifiedUid != null &&
             persistedVerifiedUid == current.uid) {
           _d1EmailVerified = true;
@@ -198,7 +198,7 @@ class AuthController extends ChangeNotifier {
       _authSub = _backend.authStateChanges.listen((nextUser) async {
         if (_isDisposed) return;
         if (nextUser != null) {
-          _user = nextUser;
+          _user = await _enrichUser(nextUser);
           if (!nextUser.emailVerified && !_d1EmailVerified) {
             final savedUid = await _loadPersistedVerifiedUid();
             if (savedUid != null && savedUid == nextUser.uid) {
@@ -771,6 +771,42 @@ class AuthController extends ChangeNotifier {
   Future<String?> getIdToken({bool forceRefresh = false}) async {
     if (!isAuthenticated) return null;
     return _backend.getIdToken(forceRefresh: forceRefresh);
+  }
+
+  /// Kullanıcının varsa yerel olarak özelleştirilmiş görünen adını ekler.
+  Future<AppAuthUser> _enrichUser(AppAuthUser user) async {
+    final rawName = user.displayName?.trim() ?? '';
+    if (rawName.isNotEmpty) {
+      return user;
+    }
+    if (_localStore is AuthLocalRepository) {
+      final custom = await (_localStore as AuthLocalRepository).loadCustomDisplayName();
+      if (custom != null && custom.isNotEmpty) {
+        return user.copyWith(displayName: custom);
+      }
+    }
+    return user;
+  }
+
+  /// Kullanıcının profil görünen adını (Display Name) günceller ve kaydeder.
+  Future<bool> updateDisplayName(String newName) async {
+    final trimmed = newName.trim();
+    if (trimmed.isEmpty) return false;
+    try {
+      await _backend.updateDisplayName(trimmed);
+      final current = _user;
+      if (current != null) {
+        _user = current.copyWith(displayName: trimmed);
+      }
+      if (_localStore is AuthLocalRepository) {
+        await (_localStore as AuthLocalRepository).saveCustomDisplayName(trimmed);
+      }
+      _safeNotify();
+      return true;
+    } catch (e) {
+      debugPrint('[AuthController] Isim guncellenemedi: $e');
+      return false;
+    }
   }
 
   Future<void> signOut() async {

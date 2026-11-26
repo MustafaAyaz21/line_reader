@@ -452,6 +452,7 @@ class CloudSyncService {
           final isDefault = item['is_default'] == true;
           final colorValue =
               (item['color_value'] as num?)?.toInt() ?? WordListColors.palette.first;
+          final icon = (item['icon'] as String?)?.trim();
           final createdIso = item['created_at'] as String?;
           final remoteCreated =
               createdIso != null ? DateTime.tryParse(createdIso) : null;
@@ -474,16 +475,19 @@ class CloudSyncService {
               final created = await _wordRepository.createList(
                 name: name,
                 colorValue: colorValue,
+                icon: icon,
               );
               byNormName[_norm(created.name)] = created;
             } catch (_) {}
-          } else if (existing != null && existing.colorValue != colorValue) {
+          } else if (existing != null &&
+              (existing.colorValue != colorValue || existing.icon != icon)) {
             try {
               await _wordRepository.updateList(
                 id: existing.id,
                 name: existing.name,
                 colorValue: colorValue,
                 isDefault: existing.isDefault,
+                icon: icon,
               );
             } catch (_) {}
           }
@@ -588,6 +592,7 @@ class CloudSyncService {
               'id': l.id,
               'name': l.name,
               'color_value': l.colorValue,
+              'icon': l.icon,
               'is_default': l.isDefault,
               'created_at': l.createdAt.toUtc().toIso8601String(),
             })

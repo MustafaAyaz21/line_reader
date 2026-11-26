@@ -53,11 +53,16 @@ class WordListCard extends StatelessWidget {
                   ),
                 ),
                 alignment: Alignment.center,
-                child: Icon(
-                  list.isDefault ? Icons.star_rounded : Icons.folder_rounded,
-                  color: list.color,
-                  size: 22,
-                ),
+                child: list.icon != null && list.icon!.isNotEmpty
+                    ? Text(
+                        list.icon!,
+                        style: const TextStyle(fontSize: 22),
+                      )
+                    : Icon(
+                        list.isDefault ? Icons.star_rounded : Icons.folder_rounded,
+                        color: list.color,
+                        size: 22,
+                      ),
               ),
               const SizedBox(width: 14),
 

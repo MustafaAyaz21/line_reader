@@ -415,10 +415,11 @@ class _QuickLookupOverlayScreenState extends State<_QuickLookupOverlayScreen>
     WordList? createdList;
     final created = await WordListEditorDialog.show(
       context,
-      onSubmit: (name, colorValue) async {
+      onSubmit: (name, colorValue, icon) async {
         final result = await _wordsController.createListWithResult(
           name: name,
           colorValue: colorValue,
+          icon: icon,
         );
         if (result.error != null) {
           return result.error;

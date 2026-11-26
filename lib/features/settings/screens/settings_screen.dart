@@ -1407,11 +1407,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
-                          Text(
-                            user.effectiveName,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  user.effectiveName,
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              IconButton(
+                                icon: const Icon(Icons.edit_outlined, size: 16),
+                                onPressed: () => _handleEditDisplayName(
+                                  context,
+                                  auth,
+                                  user.effectiveName,
+                                ),
+                                tooltip: s.t('İsmi Düzenle', 'Edit Name'),
+                                visualDensity: VisualDensity.compact,
+                                constraints: const BoxConstraints(
+                                  minWidth: 28,
+                                  minHeight: 28,
+                                ),
+                                padding: EdgeInsets.zero,
+                              ),
+                            ],
                           ),
                           if (user.email.isNotEmpty)
                             Text(
@@ -1852,6 +1876,62 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _handleEditDisplayName(
+    BuildContext context,
+    AuthController auth,
+    String currentName,
+  ) async {
+    final s = AppStrings.of(context);
+    final controller = TextEditingController(text: currentName);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: Text(s.t('Görünen İsmi Düzenle', 'Edit Display Name')),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+          decoration: InputDecoration(
+            labelText: s.t('Adınız Soyadınız', 'Your Name'),
+            hintText: 'Örn: Mustafa Ayaz',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          onSubmitted: (val) {
+            if (val.trim().isNotEmpty) {
+              Navigator.of(dialogCtx).pop(true);
+            }
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: Text(s.t('İptal', 'Cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            child: Text(s.t('Kaydet', 'Save')),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && controller.text.trim().isNotEmpty) {
+      final success = await auth.updateDisplayName(controller.text.trim());
+      if (context.mounted && success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              s.t('İsminiz güncellendi.', 'Name updated successfully.'),
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 }
 

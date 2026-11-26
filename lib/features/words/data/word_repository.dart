@@ -29,6 +29,7 @@ class WordRepository {
         l.color_value,
         l.is_default,
         l.created_at,
+        l.icon,
         COUNT(w.id) AS word_count
       FROM ${AppDatabase.wordListsTable} l
       LEFT JOIN ${AppDatabase.wordsTable} w ON w.list_id = l.id
@@ -47,6 +48,7 @@ class WordRepository {
   Future<WordList> createList({
     required String name,
     required int colorValue,
+    String? icon,
   }) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) {
@@ -65,6 +67,7 @@ class WordRepository {
     }
 
     final now = DateTime.now();
+    final sanitizedIcon = icon?.trim().isEmpty == true ? null : icon?.trim();
     final id = await db.insert(
       AppDatabase.wordListsTable,
       <String, Object?>{
@@ -72,6 +75,7 @@ class WordRepository {
         'color_value': colorValue,
         'is_default': 0,
         'created_at': now.millisecondsSinceEpoch,
+        'icon': sanitizedIcon,
       },
     );
 
@@ -82,6 +86,7 @@ class WordRepository {
       isDefault: false,
       createdAt: now,
       wordCount: 0,
+      icon: sanitizedIcon,
     );
   }
 
@@ -90,14 +95,19 @@ class WordRepository {
     required String name,
     required int colorValue,
     required bool isDefault,
+    String? icon,
   }) async {
     final db = await _getReadyDatabase();
+    final sanitizedIcon = icon?.trim().isEmpty == true ? null : icon?.trim();
 
     if (isDefault) {
-      // Varsayılan "Favoriler" listesinin adı korunur, rengi özelleştirilebilir.
+      // Varsayılan "Favoriler" listesinin adı korunur, rengi ve logosu özelleştirilebilir.
       await db.update(
         AppDatabase.wordListsTable,
-        <String, Object?>{'color_value': colorValue},
+        <String, Object?>{
+          'color_value': colorValue,
+          'icon': sanitizedIcon,
+        },
         where: 'id = ?',
         whereArgs: <Object>[id],
       );
@@ -124,6 +134,7 @@ class WordRepository {
       <String, Object?>{
         'name': trimmed,
         'color_value': colorValue,
+        'icon': sanitizedIcon,
       },
       where: 'id = ?',
       whereArgs: <Object>[id],

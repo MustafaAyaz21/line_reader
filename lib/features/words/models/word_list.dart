@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 /// Yeni kelime listesi oluşturup oluşan listeyi (veya doğrulama/hata mesajını)
 /// döndüren geri çağırma imzası.
 typedef CreateWordListCallback = Future<({WordList? list, String? error})>
-    Function(String name, int colorValue);
+    Function(String name, int colorValue, [String? icon]);
 
 /// Özel kelime listeleri için hazır renk paleti.
 abstract final class WordListColors {
@@ -21,6 +21,8 @@ abstract final class WordListColors {
   ];
 }
 
+const Object _sentinel = Object();
+
 /// Yerel SQLite veri tabanında saklanan kelime listesi (klasör) modeli.
 class WordList {
   const WordList({
@@ -30,6 +32,7 @@ class WordList {
     required this.isDefault,
     required this.createdAt,
     this.wordCount = 0,
+    this.icon,
   });
 
   final int id;
@@ -38,6 +41,7 @@ class WordList {
   final bool isDefault;
   final DateTime createdAt;
   final int wordCount;
+  final String? icon;
 
   Color get color => Color(colorValue);
 
@@ -51,7 +55,19 @@ class WordList {
         map['created_at'] as int,
       ),
       wordCount: (map['word_count'] as int?) ?? 0,
+      icon: map['icon'] as String?,
     );
+  }
+
+  Map<String, Object?> toMap() {
+    return <String, Object?>{
+      'id': id,
+      'name': name,
+      'color_value': colorValue,
+      'is_default': isDefault ? 1 : 0,
+      'created_at': createdAt.millisecondsSinceEpoch,
+      'icon': icon,
+    };
   }
 
   WordList copyWith({
@@ -61,6 +77,7 @@ class WordList {
     bool? isDefault,
     DateTime? createdAt,
     int? wordCount,
+    Object? icon = _sentinel,
   }) {
     return WordList(
       id: id ?? this.id,
@@ -69,6 +86,7 @@ class WordList {
       isDefault: isDefault ?? this.isDefault,
       createdAt: createdAt ?? this.createdAt,
       wordCount: wordCount ?? this.wordCount,
+      icon: identical(icon, _sentinel) ? this.icon : (icon as String?),
     );
   }
 }
