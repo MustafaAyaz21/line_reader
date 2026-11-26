@@ -608,3 +608,72 @@ class WordDefinitionAndExamplesSection extends StatelessWidget {
     );
   }
 }
+
+/// Örnek cümlenin kaynağını (`subtitle` -> Film/Dizi, `tatoeba` -> Tatoeba)
+/// gösteren kompakt rozet.
+class WordExampleSourceBadge extends StatelessWidget {
+  const WordExampleSourceBadge({
+    super.key,
+    required this.source,
+  });
+
+  final String? source;
+
+  @override
+  Widget build(BuildContext context) {
+    final normalized = source?.trim().toLowerCase();
+    if (normalized != 'subtitle' && normalized != 'tatoeba') {
+      return const SizedBox.shrink();
+    }
+
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final s = context.l10n;
+    final isSubtitle = normalized == 'subtitle';
+    final label = isSubtitle
+        ? s.t('Film/Dizi', 'Movie/TV')
+        : 'Tatoeba';
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 5),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: (isSubtitle
+                      ? colorScheme.tertiaryContainer
+                      : colorScheme.secondaryContainer)
+                  .withAlpha(150),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isSubtitle ? Icons.movie_outlined : Icons.menu_book_outlined,
+                  size: 11,
+                  color: isSubtitle
+                      ? colorScheme.onTertiaryContainer
+                      : colorScheme.onSecondaryContainer,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  label,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: isSubtitle
+                        ? colorScheme.onTertiaryContainer
+                        : colorScheme.onSecondaryContainer,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

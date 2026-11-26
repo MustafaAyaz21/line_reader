@@ -184,6 +184,43 @@ async function handleDictionaryProxy(request, env, url) {
   };
 
   try {
+    const isSingleEnglishWord = /^[a-zA-Z]+$/.test(query) && sl === "en" && tl === "tr";
+
+    // 0.5) Tek kelimede D1 OpenSubtitles/Tatoeba frekans sözlüğüne bak (< 50 ms)
+    if (isSingleEnglishWord && env && env.DB) {
+      try {
+        const lowerWord = query.toLowerCase();
+        const row = await env.DB
+          .prepare("SELECT meanings_json FROM corpus_lexicon WHERE word = ? LIMIT 1")
+          .bind(lowerWord)
+          .first();
+        if (row && row.meanings_json) {
+          const meanings = JSON.parse(row.meanings_json);
+          if (Array.isArray(meanings) && meanings.length >= 3) {
+            const primary = String(meanings[0] || "").trim();
+            const detailedEntries = meanings
+              .map((m) => String(m || "").trim())
+              .filter((m) => m.length > 0)
+              .map((m) => [m]);
+            if (primary && detailedEntries.length >= 3) {
+              const d1Payload = [
+                [[primary, lowerWord, null, null, 10]],
+                [["", meanings, detailedEntries]],
+              ];
+              return cacheAndReturn(new Response(JSON.stringify(d1Payload), {
+                status: 200,
+                headers: {
+                  ...CORS_HEADERS,
+                  "Content-Type": "application/json; charset=utf-8",
+                  "Cache-Control": "public, max-age=86400, s-maxage=604800",
+                },
+              }));
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
     const googleUrl = new URL("https://translate.googleapis.com/translate_a/single");
     const dtParams = url.searchParams.getAll("dt");
 
@@ -205,8 +242,6 @@ async function handleDictionaryProxy(request, env, url) {
       googleUrl.searchParams.append("dt", "qca");
       googleUrl.searchParams.set("q", query);
     }
-
-    const isSingleEnglishWord = /^[a-zA-Z]+$/.test(query) && sl === "en" && tl === "tr";
 
     // Google Translate ve (tek kelimeyse) dictionaryapi.dev doğrulamasını PARALEL çalıştır!
     const [res, dictCheck] = await Promise.all([
@@ -405,7 +440,56 @@ async function handleWordExamples(request, env, url) {
 
   const cacheKey = `v2:${word}`;
 
-  // 1) Önce Cloudflare D1 önbelleğine bak (maliyetsiz ve <100ms).
+  // 0) Cloudflare Edge Cache kontrolü (< 20 ms)
+  const edgeCacheKey = new Request(`https://cache.linereader.internal/examples/v2/${encodeURIComponent(word)}`);
+  const edgeCache = typeof caches !== "undefined" ? caches.default : null;
+  if (edgeCache) {
+    try {
+      const hit = await edgeCache.match(edgeCacheKey);
+      if (hit) return hit;
+    } catch (_) {}
+  }
+
+  const cacheExamplesAndReturn = (payload) => {
+    const resp = new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: {
+        ...CORS_HEADERS,
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "public, max-age=86400, s-maxage=604800",
+      },
+    });
+    if (edgeCache) {
+      try {
+        edgeCache.put(edgeCacheKey, resp.clone()).catch(() => {});
+      } catch (_) {}
+    }
+    return resp;
+  };
+
+  // 1) Önce OpenSubtitles & Tatoeba D1 korpusuna bak (< 50 ms)
+  if (env && env.DB) {
+    try {
+      const corpusRow = await env.DB
+        .prepare("SELECT examples_json FROM corpus_lexicon WHERE word = ? LIMIT 1")
+        .bind(word)
+        .first();
+      if (corpusRow && corpusRow.examples_json) {
+        const parsedCorpus = JSON.parse(corpusRow.examples_json);
+        if (Array.isArray(parsedCorpus) && parsedCorpus.length >= 1) {
+          return cacheExamplesAndReturn({
+            ok: true,
+            word,
+            cached: true,
+            source: "corpus",
+            examples: parsedCorpus,
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  // 2) Mevcut D1 AI önbelleğine bak (maliyetsiz ve < 100 ms).
   if (env && env.DB) {
     try {
       await ensureSchema(env.DB);
@@ -416,7 +500,7 @@ async function handleWordExamples(request, env, url) {
       if (cached && cached.examples_json) {
         const parsed = JSON.parse(cached.examples_json);
         if (Array.isArray(parsed) && parsed.length >= 2) {
-          return jsonResponse({
+          return cacheExamplesAndReturn({
             ok: true,
             word,
             cached: true,
@@ -616,6 +700,15 @@ async function ensureSchema(db) {
         timezone_offset INTEGER NOT NULL DEFAULT 3,
         last_prepared_date TEXT,
         last_published_date TEXT,
+        updated_at TEXT NOT NULL
+      )
+    `),
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS corpus_lexicon (
+        word TEXT PRIMARY KEY,
+        meanings_json TEXT NOT NULL DEFAULT '[]',
+        examples_json TEXT NOT NULL DEFAULT '[]',
+        freq_rank INTEGER NOT NULL DEFAULT 999999,
         updated_at TEXT NOT NULL
       )
     `),

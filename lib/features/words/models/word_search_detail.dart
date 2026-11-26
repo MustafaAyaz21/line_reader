@@ -6,10 +6,13 @@ class WordExampleSentence {
   const WordExampleSentence({
     required this.english,
     this.turkish,
+    this.source,
   });
 
   final String english;
   final String? turkish;
+  /// Alıntı kaynağı: `'subtitle'` (Film/Dizi), `'tatoeba'` veya `null`.
+  final String? source;
 }
 
 /// Kelime listesine manuel ekleme ekranında gösterilen ayrıntılı arama sonucu:

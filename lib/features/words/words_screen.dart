@@ -1249,6 +1249,7 @@ class _WordsScreenState extends State<WordsScreen> {
                             ),
                           ),
                         ],
+                        WordExampleSourceBadge(source: example.source),
                       ],
                     ),
                   ),

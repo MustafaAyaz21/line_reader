@@ -61,6 +61,7 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
   int _searchGeneration = 0;
 
   bool _isLoading = false;
+  bool _isLoadingExamples = false;
   bool _isSaving = false;
   String? _errorMessage;
   WordSearchDetail? _detail;
@@ -154,6 +155,7 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
     final myGen = ++_searchGeneration;
     setState(() {
       _isLoading = true;
+      _isLoadingExamples = true;
       _errorMessage = null;
       _detail = null;
       _matchedExistingWord = null;
@@ -166,7 +168,26 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
     try {
       // Sözlük araması ile bu kelimenin listede zaten kayıtlı olup olmadığını paralel kontrol et.
       final results = await Future.wait<Object?>(<Future<Object?>>[
-        _searchService.searchWord(query),
+        _searchService.searchWord(
+          query,
+          onExamplesUpdated: (examples) {
+            if (!mounted || myGen != _searchGeneration) return;
+            setState(() {
+              _isLoadingExamples = false;
+              final current = _detail;
+              if (current != null &&
+                  !current.isMisspelled &&
+                  examples.isNotEmpty) {
+                _detail = WordSearchDetail(
+                  word: current.word,
+                  meanings: current.meanings,
+                  examples: examples,
+                  lexiconInfo: current.lexiconInfo,
+                );
+              }
+            });
+          },
+        ),
         widget.controller.findExistingWordsInList(
           listId: _selectedListId,
           word: query,
@@ -185,6 +206,7 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
           _selectedSynonyms.clear();
           _selectedAntonyms.clear();
           _isLoading = false;
+          _isLoadingExamples = false;
         });
         return;
       }
@@ -289,12 +311,16 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
           ..clear()
           ..addAll(preselectedAntonyms);
         _isLoading = false;
+        if (detail.examples.isNotEmpty) {
+          _isLoadingExamples = false;
+        }
       });
     } on TranslationException catch (error) {
       if (!mounted || myGen != _searchGeneration) return;
       setState(() {
         _errorMessage = error.message;
         _isLoading = false;
+        _isLoadingExamples = false;
       });
     } catch (_) {
       if (!mounted || myGen != _searchGeneration) return;
@@ -302,6 +328,7 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
         _errorMessage =
             'Kelime aranırken bir sorun oluştu. İnternet bağlantınızı kontrol edip tekrar deneyin.';
         _isLoading = false;
+        _isLoadingExamples = false;
       });
     }
   }
@@ -1387,6 +1414,37 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
                 detail.word,
               ),
             ],
+          ] else if (_isLoadingExamples) ...[
+            const SizedBox(height: 18),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withAlpha(70),
+                ),
+              ),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Örnek cümleler yükleniyor...',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ],
       ),
@@ -1533,6 +1591,7 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
                     ),
                   ),
                 ],
+                WordExampleSourceBadge(source: example.source),
               ],
             ),
           ),

@@ -69,7 +69,13 @@ Respond ONLY with valid JSON:
   String? _activeGeminiModel;
 
   /// Verilen İngilizce kelime için 10–15 farklı anlam ve 3 kısa örnek cümle getirir.
-  Future<WordSearchDetail> searchWord(String rawQuery) async {
+  ///
+  /// [onExamplesUpdated] verilirse anlamlar hazır olur olmaz sonuç hemen döner;
+  /// örnek cümleler arka planda tamamlanıp bu geri çağırma üzerinden iletilir.
+  Future<WordSearchDetail> searchWord(
+    String rawQuery, {
+    void Function(List<WordExampleSentence> examples)? onExamplesUpdated,
+  }) async {
     final normalizedWord = _normalizeEnglishQuery(rawQuery);
     if (normalizedWord.isEmpty) {
       throw const TranslationException(
@@ -117,10 +123,14 @@ Respond ONLY with valid JSON:
       if (!seenExamples.add(key)) return;
 
       final cleanTr = example.turkish?.trim();
+      final cleanSource = example.source?.trim();
       collectedExamples.add(
         WordExampleSentence(
           english: cleanEn,
           turkish: (cleanTr != null && cleanTr.isNotEmpty) ? cleanTr : null,
+          source: (cleanSource != null && cleanSource.isNotEmpty)
+              ? cleanSource
+              : null,
         ),
       );
     }
@@ -249,8 +259,9 @@ Respond ONLY with valid JSON:
           }
         }
 
-        // Örnek cümleleri topla (zaten paralel başlatıldı!).
-        if (collectedExamples.length < _targetExamplesCount) {
+        // Örnek cümleleri toplayan yardımcı blok (aşamalı modda arka planda çalışır).
+        Future<void> collectExamplesAsync() async {
+          if (collectedExamples.length >= _targetExamplesCount) return;
           final richResults = await Future.wait<List<WordExampleSentence>>(
             <Future<List<WordExampleSentence>>>[
               workerExamplesFuture,
@@ -282,73 +293,97 @@ Respond ONLY with valid JSON:
               addExample(ex);
             }
           }
-        }
 
-        // Hâlâ 3 örneğe ulaşmadıysa sözlük kaynaklarından 8–22 kelimelik
-        // tam cümleleri (kısa öbekleri eleyerek) kalite sırasına göre seç.
-        final rawEnglishExamples = <String>[];
-        if (dictBundle != null) {
-          rawEnglishExamples.addAll(dictBundle.examples);
-        }
-        if (googleBundle != null) {
-          rawEnglishExamples.addAll(googleBundle.examples);
-        }
-
-        rawEnglishExamples.sort(
-          (a, b) => _scoreExampleSentence(b).compareTo(_scoreExampleSentence(a)),
-        );
-        final chosenEnglish = <String>[];
-        final chosenKeys = <String>{
-          ...collectedExamples.map((e) => e.english.toLowerCase()),
-        };
-
-        for (final candidate in rawEnglishExamples) {
-          if (collectedExamples.length + chosenEnglish.length >=
-              _targetExamplesCount) {
-            break;
+          // Hâlâ 3 örneğe ulaşmadıysa sözlük kaynaklarından 8–22 kelimelik
+          // tam cümleleri (kısa öbekleri eleyerek) kalite sırasına göre seç.
+          final rawEnglishExamples = <String>[];
+          if (dictBundle != null) {
+            rawEnglishExamples.addAll(dictBundle.examples);
           }
-          final clean = _cleanSentence(candidate);
-          if (!_isQualityExampleSentence(clean, normalizedWord)) continue;
-          if (chosenKeys.add(clean.toLowerCase())) {
-            chosenEnglish.add(clean);
+          if (googleBundle != null) {
+            rawEnglishExamples.addAll(googleBundle.examples);
           }
-        }
 
-        // 3 örneğe hâlâ ulaşmadıysa (ör. çevrimdışı) 10–16 kelimelik doğal yedeklerle tamamla.
-        final neededExamples = _targetExamplesCount -
-            (collectedExamples.length + chosenEnglish.length);
-        if (neededExamples > 0) {
-          final primaryPos = collectedMeanings.isNotEmpty
-              ? collectedMeanings.first.partOfSpeech
-              : dictBundle?.primaryPos;
-          final fallbackSentences = _buildFallbackShortExamples(
-            word: normalizedWord,
-            pos: primaryPos,
+          rawEnglishExamples.sort(
+            (a, b) => _scoreExampleSentence(b).compareTo(_scoreExampleSentence(a)),
           );
-          for (final sentence in fallbackSentences) {
+          final chosenEnglish = <String>[];
+          final chosenKeys = <String>{
+            ...collectedExamples.map((e) => e.english.toLowerCase()),
+          };
+
+          for (final candidate in rawEnglishExamples) {
             if (collectedExamples.length + chosenEnglish.length >=
                 _targetExamplesCount) {
               break;
             }
-            if (chosenKeys.add(sentence.toLowerCase())) {
-              chosenEnglish.add(sentence);
+            final clean = _cleanSentence(candidate);
+            if (!_isQualityExampleSentence(clean, normalizedWord)) continue;
+            if (chosenKeys.add(clean.toLowerCase())) {
+              chosenEnglish.add(clean);
+            }
+          }
+
+          // 3 örneğe hâlâ ulaşmadıysa (ör. çevrimdışı) 10–16 kelimelik doğal yedeklerle tamamla.
+          final neededExamples = _targetExamplesCount -
+              (collectedExamples.length + chosenEnglish.length);
+          if (neededExamples > 0) {
+            final primaryPos = collectedMeanings.isNotEmpty
+                ? collectedMeanings.first.partOfSpeech
+                : dictBundle?.primaryPos;
+            final fallbackSentences = _buildFallbackShortExamples(
+              word: normalizedWord,
+              pos: primaryPos,
+            );
+            for (final sentence in fallbackSentences) {
+              if (collectedExamples.length + chosenEnglish.length >=
+                  _targetExamplesCount) {
+                break;
+              }
+              if (chosenKeys.add(sentence.toLowerCase())) {
+                chosenEnglish.add(sentence);
+              }
+            }
+          }
+
+          if (chosenEnglish.isNotEmpty) {
+            final translatedExamples =
+                await _translateSentencesBatch(chosenEnglish);
+            for (var i = 0; i < chosenEnglish.length; i++) {
+              final tr =
+                  i < translatedExamples.length ? translatedExamples[i] : null;
+              addExample(
+                WordExampleSentence(
+                  english: chosenEnglish[i],
+                  turkish: tr,
+                ),
+              );
             }
           }
         }
 
-        if (chosenEnglish.isNotEmpty) {
-          final translatedExamples =
-              await _translateSentencesBatch(chosenEnglish);
-          for (var i = 0; i < chosenEnglish.length; i++) {
-            final tr =
-                i < translatedExamples.length ? translatedExamples[i] : null;
-            addExample(
-              WordExampleSentence(
-                english: chosenEnglish[i],
-                turkish: tr,
-              ),
-            );
-          }
+        if (onExamplesUpdated != null &&
+            collectedMeanings.isNotEmpty &&
+            collectedExamples.length < _targetExamplesCount) {
+          // Anlamlar hazır! Örnek cümleleri arka planda tamamla ve ekrana gönder.
+          unawaited(
+            collectExamplesAsync().then((_) {
+              final updatedExamples =
+                  List<WordExampleSentence>.unmodifiable(collectedExamples);
+              final cached = _sessionCache[normalizedWord];
+              if (cached != null && updatedExamples.isNotEmpty) {
+                _sessionCache[normalizedWord] = WordSearchDetail(
+                  word: cached.word,
+                  meanings: cached.meanings,
+                  examples: updatedExamples,
+                  lexiconInfo: cached.lexiconInfo,
+                );
+              }
+              onExamplesUpdated(updatedExamples);
+            }).catchError((_) {}),
+          );
+        } else {
+          await collectExamplesAsync();
         }
       } on TranslationException catch (error) {
         onlineError = error;
@@ -425,7 +460,9 @@ Respond ONLY with valid JSON:
     if (isSingleWord) {
       try {
         lexiconInfo = await lexiconFuture.timeout(
-          const Duration(seconds: 3),
+          onExamplesUpdated != null
+              ? const Duration(milliseconds: 600)
+              : const Duration(seconds: 3),
           onTimeout: () => null,
         );
       } catch (_) {}
@@ -1039,11 +1076,10 @@ Respond ONLY with valid JSON:
   Future<List<WordExampleSentence>> _fetchWorkerExamples(String word) async {
     final endpoints = <String>[
       ApiConfig.wordExamplesWorkerUrl,
-      '${ApiConfig.browserAiFallbackEndpoint}/examples',
+      if (!kIsWeb) '${ApiConfig.browserAiFallbackEndpoint}/examples',
     ];
     for (var i = 0; i < endpoints.length; i++) {
-      final timeout =
-          i == 0 ? const Duration(milliseconds: 3000) : const Duration(seconds: 4);
+      const timeout = Duration(seconds: 6);
       try {
         final uri = Uri.parse(endpoints[i]);
         final response = await _httpClient
@@ -1068,11 +1104,13 @@ Respond ONLY with valid JSON:
           if (item is! Map<String, dynamic>) continue;
           final en = _cleanSentence((item['english'] ?? '').toString());
           final tr = (item['turkish'] ?? '').toString().trim();
+          final src = (item['source'] ?? '').toString().trim();
           if (en.isEmpty) continue;
           results.add(
             WordExampleSentence(
               english: en,
               turkish: tr.isNotEmpty ? tr : null,
+              source: src.isNotEmpty ? src : null,
             ),
           );
         }
@@ -1139,7 +1177,13 @@ Respond ONLY with valid JSON:
         }
 
         if (tr != null && tr.isNotEmpty) {
-          examples.add(WordExampleSentence(english: en, turkish: tr));
+          examples.add(
+            WordExampleSentence(
+              english: en,
+              turkish: tr,
+              source: 'tatoeba',
+            ),
+          );
         }
         if (examples.length >= 8) break;
       }
