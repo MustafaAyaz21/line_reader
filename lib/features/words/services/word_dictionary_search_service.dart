@@ -424,7 +424,10 @@ Respond ONLY with valid JSON:
 
     if (isSingleWord) {
       try {
-        lexiconInfo = await lexiconFuture;
+        lexiconInfo = await lexiconFuture.timeout(
+          const Duration(seconds: 3),
+          onTimeout: () => null,
+        );
       } catch (_) {}
     }
 
