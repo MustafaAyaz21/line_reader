@@ -119,9 +119,23 @@ class _AuthScreenState extends State<AuthScreen> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed &&
-        widget.controller.isAwaitingEmailVerification) {
-      _checkVerificationNow();
+    if (state == AppLifecycleState.resumed) {
+      if (widget.controller.isAwaitingEmailVerification) {
+        _checkVerificationNow();
+      }
+      // Kullanıcı Google penceresinden dönmüş veya vazgeçmişse takılı kalmayı önle
+      if (widget.controller.isBusy) {
+        Future<void>.delayed(const Duration(milliseconds: 1200), () {
+          if (mounted &&
+              widget.controller.isBusy &&
+              !widget.controller.isAuthenticated) {
+            widget.controller.cancelBusyState();
+            setState(() {
+              _errorMessage = null;
+            });
+          }
+        });
+      }
     }
   }
 
@@ -241,6 +255,11 @@ class _AuthScreenState extends State<AuthScreen> with WidgetsBindingObserver {
               'Google ile giriş yapılamadı.',
               'Could not sign in with Google.',
             );
+      });
+    } else {
+      // İptal edildiyse veya vazgeçildiyse ekranı temiz bırak
+      setState(() {
+        _errorMessage = null;
       });
     }
   }
@@ -369,11 +388,27 @@ class _AuthScreenState extends State<AuthScreen> with WidgetsBindingObserver {
 
     if (result.isSuccess) {
       setState(() {
+        _isSignUpMode = false;
+        _passwordController.clear();
+        _errorMessage = null;
         _infoMessage = s.t(
-          'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.',
-          'A password reset link has been sent to your email.',
+          'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi. Şifrenizi yeniledikten sonra bu ekrandan giriş yapabilirsiniz.',
+          'A password reset link has been sent to your email. You can sign in once you reset your password.',
         );
       });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              s.t(
+                'Şifre sıfırlama bağlantısı gönderildi. Giriş ekranına yönlendirildiniz.',
+                'Password reset link sent. Redirected to sign-in.',
+              ),
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } else {
       setState(() {
         _errorMessage = result.message ??
@@ -683,6 +718,23 @@ class _AuthScreenState extends State<AuthScreen> with WidgetsBindingObserver {
                                 style: const TextStyle(fontWeight: FontWeight.w700),
                               ),
                       ),
+                      if (isBusy) ...<Widget>[
+                        const SizedBox(height: 10),
+                        Center(
+                          child: TextButton.icon(
+                            onPressed: () {
+                              widget.controller.cancelBusyState();
+                              setState(() {
+                                _errorMessage = null;
+                              });
+                            },
+                            icon: const Icon(Icons.close_rounded, size: 16),
+                            label: Text(
+                              s.t('Giriş İşlemini İptal Et', 'Cancel Sign-In'),
+                            ),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 20),
                       // Misafir devamı + günlük 40 kelime çeviri sınırı açıklaması
                       Container(

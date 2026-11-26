@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 /// Ücretsiz çeviri/sözlük servisleri ve isteğe bağlı Gemini API uç nokta ayarları.
 abstract final class ApiConfig {
   /// İsteğe bağlı Gemini API uç noktası (yalnızca tarayıcı bağlamsal AI
@@ -49,8 +51,26 @@ abstract final class ApiConfig {
   static const String geminiTtsVoiceName = 'Kore';
 
   /// Birincil ücretsiz bağlam + iki dilli sözlük uç noktası (anahtar gerektirmez).
-  static const String contextualTranslateBaseUrl =
-      'https://translate.googleapis.com/translate_a/single';
+  static String get contextualTranslateBaseUrl {
+    if (kIsWeb) {
+      return 'https://linereader-ai.xreasayaz21.workers.dev/dict';
+    }
+    return 'https://translate.googleapis.com/translate_a/single';
+  }
+
+  /// Web ortamında CORS engeli aşımı için kullanılacak alternatif uç noktalar
+  static List<String> get contextualTranslateBaseUrls {
+    if (kIsWeb) {
+      return const <String>[
+        'https://linereader-ai.xreasayaz21.workers.dev/dict',
+        'https://getlinereader.com/api/dict',
+        '/api/dict',
+      ];
+    }
+    return const <String>[
+      'https://translate.googleapis.com/translate_a/single',
+    ];
+  }
 
   /// Yedek ücretsiz açık sözlük servisi (anahtar gerektirmez).
   static const String freeDictionaryBaseUrl =

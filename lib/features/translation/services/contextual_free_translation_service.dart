@@ -206,24 +206,32 @@ class ContextualFreeTranslationService implements WordTranslationService {
       if (includeDictionary) 'dt=bd',
       'q=${Uri.encodeQueryComponent(query)}',
     ];
-    final uri = Uri.parse(
-      '${ApiConfig.contextualTranslateBaseUrl}?${queryParts.join('&')}',
-    );
+    final queryStr = queryParts.join('&');
+    http.Response? response;
+    Object? lastError;
 
-    final http.Response response;
-    try {
-      response = await _httpClient.get(uri).timeout(ApiConfig.requestTimeout);
-    } on TimeoutException {
-      throw const TranslationException(
-        type: TranslationErrorType.network,
-        message: 'Anlam sorgusu zaman aşımına uğradı. Tekrar deneyin.',
-      );
-    } on SocketException {
-      throw const TranslationException(
-        type: TranslationErrorType.network,
-        message: 'İnternet bağlantısı kurulamadı.',
-      );
-    } on http.ClientException {
+    for (final base in ApiConfig.contextualTranslateBaseUrls) {
+      try {
+        final uri = Uri.parse('$base?$queryStr');
+        final res = await _httpClient.get(uri).timeout(ApiConfig.requestTimeout);
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          response = res;
+          break;
+        } else if (res.statusCode == 429) {
+          throw const TranslationException(
+            type: TranslationErrorType.rateLimited,
+            message: 'Çeviri servisi geçici olarak yoğun. Tekrar deneyin.',
+          );
+        }
+      } catch (err) {
+        lastError = err;
+      }
+    }
+
+    if (response == null) {
+      if (lastError is TranslationException) {
+        throw lastError;
+      }
       throw const TranslationException(
         type: TranslationErrorType.network,
         message: 'Ücretsiz çeviri servisine bağlanılamadı.',

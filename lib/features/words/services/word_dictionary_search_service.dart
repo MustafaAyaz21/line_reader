@@ -667,11 +667,19 @@ Respond ONLY with valid JSON:
         'dt=qca',
         'q=${Uri.encodeQueryComponent(word)}',
       ];
-      final uri = Uri.parse(
-        '${ApiConfig.contextualTranslateBaseUrl}?${queryParts.join('&')}',
-      );
-      final response = await _httpClient.get(uri).timeout(_timeout);
-      if (response.statusCode < 200 || response.statusCode >= 300) {
+      http.Response? response;
+      final queryStr = queryParts.join('&');
+      for (final base in ApiConfig.contextualTranslateBaseUrls) {
+        try {
+          final uri = Uri.parse('$base?$queryStr');
+          final res = await _httpClient.get(uri).timeout(_timeout);
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            response = res;
+            break;
+          }
+        } catch (_) {}
+      }
+      if (response == null) {
         return null;
       }
 
@@ -931,11 +939,19 @@ Respond ONLY with valid JSON:
         'dt=t',
         'q=${Uri.encodeQueryComponent(joined)}',
       ];
-      final uri = Uri.parse(
-        '${ApiConfig.contextualTranslateBaseUrl}?${queryParts.join('&')}',
-      );
-      final response = await _httpClient.get(uri).timeout(_timeout);
-      if (response.statusCode < 200 || response.statusCode >= 300) {
+      http.Response? response;
+      final queryStr = queryParts.join('&');
+      for (final base in ApiConfig.contextualTranslateBaseUrls) {
+        try {
+          final uri = Uri.parse('$base?$queryStr');
+          final res = await _httpClient.get(uri).timeout(_timeout);
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            response = res;
+            break;
+          }
+        } catch (_) {}
+      }
+      if (response == null) {
         return List<String?>.filled(sentences.length, null);
       }
 

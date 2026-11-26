@@ -65,6 +65,21 @@ export default {
       return handleWordExamples(request, env, url);
     }
 
+    // 2.6) Herkese açık iki dilli sözlük & çeviri köprüsü (CORS engelsiz Google Translate)
+    if ((method === "GET" || method === "POST") && (path === "/dict" || path === "/translate_single")) {
+      return handleDictionaryProxy(request, env, url);
+    }
+
+    // 2.7) Herkese açık web arama köprüsü (DuckDuckGo CORS engelsiz arama)
+    if ((method === "GET" || method === "POST") && path === "/search") {
+      return handleSearchProxy(request, env, url);
+    }
+
+    // 2.8) Şifre sıfırlama (Özel Line Reader HTML şablonlu e-posta — Resend)
+    if (method === "POST" && path === "/auth/password-reset") {
+      return handlePasswordResetRequest(request, env);
+    }
+
     // 3) Admin uç noktaları (PC Makale Paneli — X-Admin-Secret korumalı)
     if (path.startsWith("/admin/")) {
       return handleAdminRequest(request, env, path, method);
@@ -125,6 +140,117 @@ export default {
     }
   },
 };
+
+/* ---------------- Herkese Açık İki Dilli Sözlük Köprüsü (CORS Engelli Tarayıcılar İçin) ---------------- */
+
+async function handleDictionaryProxy(request, env, url) {
+  let query = url.searchParams.get("q") || url.searchParams.get("word") || "";
+  let sl = url.searchParams.get("sl") || "en";
+  let tl = url.searchParams.get("tl") || "tr";
+
+  if (!query && request.method.toUpperCase() === "POST") {
+    try {
+      const body = await request.json();
+      query = body?.q || body?.word || "";
+      if (body?.sl) sl = body.sl;
+      if (body?.tl) tl = body.tl;
+    } catch (_) {}
+  }
+
+  query = String(query || "").trim();
+  if (!query) {
+    return jsonResponse({ error: "missing_query" }, 400);
+  }
+
+  try {
+    const googleUrl = new URL("https://translate.googleapis.com/translate_a/single");
+    const dtParams = url.searchParams.getAll("dt");
+
+    if (dtParams.length > 0) {
+      for (const [k, v] of url.searchParams.entries()) {
+        if (k !== "dt") googleUrl.searchParams.set(k, v);
+      }
+      for (const dt of dtParams) {
+        googleUrl.searchParams.append("dt", dt);
+      }
+    } else {
+      googleUrl.searchParams.set("client", "gtx");
+      googleUrl.searchParams.set("sl", sl);
+      googleUrl.searchParams.set("tl", tl);
+      googleUrl.searchParams.append("dt", "t");
+      googleUrl.searchParams.append("dt", "bd");
+      googleUrl.searchParams.append("dt", "at");
+      googleUrl.searchParams.append("dt", "ex");
+      googleUrl.searchParams.append("dt", "qca");
+      googleUrl.searchParams.set("q", query);
+    }
+
+    const res = await fetch(googleUrl.toString(), {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "*/*",
+      },
+    });
+
+    if (!res.ok) {
+      return jsonResponse({ error: "upstream_error", status: res.status }, res.status);
+    }
+
+    const text = await res.text();
+    return new Response(text, {
+      status: 200,
+      headers: {
+        ...CORS_HEADERS,
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "public, max-age=86400, s-maxage=604800",
+      },
+    });
+  } catch (err) {
+    return jsonResponse({ error: "proxy_failed", details: String(err) }, 500);
+  }
+}
+
+/* ---------------- Herkese Açık Web Arama Köprüsü (DuckDuckGo HTML Proxy) ---------------- */
+
+async function handleSearchProxy(request, env, url) {
+  let query = url.searchParams.get("q") || "";
+  if (!query && request.method.toUpperCase() === "POST") {
+    try {
+      const body = await request.json();
+      query = body?.q || "";
+    } catch (_) {}
+  }
+
+  query = String(query || "").trim();
+  if (!query) {
+    return jsonResponse({ error: "missing_query" }, 400);
+  }
+
+  try {
+    const ddgUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+    const res = await fetch(ddgUrl, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept":
+          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9,tr;q=0.8",
+      },
+    });
+
+    const text = await res.text();
+    return new Response(text, {
+      status: 200,
+      headers: {
+        ...CORS_HEADERS,
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "public, max-age=600",
+      },
+    });
+  } catch (err) {
+    return jsonResponse({ error: "search_proxy_failed", details: String(err) }, 500);
+  }
+}
 
 /* ---------------- Herkese Açık D1 Önbellekli Örnek Cümle Üretici ---------------- */
 
@@ -708,6 +834,360 @@ function buildLineReaderOtpEmailHtml({ code, displayName, isEnglish }) {
   </table>
 </body>
 </html>`;
+}
+
+/* ---------------- Line Reader Şifre Sıfırlama E-posta Şablonu (Kayıt Tasarımıyla Birebir + Ortada Buton) ---------------- */
+
+function buildLineReaderPasswordResetEmailHtml({ link, email, isEnglish }) {
+  const title = isEnglish ? "Reset Your Password" : "Şifrenizi Sıfırlayın";
+  const greeting = isEnglish ? "Hello," : "Merhaba,";
+  const subtitle = isEnglish
+    ? "Account Security & Access"
+    : "Hesap Güvenliği ve Erişim";
+  const bodyCopy = isEnglish
+    ? "We received a request to reset the password for your Line Reader account. Click the button below to set a new password."
+    : "Line Reader hesabınız için bir şifre sıfırlama talebinde bulundunuz. Yeni şifrenizi güvenle belirlemek için aşağıdaki butona tıklayın.";
+  const buttonText = isEnglish ? "Reset Password →" : "Şifremi Sıfırla →";
+  const validity = isEnglish
+    ? "This link is valid for 1 hour and is for your security."
+    : "Bu bağlantı güvenliğiniz için 1 saat boyunca geçerlidir.";
+  const fallbackText = isEnglish
+    ? "If the button above does not work, copy and paste this link into your browser:"
+    : "Yukarıdaki buton çalışmıyorsa aşağıdaki bağlantıyı tarayıcınıza kopyalayabilirsiniz:";
+  const footerNote = isEnglish
+    ? "If you did not request a password reset, you can safely ignore this email. Your password will not change."
+    : "Şifre sıfırlama talebinde bulunmadıysanız bu e-postayı güvenle silebilirsiniz. Şifreniz değişmeyecektir.";
+
+  return `<!DOCTYPE html>
+<html lang="${isEnglish ? "en" : "tr"}">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light dark" />
+  <title>${title} — Line Reader</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F5F2EC;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1E1B18;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#F5F2EC;padding:36px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:520px;background-color:#FFFFFF;border-radius:24px;border:1px solid #E7E0D6;overflow:hidden;box-shadow:0 12px 32px rgba(30,27,24,0.06);">
+          <tr>
+            <td style="padding:32px 32px 20px 32px;text-align:center;background:linear-gradient(135deg,#FFFDF9 0%,#F7F2E8 100%);border-bottom:1px solid #EFE9DF;">
+              <div style="display:inline-block;width:52px;height:52px;line-height:52px;border-radius:16px;background-color:#1E1B18;color:#F5E6C8;font-size:24px;font-weight:800;letter-spacing:-0.5px;margin-bottom:14px;">LR</div>
+              <div style="font-size:21px;font-weight:800;color:#1E1B18;letter-spacing:-0.3px;">Line Reader</div>
+              <div style="font-size:13px;color:#786F66;margin-top:4px;">${subtitle}</div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px;">
+              <h1 style="margin:0 0 12px 0;font-size:20px;font-weight:800;color:#1E1B18;">${title}</h1>
+              <p style="margin:0 0 10px 0;font-size:15px;line-height:1.6;color:#3D3731;font-weight:600;">${greeting}</p>
+              <p style="margin:0 0 26px 0;font-size:14px;line-height:1.65;color:#5E554D;">${bodyCopy}</p>
+              
+              <!-- Kayıt ekranındaki kutucuklar yerine ortada şık BUTON -->
+              <div style="background-color:#FAF7F2;border:1.5px dashed #D6CBB9;border-radius:18px;padding:26px 16px;text-align:center;margin-bottom:22px;">
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:1.6px;color:#8C7F70;font-weight:700;margin-bottom:16px;">${isEnglish ? "PASSWORD RESET" : "ŞİFRE SIFIRLAMA"}</div>
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:0 auto;">
+                  <tr>
+                    <td align="center" style="border-radius:12px;background-color:#1E1B18;">
+                      <a href="${link}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:14px 38px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;font-weight:700;color:#F5E6C8;text-decoration:none;border-radius:12px;letter-spacing:0.2px;">
+                        ${buttonText}
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+
+              <p style="margin:0 0 16px 0;font-size:12.5px;line-height:1.5;color:#786F66;text-align:center;">⏱️ ${validity}</p>
+              
+              <div style="padding-top:14px;border-top:1px solid #F0EAE1;">
+                <p style="margin:0 0 6px 0;font-size:11px;color:#9E948A;">${fallbackText}</p>
+                <a href="${link}" style="font-size:11px;color:#8A5A2B;word-break:break-all;text-decoration:underline;">${link}</a>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px 32px 26px 32px;background-color:#FAF8F5;border-top:1px solid #EFE9DF;text-align:center;">
+              <p style="margin:0 0 8px 0;font-size:12px;line-height:1.5;color:#8C8278;">${footerNote}</p>
+              <a href="https://getlinereader.com" style="font-size:12px;font-weight:700;color:#8A5A2B;text-decoration:none;">getlinereader.com</a>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+/* ---------------- Firebase Service Account & Identity Toolkit Köprüsü ---------------- */
+
+const FIREBASE_SA_EMAIL = "firebase-adminsdk-fbsvc@line-reader-e2e00.iam.gserviceaccount.com";
+const FIREBASE_SA_PRIVATE_KEY_PEM = `-----BEGIN PRIVATE KEY-----
+MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCXiWTh1Nyj2HOV
+R9C+vqQ7cr9MOmNGopPu4EIlaA0e1DhO78Y+LfUvsREURP7Em527+tVW1duAgQ5V
+qU77+dogxp6IIpjXCJ4MwDWtd6YQa0G30Tda0UeXTPgTuPNLrPto/ljuCNPPatda
+6Yy7gz7ak7aNiBMRn7tHndfNHJd6+zK0m9YAadtKzegons5kRomH5+AciEbzajoW
+t4WzG62w7MfnoEA0DTKrIotmhuGZ1DYppT8z9iq6uGFpGjddaMmAv4QTl+u8j1oB
+J/brJWlV1/8wrfVoGKYFGzAO11ReDu1MDBcgdiFyvtcn5SkzXV0gSWxqRslOad4Z
+f8+nPkLTAgMBAAECggEACyImDk2EVGlfvJUFKi55hICeu2wCxTrGoaNKWNM3O4+d
+/3awWvsna3SX66RSD4Hbaec462NU+DEDK5n/2pV1yDivhxL7pbjVW9x3VSJYShaH
+QokVhw+fMeeOxmwtO98erY0aXYq6fR+9aMmF9HTlFkwJ+oYH2KCistVO+JvkKT3U
+f6QZb6fhhjJ80LF3EmARHYMEvC2gmh40O5f14wdJbBfP/6tPsMjOpaqFSBFgtBhh
++HLLaAw0+23cemAU3w01gBm57XUO0ZGMzuXl4hv/lW9Z6kI9AGFBveFkY2Q+zfTN
+7+r3diQaxfbMgt/u1BhAxEd30u8neTPlfHRk5swMAQKBgQDGJBe6GNKuCNQi0Rlz
+eVcPLTbXWEbrWfWY3mFnSTqAF6gQlADbsJybWsB/uTwWO3iOsUHFjLF1JgkvDHvm
+dg97ddSHs3xosS5D75BeqvxCKkVivV9Q0YWnwRX+iIHlt33Vbq2amS9wLFQNAoby
+Rggw+dPqir6yMcVsDcwq6JqE0wKBgQDDyW0i/SjYZhNX96VEmJJ2Y53T6HFhJHHm
+S4T8mY+zuCVlUTav89yoMizT+sZd+oFmPjx1TVR/lRCanC03YFpkWz3RnobJ4gx6
+KKER8y5TmE2U3kV7/R61yqHqgT/IYtpBxnWKc9cLwxBTtPLwX2zW135GQFmnVeI+
+B4+hYo6KAQKBgQC5F5xGjsu4Ia0xfQ1+bnpiRgV18xQE5PtlO0/YMXMBl5e7LNcE
+Yp5ZDdTHO52i0xlSisl7JmvbmJV5qvrPFbhux2qq/YMZNXKXqeG+XZHaqSw6CddR
+Yvis9dV6+cAGfHuC9qobwj+rVO2LXbH7/mnGfop1DfkH8zCOOPFhn/pAWwKBgHC6
+/vsBd046X/LrpZ48l0BRlWOZWAcN/AMVAqqLJMHfSrDutSVUrX2u/j7ECwm7nlwn
+g5oq/3dCdj//os1azlEwdATJWWTOok6ILE3wjoEVlb4cyTdeBBu6Y8ZpyzbvLCpp
+Qe6JSo38L99ytdsPptSBWbTLgpOmENGUeu/6loYBAoGBAJAPWPJhHhc6k0xejYPy
+Xr521nWytr3EB7yNOFU78d7hOcjMD7dDS3ZNBScj2u8XxCd81BFmdru6yyyIuW2s
+/egFhZt4t/EX6isY7vQpQ/6K3+aGDGO7cIO7X1DAXDhUvDmTO+RldpCRtT/7JPMK
+r2HP+94LFEhhIbrE4LXSEPD4
+-----END PRIVATE KEY-----`;
+
+function strToBase64Url(str) {
+  const bytes = new TextEncoder().encode(str);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function pemToBinaryDer(pem) {
+  const b64 = pem
+    .replace(/-----BEGIN[ A-Z0-9_-]+-----/g, "")
+    .replace(/-----END[ A-Z0-9_-]+-----/g, "")
+    .replace(/\s+/g, "");
+  const raw = atob(b64);
+  const buf = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) {
+    buf[i] = raw.charCodeAt(i);
+  }
+  return buf.buffer;
+}
+
+let _cachedGoogleAccessToken = null;
+let _cachedGoogleTokenExpiry = 0;
+
+async function getGoogleIdentityToolkitAccessToken(env) {
+  const now = Math.floor(Date.now() / 1000);
+  if (_cachedGoogleAccessToken && _cachedGoogleTokenExpiry > now + 120) {
+    return _cachedGoogleAccessToken;
+  }
+
+  const pem = String(env?.FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY || FIREBASE_SA_PRIVATE_KEY_PEM).trim();
+  const clientEmail = String(env?.FIREBASE_SERVICE_ACCOUNT_EMAIL || FIREBASE_SA_EMAIL).trim();
+
+  try {
+    const derBuffer = pemToBinaryDer(pem);
+    const cryptoKey = await crypto.subtle.importKey(
+      "pkcs8",
+      derBuffer,
+      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+      false,
+      ["sign"]
+    );
+
+    const header = { alg: "RS256", typ: "JWT" };
+    const claim = {
+      iss: clientEmail,
+      scope: "https://www.googleapis.com/auth/identitytoolkit",
+      aud: "https://oauth2.googleapis.com/token",
+      iat: now,
+      exp: now + 3600,
+    };
+
+    const signingInput = `${strToBase64Url(JSON.stringify(header))}.${strToBase64Url(JSON.stringify(claim))}`;
+    const sigBuffer = await crypto.subtle.sign(
+      "RSASSA-PKCS1-v1_5",
+      cryptoKey,
+      new TextEncoder().encode(signingInput)
+    );
+
+    const sigBytes = new Uint8Array(sigBuffer);
+    let sigBinary = "";
+    for (let i = 0; i < sigBytes.length; i++) {
+      sigBinary += String.fromCharCode(sigBytes[i]);
+    }
+    const sigB64Url = btoa(sigBinary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+    const assertion = `${signingInput}.${sigB64Url}`;
+    const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${encodeURIComponent(assertion)}`,
+    });
+
+    if (!tokenRes.ok) {
+      return null;
+    }
+
+    const tokenData = await tokenRes.json();
+    _cachedGoogleAccessToken = tokenData.access_token;
+    _cachedGoogleTokenExpiry = now + Number(tokenData.expires_in || 3600);
+    return _cachedGoogleAccessToken;
+  } catch (err) {
+    return null;
+  }
+}
+
+async function handlePasswordResetRequest(request, env) {
+  let body = {};
+  try {
+    body = await request.json();
+  } catch (_) {}
+
+  const email = String(body?.email || "").trim().toLowerCase();
+  if (!email || !email.includes("@")) {
+    return jsonResponse(
+      { ok: false, error: "invalid_email", message: "Geçerli bir e-posta adresi girin." },
+      400
+    );
+  }
+
+  const isEnglish = String(body?.lang || "tr").toLowerCase().startsWith("en");
+
+  // Cooldown / Aşırı istek kontrolü
+  if (env.DB) {
+    try {
+      await ensureSchema(env.DB);
+      const nowMs = Date.now();
+      const existing = await env.DB
+        .prepare("SELECT last_sent_at FROM email_verification_codes WHERE email = ? LIMIT 1")
+        .bind(email)
+        .first();
+      const lastSent = Number(existing?.last_sent_at || 0);
+      const elapsedSec = Math.floor((nowMs - lastSent) / 1000);
+      if (lastSent > 0 && elapsedSec < 45) {
+        const waitSec = 45 - elapsedSec;
+        return jsonResponse(
+          {
+            ok: false,
+            error: "cooldown",
+            cooldown_seconds: waitSec,
+            message: isEnglish
+              ? `Please wait ${waitSec}s before requesting a new password reset link.`
+              : `Yeni şifre sıfırlama bağlantısı istemeden önce lütfen ${waitSec} saniye bekleyin.`,
+          },
+          429
+        );
+      }
+    } catch (_) {}
+  }
+
+  try {
+    // 1) Google OAuth2 access token al
+    const accessToken = await getGoogleIdentityToolkitAccessToken(env);
+    if (!accessToken) {
+      return jsonResponse(
+        { ok: false, error: "sa_token_failed", message: "Kimlik doğrulama anahtarı oluşturulamadı." },
+        500
+      );
+    }
+
+    // 2) Firebase Auth Identity Toolkit'ten güvenli şifre sıfırlama linkini (oobLink) üret
+    const oobRes = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/accounts:sendOobCode`,
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          requestType: "PASSWORD_RESET",
+          email: email,
+          returnOobLink: true,
+        }),
+      }
+    );
+
+    const oobData = await oobRes.json();
+    if (!oobRes.ok || !oobData.oobLink) {
+      const errCode = oobData?.error?.message || "";
+      if (errCode === "EMAIL_NOT_FOUND") {
+        // Güvenlik gereği kullanıcının kayıtlı olup olmadığını sızdırmadan başarılı mesajı ver
+        return jsonResponse({
+          ok: true,
+          message: isEnglish
+            ? "If an account exists for this email, a reset link was sent."
+            : "Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.",
+        });
+      }
+      return jsonResponse({ ok: false, error: "oob_link_failed", detail: errCode }, 500);
+    }
+
+    const oobLink = oobData.oobLink;
+
+    // 3) Resend üzerinden özel tasarımlı HTML şablonuyla e-posta gönder
+    const resendKey = String(env.RESEND_API_KEY || "").trim();
+    if (!resendKey) {
+      return jsonResponse({ ok: false, error: "email_provider_not_configured" }, 503);
+    }
+
+    const fromAddress = String(env.RESEND_FROM_EMAIL || "Line Reader <noreply@getlinereader.com>").trim();
+    const subject = isEnglish
+      ? "Reset your password for Line Reader"
+      : "Line Reader Şifre Sıfırlama Talebiniz";
+
+    const mailRes = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${resendKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: fromAddress,
+        to: [email],
+        subject,
+        html: buildLineReaderPasswordResetEmailHtml({
+          link: oobLink,
+          email,
+          isEnglish,
+        }),
+      }),
+    });
+
+    if (!mailRes.ok) {
+      const errText = await mailRes.text();
+      return jsonResponse({ ok: false, error: "email_send_failed", detail: errText.slice(0, 200) }, 502);
+    }
+
+    // Cooldown kaydı güncelle
+    if (env.DB) {
+      try {
+        const nowMs = Date.now();
+        await env.DB
+          .prepare(`
+            INSERT INTO email_verification_codes (email, uid, code_hash, expires_at, attempts, last_sent_at, created_at)
+            VALUES (?, '', '', ?, 0, ?, ?)
+            ON CONFLICT(email) DO UPDATE SET last_sent_at = excluded.last_sent_at
+          `)
+          .bind(email, nowMs + 3600000, nowMs, new Date(nowMs).toISOString())
+          .run();
+      } catch (_) {}
+    }
+
+    return jsonResponse({
+      ok: true,
+      message: isEnglish
+        ? "Password reset link sent to your email."
+        : "Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.",
+    });
+  } catch (err) {
+    return jsonResponse(
+      { ok: false, error: "internal_error", detail: String(err?.message || err) },
+      500
+    );
+  }
 }
 
 async function handleSendVerificationOtp(request, env, user) {

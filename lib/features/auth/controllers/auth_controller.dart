@@ -414,7 +414,13 @@ class AuthController extends ChangeNotifier {
     _safeNotify();
 
     try {
-      final result = await _backend.signInWithGoogle();
+      final result = await _backend.signInWithGoogle().timeout(
+        const Duration(seconds: 45),
+        onTimeout: () {
+          debugPrint('[AuthController] Google oturum açma zaman aşımına uğradı.');
+          return const AuthActionResult.cancelled();
+        },
+      );
       if (result.isSuccess && result.user != null) {
         _user = result.user;
         _status = AuthSessionStatus.authenticated;
@@ -423,7 +429,18 @@ class AuthController extends ChangeNotifier {
         await _syncEntitlementAfterSignIn();
       }
       return result;
+    } catch (error) {
+      debugPrint('[AuthController] Google oturum açma hatası: $error');
+      return const AuthActionResult.cancelled();
     } finally {
+      _isBusy = false;
+      _safeNotify();
+    }
+  }
+
+  /// Bekleyen veya takılı kalan giriş/yükleme durumunu anında temizler.
+  void cancelBusyState() {
+    if (_isBusy) {
       _isBusy = false;
       _safeNotify();
     }

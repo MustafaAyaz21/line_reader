@@ -383,6 +383,11 @@ class _BrowserScreenState extends State<BrowserScreen> {
 
   Future<void> _openWebUrl(Uri uri, {String? initialTitle}) async {
     _addressFocusNode.unfocus();
+    _currentPageTitle = initialTitle ?? uri.host;
+    _currentUrl.value = uri.toString();
+    _syncAddressBar(uri.toString());
+    _resolveViewMode().value = _BrowserViewMode.web;
+
     if (kIsWeb || _webViewController == null) {
       openExternalUrlInNewTab(uri.toString());
       if (mounted) {
@@ -398,11 +403,8 @@ class _BrowserScreenState extends State<BrowserScreen> {
       }
       return;
     }
-    _currentPageTitle = initialTitle ?? '';
     _hasEarlyInjectedCurrentPage = false;
     _hasLoadedAnyWebPage = true;
-    _resolveViewMode().value = _BrowserViewMode.web;
-    _syncAddressBar(uri.toString());
     _loadingProgress.value = 10;
     await _webViewController!.loadRequest(uri);
   }
@@ -410,6 +412,14 @@ class _BrowserScreenState extends State<BrowserScreen> {
   Future<void> _performBackgroundSearch(String rawQuery) async {
     final query = rawQuery.trim();
     if (query.isEmpty) return;
+
+    // Eğer doğrudan web adresi (URL veya alan adı) girildiyse aramaya değil doğrudan web sayfasına git!
+    final directUri = UrlHelper.tryParseDirectUrl(query);
+    if (directUri != null) {
+      _openedWebFromSearch = false;
+      await _openWebUrl(directUri);
+      return;
+    }
 
     _addressFocusNode.unfocus();
     final int myGen = ++_searchGeneration;
@@ -903,7 +913,8 @@ class _BrowserScreenState extends State<BrowserScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final favoritesController = _resolveFavoriteSitesController();
     final toolbarListenable = _resolveToolbarListenable();
     final viewModeNotifier = _resolveViewMode();
@@ -991,7 +1002,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
                       builder: (context, _) {
                         return BrowserStartView(
                           favoriteSites: favoritesController.sites,
-                          onSearch: _performBackgroundSearch,
+                          onSearch: _handleSubmit,
                           onSelectFavorite: _handleSelectFavoriteSite,
                           onManageFavorites: _handleOpenFavoriteSites,
                         );
@@ -1015,6 +1026,8 @@ class _BrowserScreenState extends State<BrowserScreen> {
                         color: Colors.white,
                         child: _webViewWidget!,
                       )
+                    else if (kIsWeb && mode == _BrowserViewMode.web)
+                      _buildWebFallbackView(context, theme, colorScheme)
                     else
                       const SizedBox.shrink(),
                   ],
@@ -1023,6 +1036,150 @@ class _BrowserScreenState extends State<BrowserScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildWebFallbackView(
+    BuildContext context,
+    ThemeData theme,
+    ColorScheme colorScheme,
+  ) {
+    final url = _currentUrl.value.isNotEmpty
+        ? _currentUrl.value
+        : _addressController.text.trim();
+    final uri = Uri.tryParse(url);
+    final host = uri?.host.isNotEmpty == true ? uri!.host : url;
+
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 580),
+          child: Container(
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              color: colorScheme.surface.withAlpha(240),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withAlpha(90),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(30),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.public_rounded,
+                    size: 32,
+                    color: colorScheme.onPrimaryContainer,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  host.isNotEmpty ? host : 'Web Sitesi',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (url.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    url,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: () {
+                        if (url.isNotEmpty) {
+                          openExternalUrlInNewTab(url);
+                        }
+                      },
+                      icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                      label: const Text('Siteyi Aç (Yeni Sekme)'),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 14,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    OutlinedButton.icon(
+                      onPressed: _returnToBrowserStart,
+                      icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                      label: const Text('Geri Dön'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest.withAlpha(120),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline_rounded,
+                        size: 18,
+                        color: colorScheme.primary,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Web tarayıcılarının güvenlik kuralları (X-Frame-Options) gereği dış haber ve makale siteleri yeni sekmede açılır. Sayfadaki kelimeleri Line Reader ile anında çevirerek okumak için Android veya Masaüstü uygulamasını kullanabilirsiniz.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 12,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:http/http.dart' as http;
 
 import '../models/auth_user.dart';
 
@@ -152,19 +154,23 @@ class FirebaseAuthBackend implements AuthBackend {
     try {
       if (kIsWeb) {
         final provider = GoogleAuthProvider()..addScope('email');
-        final userCredential =
-            await FirebaseAuth.instance.signInWithPopup(provider);
+        final userCredential = await FirebaseAuth.instance
+            .signInWithPopup(provider)
+            .timeout(
+              const Duration(seconds: 40),
+              onTimeout: () => throw TimeoutException('Google sign in timed out'),
+            );
         final user = userCredential.user;
         if (user == null) {
-          return const AuthActionResult.failure(
-            errorCode: 'null_user',
-            message: 'Google girişi tamamlanamadı.',
-          );
+          return const AuthActionResult.cancelled();
         }
         return AuthActionResult.success(user: _mapFirebaseUser(user));
       }
 
-      final googleUser = await _googleSignIn.signIn();
+      final googleUser = await _googleSignIn.signIn().timeout(
+        const Duration(seconds: 40),
+        onTimeout: () => null,
+      );
       if (googleUser == null) {
         return const AuthActionResult.cancelled();
       }
@@ -193,12 +199,23 @@ class FirebaseAuthBackend implements AuthBackend {
       }
 
       return AuthActionResult.success(user: _mapFirebaseUser(user));
+    } on TimeoutException {
+      debugPrint('[FirebaseAuthBackend] Google Sign-In zaman asimi / iptal.');
+      return const AuthActionResult.cancelled();
     } on FirebaseAuthException catch (error) {
+      if (error.code == 'popup-closed-by-user' ||
+          error.code == 'cancelled-popup-request') {
+        debugPrint('[FirebaseAuthBackend] Google popup kullanici tarafindan kapatildi.');
+        return const AuthActionResult.cancelled();
+      }
       return AuthActionResult.failure(
         errorCode: error.code,
         message: _mapFirebaseError(error.code),
       );
     } on PlatformException catch (error) {
+      if (error.code == 'network_error' || error.code == 'sign_in_canceled') {
+        return const AuthActionResult.cancelled();
+      }
       debugPrint('[FirebaseAuthBackend] Google Sign-In platform hatasi: $error');
       return AuthActionResult.failure(
         errorCode: error.code,
@@ -398,8 +415,27 @@ class FirebaseAuthBackend implements AuthBackend {
       );
     }
 
+    final cleanEmail = email.trim();
+    if (cleanEmail.isEmpty) {
+      return const AuthActionResult.failure(
+        errorCode: 'invalid-email',
+        message: 'Lütfen geçerli bir e-posta adresi girin.',
+      );
+    }
+
     try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: email.trim());
+      // 1) Öncelikle Cloudflare Worker + Resend üzerinden özel tasarımlı HTML şablonuyla göndermeyi dene
+      final customSuccess = await _trySendCustomPasswordResetEmail(cleanEmail);
+      if (customSuccess) {
+        return const AuthActionResult.success(
+          message: 'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.',
+        );
+      }
+    } catch (_) {}
+
+    // 2) Yedek: Firebase Auth yerleşik e-posta gönderimi
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: cleanEmail);
       return const AuthActionResult.success(
         message: 'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.',
       );
@@ -414,6 +450,29 @@ class FirebaseAuthBackend implements AuthBackend {
         message: 'Şifre sıfırlama isteği gönderilemedi.',
       );
     }
+  }
+
+  Future<bool> _trySendCustomPasswordResetEmail(String email) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('https://linereader-ai.xreasayaz21.workers.dev/auth/password-reset'),
+            headers: const <String, String>{'Content-Type': 'application/json'},
+            body: jsonEncode(<String, dynamic>{
+              'email': email,
+              'lang': 'tr',
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is Map && data['ok'] == true) {
+          return true;
+        }
+      }
+    } catch (_) {}
+    return false;
   }
 
   @override

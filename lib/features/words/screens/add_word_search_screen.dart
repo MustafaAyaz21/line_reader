@@ -809,7 +809,7 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
               children: [
                 // Üst Arama Çubuğu
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
                   child: Row(
                     children: [
                       Expanded(
@@ -847,7 +847,7 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
                                   )
                                 : null,
                             filled: true,
-                            fillColor: colorScheme.surfaceContainerHighest,
+                            fillColor: colorScheme.surfaceContainerHighest.withAlpha(120),
                             isDense: true,
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 14,
@@ -855,33 +855,50 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
-                              borderSide: BorderSide.none,
+                              borderSide: BorderSide(
+                                color: colorScheme.outlineVariant.withAlpha(80),
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(
+                                color: colorScheme.outlineVariant.withAlpha(80),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(
+                                color: colorScheme.primary,
+                                width: 1.6,
+                              ),
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      FilledButton(
-                        onPressed: _isLoading
-                            ? null
-                            : () => _performSearch(_searchController.text),
-                        style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                      const SizedBox(width: 10),
+                      SizedBox(
+                        width: 120,
+                        height: 46,
+                        child: FilledButton.icon(
+                          onPressed: _isLoading
+                              ? null
+                              : () => _performSearch(_searchController.text),
+                          icon: const Icon(Icons.search_rounded, size: 18),
+                          label: const Text('Ara'),
+                          style: FilledButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
                           ),
                         ),
-                        child: const Text('Ara'),
                       ),
                     ],
                   ),
                 ),
                 if (widget.editingWord == null)
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
                     child: Row(
                       children: [
                         if (allLists.isNotEmpty) ...[
@@ -893,14 +910,31 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
                                   : allLists.first.id,
                               isExpanded: true,
                               decoration: InputDecoration(
-                                labelText: 'Hedef Liste',
+                                filled: true,
+                                fillColor: colorScheme.surfaceContainerHighest.withAlpha(120),
                                 isDense: true,
                                 contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
+                                  horizontal: 14,
+                                  vertical: 10,
                                 ),
                                 border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(
+                                    color: colorScheme.outlineVariant.withAlpha(80),
+                                  ),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(
+                                    color: colorScheme.outlineVariant.withAlpha(80),
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(
+                                    color: colorScheme.primary,
+                                    width: 1.6,
+                                  ),
                                 ),
                               ),
                               items: allLists.map((item) {
@@ -910,14 +944,14 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
                                     children: [
                                       if (item.icon != null && item.icon!.isNotEmpty) ...[
                                         Text(item.icon!, style: const TextStyle(fontSize: 14)),
-                                        const SizedBox(width: 6),
+                                        const SizedBox(width: 8),
                                       ] else ...[
                                         Container(
-                                          width: 6,
-                                          height: 15,
+                                          width: 8,
+                                          height: 16,
                                           decoration: BoxDecoration(
                                             color: item.color,
-                                            borderRadius: BorderRadius.circular(3),
+                                            borderRadius: BorderRadius.circular(4),
                                           ),
                                         ),
                                         const SizedBox(width: 8),
@@ -926,6 +960,7 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
                                         child: Text(
                                           item.name,
                                           overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(fontWeight: FontWeight.w600),
                                         ),
                                       ),
                                     ],
@@ -939,20 +974,21 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
                               },
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 10),
                         ],
-                        OutlinedButton.icon(
-                          key: const ValueKey<String>('add_word_create_list_button'),
-                          onPressed: _handleCreateNewList,
-                          icon: const Icon(Icons.add_rounded, size: 18),
-                          label: const Text('Yeni Liste'),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 11,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                        SizedBox(
+                          width: 120,
+                          height: 46,
+                          child: OutlinedButton.icon(
+                            key: const ValueKey<String>('add_word_create_list_button'),
+                            onPressed: _handleCreateNewList,
+                            icon: const Icon(Icons.add_rounded, size: 18),
+                            label: const Text('Yeni Liste'),
+                            style: OutlinedButton.styleFrom(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
                             ),
                           ),
                         ),

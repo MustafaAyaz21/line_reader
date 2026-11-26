@@ -82,9 +82,12 @@ class WebSearchService {
 
   /// DuckDuckGo hafif HTML sonucunu arka planda ayrıştırır (genel web bağlantıları).
   Future<List<WebSearchResult>> _searchDuckDuckGoHtml(String query) async {
-    final uri = Uri.https('html.duckduckgo.com', '/html/', <String, String>{
-      'q': query,
-    });
+    final uri = kIsWeb
+        ? Uri.parse(
+            'https://linereader-ai.xreasayaz21.workers.dev/search?q=${Uri.encodeQueryComponent(query)}')
+        : Uri.https('html.duckduckgo.com', '/html/', <String, String>{
+            'q': query,
+          });
 
     try {
       final response =

@@ -479,17 +479,27 @@ class CloudSyncService {
               );
               byNormName[_norm(created.name)] = created;
             } catch (_) {}
-          } else if (existing != null &&
-              (existing.colorValue != colorValue || existing.icon != icon)) {
-            try {
-              await _wordRepository.updateList(
-                id: existing.id,
-                name: existing.name,
-                colorValue: colorValue,
-                isDefault: existing.isDefault,
-                icon: icon,
-              );
-            } catch (_) {}
+          } else if (existing != null) {
+            // Eğer sunucudaki ikon null veya boşsa ama yerelde bir ikon zaten seçilmişse,
+            // yereldeki ikonu koru (sunucunun henüz güncellenmemiş eski null verisiyle ezilmesini önle).
+            final effectiveIcon = (icon != null && icon.isNotEmpty)
+                ? icon
+                : existing.icon;
+            final effectiveColor =
+                colorValue != 0 ? colorValue : existing.colorValue;
+
+            if (existing.colorValue != effectiveColor ||
+                existing.icon != effectiveIcon) {
+              try {
+                await _wordRepository.updateList(
+                  id: existing.id,
+                  name: existing.name,
+                  colorValue: effectiveColor,
+                  isDefault: existing.isDefault,
+                  icon: effectiveIcon,
+                );
+              } catch (_) {}
+            }
           }
         }
       }
