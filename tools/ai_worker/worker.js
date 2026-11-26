@@ -163,7 +163,7 @@ async function handleDictionaryProxy(request, env, url) {
   }
 
   // 0) Cloudflare Edge Cache kontrolü (daha önce aranan kelimeler < 20ms döner)
-  const cacheKey = new Request(`https://cache.linereader.internal/dict/${encodeURIComponent(sl)}/${encodeURIComponent(tl)}/${encodeURIComponent(query.toLowerCase())}`);
+  const cacheKey = new Request(`https://cache.linereader.internal/dict/v2/${encodeURIComponent(sl)}/${encodeURIComponent(tl)}/${encodeURIComponent(query.toLowerCase())}`);
   const edgeCache = typeof caches !== "undefined" ? caches.default : null;
   if (edgeCache) {
     try {
@@ -196,13 +196,13 @@ async function handleDictionaryProxy(request, env, url) {
           .first();
         if (row && row.meanings_json) {
           const meanings = JSON.parse(row.meanings_json);
-          if (Array.isArray(meanings) && meanings.length >= 3) {
+          if (Array.isArray(meanings) && meanings.length >= 1) {
             const primary = String(meanings[0] || "").trim();
             const detailedEntries = meanings
               .map((m) => String(m || "").trim())
               .filter((m) => m.length > 0)
               .map((m) => [m]);
-            if (primary && detailedEntries.length >= 3) {
+            if (primary && detailedEntries.length >= 1) {
               const d1Payload = [
                 [[primary, lowerWord, null, null, 10]],
                 [["", meanings, detailedEntries]],
@@ -303,6 +303,34 @@ async function handleDictionaryProxy(request, env, url) {
     // Kelime geçerli bir İngilizce kelime (veya çok kelimeli ifade) -> Cloudflare AI ile zengin Türkçe anlam üret!
     const aiBundle = await generateAiDictionaryBundle(env, query, sl, tl);
     if (aiBundle) {
+      if (isSingleEnglishWord && env && env.DB) {
+        try {
+          const aiMeanings = [];
+          const seenAi = new Set();
+          for (const grp of (aiBundle[1] || [])) {
+            for (const item of (grp[1] || [])) {
+              const clean = String(item || "").trim();
+              const k = clean.toLowerCase();
+              if (clean && !seenAi.has(k)) {
+                seenAi.add(k);
+                aiMeanings.push(clean);
+              }
+            }
+          }
+          if (aiMeanings.length > 0) {
+            await env.DB
+              .prepare(`
+                INSERT INTO corpus_lexicon (word, meanings_json, examples_json, freq_rank, updated_at)
+                VALUES (?, ?, '[]', 999999, ?)
+                ON CONFLICT(word) DO UPDATE SET
+                  meanings_json = excluded.meanings_json,
+                  updated_at = excluded.updated_at
+              `)
+              .bind(query.toLowerCase(), JSON.stringify(aiMeanings.slice(0, 15)), new Date().toISOString())
+              .run();
+          }
+        } catch (_) {}
+      }
       return cacheAndReturn(new Response(JSON.stringify(aiBundle), {
         status: 200,
         headers: {
