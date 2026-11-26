@@ -2,6 +2,7 @@ import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
 
+import 'word_audio_cache_store_stub.dart' show WordAudioDiskStore;
 import 'word_audio_cache_store_stub.dart'
     if (dart.library.io) 'word_audio_cache_store_io.dart' as store_factory;
 
@@ -16,7 +17,7 @@ class WordAudioCacheService {
   WordAudioCacheService({
     this.maxDiskBytes = defaultMaxDiskBytes,
     this.maxMemoryBytes = defaultMaxMemoryBytes,
-    store_factory.WordAudioDiskStore? diskStore,
+    WordAudioDiskStore? diskStore,
   }) : _diskStore = diskStore ??
             store_factory.createWordAudioDiskStore(maxBytes: maxDiskBytes);
 
@@ -29,7 +30,7 @@ class WordAudioCacheService {
 
   final int maxDiskBytes;
   final int maxMemoryBytes;
-  final store_factory.WordAudioDiskStore _diskStore;
+  final WordAudioDiskStore _diskStore;
 
   final LinkedHashMap<String, Uint8List> _memoryCache =
       LinkedHashMap<String, Uint8List>();

@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import 'word_audio_cache_store_stub.dart';
+export 'word_audio_cache_store_stub.dart' show WordAudioDiskStore;
 
 WordAudioDiskStore createWordAudioDiskStore({required int maxBytes}) {
   return _IoWordAudioDiskStore(maxBytes: maxBytes);

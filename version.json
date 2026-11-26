@@ -1,7 +1,7 @@
 {
-    "latest_version":  "0.1.50",
-    "version_code":  51,
+    "latest_version":  "0.1.52",
+    "version_code":  53,
     "min_version_code":  0,
-    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.50/app-release.apk",
-    "release_notes":  "v0.1.50: Hızlı kelime arama, yeni liste ikon paleti, şifre sıfırlama iyileştirmeleri ve D1 sözlük güncellemesi."
+    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.52/app-release.apk",
+    "release_notes":  "Doğal US/UK gerçek insan telaffuzu, 12 MB otomatik temizlenen çevrimdışı ses önbelleği ve web/mobil TTS iyileştirmeleri."
 }
