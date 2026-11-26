@@ -1,6 +1,15 @@
 /articles.json
   Cache-Control: no-cache, no-store, must-revalidate
 
+/app/index.html
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/app/flutter_service_worker.js
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/app/version.json
+  Cache-Control: no-cache, no-store, must-revalidate
+
 /audio/*
   Access-Control-Allow-Origin: *
   Accept-Ranges: bytes
