@@ -162,6 +162,27 @@ async function handleDictionaryProxy(request, env, url) {
     return jsonResponse({ error: "missing_query" }, 400);
   }
 
+  // 0) Cloudflare Edge Cache kontrolü (daha önce aranan kelimeler < 20ms döner)
+  const cacheKey = new Request(`https://cache.linereader.internal/dict/${encodeURIComponent(sl)}/${encodeURIComponent(tl)}/${encodeURIComponent(query.toLowerCase())}`);
+  const edgeCache = typeof caches !== "undefined" ? caches.default : null;
+  if (edgeCache) {
+    try {
+      const cachedRes = await edgeCache.match(cacheKey);
+      if (cachedRes) {
+        return cachedRes;
+      }
+    } catch (_) {}
+  }
+
+  const cacheAndReturn = (response) => {
+    if (edgeCache && response.status === 200) {
+      try {
+        edgeCache.put(cacheKey, response.clone()).catch(() => {});
+      } catch (_) {}
+    }
+    return response;
+  };
+
   try {
     const googleUrl = new URL("https://translate.googleapis.com/translate_a/single");
     const dtParams = url.searchParams.getAll("dt");
@@ -185,71 +206,76 @@ async function handleDictionaryProxy(request, env, url) {
       googleUrl.searchParams.set("q", query);
     }
 
-    let res = null;
-    try {
-      res = await fetch(googleUrl.toString(), {
-        signal: AbortSignal.timeout(2500),
+    const isSingleEnglishWord = /^[a-zA-Z]+$/.test(query) && sl === "en" && tl === "tr";
+
+    // Google Translate ve (tek kelimeyse) dictionaryapi.dev doğrulamasını PARALEL çalıştır!
+    const [res, dictCheck] = await Promise.all([
+      fetch(googleUrl.toString(), {
+        signal: AbortSignal.timeout(1200),
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
           "Accept": "*/*",
         },
-      });
-    } catch (_) {}
+      }).catch(() => null),
+      isSingleEnglishWord
+        ? fetch(
+            `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(query.toLowerCase())}`,
+            { signal: AbortSignal.timeout(2000) }
+          ).catch(() => null)
+        : Promise.resolve(null),
+    ]);
 
     if (res && res.ok) {
       const text = await res.text();
-      return new Response(text, {
+      return cacheAndReturn(new Response(text, {
         status: 200,
         headers: {
           ...CORS_HEADERS,
           "Content-Type": "application/json; charset=utf-8",
           "Cache-Control": "public, max-age=86400, s-maxage=604800",
         },
-      });
+      }));
     }
 
-    // Google Translate Cloudflare IP'sini engellediyse (429 / 403):
-    // Tek kelimeyse önce İngilizce sözlükte gerçekten var mı doğrula (yazım hatasını yakalamak için!)
-    const isSingleEnglishWord = /^[a-zA-Z]+$/.test(query) && sl === "en" && tl === "tr";
-    if (isSingleEnglishWord) {
+    // Google Translate yanıt veremediyse ve tek kelime İngilizce sözlükte YOKSA -> Yazım hatası!
+    if (isSingleEnglishWord && dictCheck && dictCheck.status === 404) {
+      let suggestion = null;
       try {
-        const dictCheck = await fetch(
-          `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(query.toLowerCase())}`
+        const dmRes = await fetch(
+          `https://api.datamuse.com/words?sp=${encodeURIComponent(query.toLowerCase())}&max=3`,
+          { signal: AbortSignal.timeout(1500) }
         );
-        if (dictCheck.status === 404) {
-          // Kelime İngilizce sözlükte YOK -> Yazım hatası! Datamuse ile doğru kelime önerisi döndür.
-          let suggestion = null;
-          try {
-            const dmRes = await fetch(
-              `https://api.datamuse.com/words?sp=${encodeURIComponent(query.toLowerCase())}&max=3`
-            );
-            if (dmRes.ok) {
-              const dmData = await dmRes.json();
-              if (Array.isArray(dmData) && dmData.length > 0 && dmData[0]?.word) {
-                suggestion = String(dmData[0].word).trim().toLowerCase();
-              }
-            }
-          } catch (_) {}
-          // Google Translate dt=qca (didYouMean) formatında yanıt dön (hasBilingualDict = false)
-          const didYouMeanPayload = [
-            null,
-            null,
-            "en",
-            null,
-            null,
-            null,
-            null,
-            suggestion ? [[suggestion]] : []
-          ];
-          return jsonResponse(didYouMeanPayload, 200);
+        if (dmRes.ok) {
+          const dmData = await dmRes.json();
+          if (Array.isArray(dmData) && dmData.length > 0 && dmData[0]?.word) {
+            suggestion = String(dmData[0].word).trim().toLowerCase();
+          }
         }
       } catch (_) {}
+      const didYouMeanPayload = [
+        null,
+        null,
+        "en",
+        null,
+        null,
+        null,
+        null,
+        suggestion ? [[suggestion]] : []
+      ];
+      return cacheAndReturn(jsonResponse(didYouMeanPayload, 200));
     }
 
-    // Kelime geçerli bir İngilizce kelime (veya çok kelimeli ifade) -> Cloudflare AI ile 12-15 zengin Türkçe anlam üret!
+    // Kelime geçerli bir İngilizce kelime (veya çok kelimeli ifade) -> Cloudflare AI ile zengin Türkçe anlam üret!
     const aiBundle = await generateAiDictionaryBundle(env, query, sl, tl);
     if (aiBundle) {
-      return jsonResponse(aiBundle, 200);
+      return cacheAndReturn(new Response(JSON.stringify(aiBundle), {
+        status: 200,
+        headers: {
+          ...CORS_HEADERS,
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "public, max-age=86400, s-maxage=604800",
+        },
+      }));
     }
 
     return jsonResponse({ error: "upstream_unavailable" }, 502);
