@@ -58,7 +58,12 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
   late final bool _ownsSearchService;
   late int _selectedListId;
   Timer? _debounceTimer;
+  Timer? _suggestDebounce;
+  int _suggestGeneration = 0;
   int _searchGeneration = 0;
+  List<WordPrefixSuggestion> _prefixSuggestions = const <WordPrefixSuggestion>[];
+  final Set<String> _reportedMissingWords = <String>{};
+  bool _isReportingMissing = false;
 
   bool _isLoading = false;
   bool _isLoadingExamples = false;
@@ -101,6 +106,7 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
   @override
   void dispose() {
     _debounceTimer?.cancel();
+    _suggestDebounce?.cancel();
     _searchController.dispose();
     _searchFocusNode.dispose();
     if (_ownsSearchService) {
@@ -116,8 +122,24 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
   void _onSearchChanged(String value) {
     setState(() {});
     _debounceTimer?.cancel();
+    _suggestDebounce?.cancel();
 
     final trimmed = value.trim();
+    final lower = trimmed.toLowerCase();
+    if (lower.length < 2 || !RegExp(r'^[a-z]+$').hasMatch(lower)) {
+      if (_prefixSuggestions.isNotEmpty) {
+        setState(() => _prefixSuggestions = const <WordPrefixSuggestion>[]);
+      }
+    } else {
+      final sGen = ++_suggestGeneration;
+      _suggestDebounce = Timer(const Duration(milliseconds: 250), () async {
+        final list = await _searchService.fetchPrefixSuggestions(lower);
+        if (!mounted || sGen != _suggestGeneration) return;
+        if (_searchController.text.trim().toLowerCase() != lower) return;
+        setState(() => _prefixSuggestions = list);
+      });
+    }
+
     if (trimmed.length < 2) return;
 
     _debounceTimer = Timer(const Duration(milliseconds: 450), () {
@@ -127,6 +149,35 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
         _performSearch(trimmed, dismissKeyboard: false);
       }
     });
+  }
+
+  Future<void> _handleReportMissingWord(String word) async {
+    final key = word.trim().toLowerCase();
+    if (key.isEmpty || _isReportingMissing || _reportedMissingWords.contains(key)) {
+      return;
+    }
+    setState(() => _isReportingMissing = true);
+    final ok = await _searchService.reportMissingWord(key);
+    if (!mounted) return;
+    setState(() {
+      _isReportingMissing = false;
+      if (ok) {
+        _reportedMissingWords.add(key);
+      }
+    });
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            ok
+                ? '"$key" eksik kelime olarak bildirildi. Teşekkürler!'
+                : 'Bildirim gönderilemedi, lütfen bağlantınızı kontrol edin.',
+          ),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
   }
 
   Future<void> _performSearch(
@@ -153,7 +204,10 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
     }
 
     final myGen = ++_searchGeneration;
+    _suggestDebounce?.cancel();
+    _suggestGeneration++;
     setState(() {
+      _prefixSuggestions = const <WordPrefixSuggestion>[];
       _isLoading = true;
       _isLoadingExamples = true;
       _errorMessage = null;
@@ -928,6 +982,22 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
                     ],
                   ),
                 ),
+                if (_prefixSuggestions.isNotEmpty &&
+                    !_isLoading &&
+                    _detail == null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: WordPrefixSuggestionsList(
+                      suggestions: _prefixSuggestions,
+                      onSelectWord: (word) {
+                        _searchController.text = word;
+                        _searchController.selection = TextSelection.collapsed(
+                          offset: word.length,
+                        );
+                        _performSearch(word, dismissKeyboard: true);
+                      },
+                    ),
+                  ),
                 if (widget.editingWord == null)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
@@ -1139,6 +1209,10 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
           );
           _performSearch(suggestion, dismissKeyboard: true);
         },
+        onReportMissingWord: () => _handleReportMissingWord(detail.word),
+        isReportingMissing: _isReportingMissing,
+        hasReportedMissing:
+            _reportedMissingWords.contains(detail.word.toLowerCase()),
       );
     }
 

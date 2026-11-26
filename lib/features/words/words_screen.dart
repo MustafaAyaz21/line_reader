@@ -94,6 +94,11 @@ class _WordsScreenState extends State<WordsScreen> {
   late final bool _ownsSearchService;
 
   int _searchGeneration = 0;
+  Timer? _suggestDebounce;
+  int _suggestGeneration = 0;
+  List<WordPrefixSuggestion> _prefixSuggestions = const <WordPrefixSuggestion>[];
+  final Set<String> _reportedMissingWords = <String>{};
+  bool _isReportingMissing = false;
   bool _isSearchingWord = false;
   bool _isSavingWord = false;
   String? _searchError;
@@ -158,6 +163,7 @@ class _WordsScreenState extends State<WordsScreen> {
 
   @override
   void dispose() {
+    _suggestDebounce?.cancel();
     widget.searchTriggerController?.removeListener(_handleExternalSearchTrigger);
     _searchController.dispose();
     _searchFocusNode.dispose();
@@ -198,12 +204,15 @@ class _WordsScreenState extends State<WordsScreen> {
   }
 
   void _clearTopSearch({bool keepText = false}) {
+    _suggestDebounce?.cancel();
+    _suggestGeneration++;
     _searchGeneration++;
     if (!keepText) {
       _searchController.clear();
     }
     _searchFocusNode.unfocus();
     setState(() {
+      _prefixSuggestions = const <WordPrefixSuggestion>[];
       _isSearchingWord = false;
       _isSavingWord = false;
       _searchError = null;
@@ -213,6 +222,53 @@ class _WordsScreenState extends State<WordsScreen> {
       _selectedSynonyms.clear();
       _selectedAntonyms.clear();
     });
+  }
+
+  void _onTopSearchChanged(String value) {
+    setState(() {});
+    _suggestDebounce?.cancel();
+    final trimmed = value.trim().toLowerCase();
+    if (trimmed.length < 2 || !RegExp(r'^[a-z]+$').hasMatch(trimmed)) {
+      if (_prefixSuggestions.isNotEmpty) {
+        setState(() => _prefixSuggestions = const <WordPrefixSuggestion>[]);
+      }
+      return;
+    }
+
+    final gen = ++_suggestGeneration;
+    _suggestDebounce = Timer(const Duration(milliseconds: 260), () async {
+      final list = await _searchService.fetchPrefixSuggestions(trimmed);
+      if (!mounted || gen != _suggestGeneration) return;
+      if (_searchController.text.trim().toLowerCase() != trimmed) return;
+      setState(() => _prefixSuggestions = list);
+    });
+  }
+
+  Future<void> _handleReportMissingWord(String word) async {
+    final key = word.trim().toLowerCase();
+    if (key.isEmpty || _isReportingMissing || _reportedMissingWords.contains(key)) {
+      return;
+    }
+    setState(() => _isReportingMissing = true);
+    final ok = await _searchService.reportMissingWord(key);
+    if (!mounted) return;
+    setState(() {
+      _isReportingMissing = false;
+      if (ok) {
+        _reportedMissingWords.add(key);
+      }
+    });
+    _showSnack(
+      ok
+          ? context.l10n.t(
+              '"$key" eksik kelime olarak bildirildi. Teşekkürler!',
+              '"$key" has been reported as a missing word. Thank you!',
+            )
+          : context.l10n.t(
+              'Bildirim gönderilemedi, lütfen bağlantınızı kontrol edin.',
+              'Could not send report, please check your connection.',
+            ),
+    );
   }
 
   Future<void> _performTopSearch(
@@ -242,8 +298,11 @@ class _WordsScreenState extends State<WordsScreen> {
 
     final targetListId = _resolveTargetListId(widget.controller.lists);
     final myGen = ++_searchGeneration;
+    _suggestDebounce?.cancel();
+    _suggestGeneration++;
 
     setState(() {
+      _prefixSuggestions = const <WordPrefixSuggestion>[];
       _selectedTargetListId = targetListId;
       _isSearchingWord = true;
       _searchError = null;
@@ -746,7 +805,7 @@ class _WordsScreenState extends State<WordsScreen> {
               textInputAction: TextInputAction.search,
               autocorrect: true,
               enableSuggestions: true,
-              onChanged: (_) => setState(() {}),
+              onChanged: _onTopSearchChanged,
               onSubmitted: (value) => _performTopSearch(value),
               style: theme.textTheme.bodyMedium,
               decoration: InputDecoration(
@@ -788,29 +847,52 @@ class _WordsScreenState extends State<WordsScreen> {
       child: Text(s.t('Ara', 'Search')),
     );
 
+    final suggestionsBox = (!_isSearchPanelOpen && _prefixSuggestions.isNotEmpty)
+        ? Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: WordPrefixSuggestionsList(
+              suggestions: _prefixSuggestions,
+              onSelectWord: (word) {
+                _searchController.text = word;
+                _searchController.selection = TextSelection.collapsed(
+                  offset: word.length,
+                );
+                _performTopSearch(word, dismissKeyboard: true);
+              },
+            ),
+          )
+        : const SizedBox.shrink();
+
     if (isWideScreen) {
       return Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 960),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
-            child: Row(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(child: searchField),
-                const SizedBox(width: 10),
-                searchButton,
-                const SizedBox(width: 12),
-                FilledButton.tonalIcon(
-                  onPressed: () => _handleCreateList(context),
-                  icon: const Icon(Icons.add_rounded, size: 18),
-                  label: Text(s.t('Yeni Liste', 'New List')),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                Row(
+                  children: [
+                    Expanded(child: searchField),
+                    const SizedBox(width: 10),
+                    searchButton,
+                    const SizedBox(width: 12),
+                    FilledButton.tonalIcon(
+                      onPressed: () => _handleCreateList(context),
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: Text(s.t('Yeni Liste', 'New List')),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
+                suggestionsBox,
               ],
             ),
           ),
@@ -820,11 +902,18 @@ class _WordsScreenState extends State<WordsScreen> {
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(child: searchField),
-          const SizedBox(width: 8),
-          searchButton,
+          Row(
+            children: [
+              Expanded(child: searchField),
+              const SizedBox(width: 8),
+              searchButton,
+            ],
+          ),
+          suggestionsBox,
         ],
       ),
     );
@@ -915,6 +1004,10 @@ class _WordsScreenState extends State<WordsScreen> {
           );
           _performTopSearch(suggestion, dismissKeyboard: true);
         },
+        onReportMissingWord: () => _handleReportMissingWord(detail.word),
+        isReportingMissing: _isReportingMissing,
+        hasReportedMissing:
+            _reportedMissingWords.contains(detail.word.toLowerCase()),
       );
     }
 

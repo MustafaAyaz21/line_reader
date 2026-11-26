@@ -65,6 +65,16 @@ export default {
       return handleWordExamples(request, env, url);
     }
 
+    // 2.55) Herkese açık D1 önek otomatik tamamlama servisi (< 15 ms, sıfır AI/Google yükü)
+    if (method === "GET" && path === "/suggest") {
+      return handleWordSuggest(request, env, url);
+    }
+
+    // 2.56) Eksik kelime bildirimi (D1'de kelime başına tek satır sayaç tutar)
+    if (method === "POST" && path === "/report-missing-word") {
+      return handleReportMissingWord(request, env);
+    }
+
     // 2.6) Herkese açık iki dilli sözlük & çeviri köprüsü (CORS engelsiz Google Translate)
     if ((method === "GET" || method === "POST") && (path === "/dict" || path === "/translate_single")) {
       return handleDictionaryProxy(request, env, url);
@@ -638,6 +648,112 @@ function parseExamplesJson(rawText) {
   }
 }
 
+/* ---------------- Herkese Açık D1 Önek Tamamlama & Eksik Kelime Bildirimi ---------------- */
+
+async function handleWordSuggest(request, env, url) {
+  const raw = (url.searchParams.get("q") || "").trim().toLowerCase();
+  if (raw.length < 2 || raw.length > 24 || !/^[a-z]+$/.test(raw)) {
+    return jsonResponse({ ok: true, suggestions: [] });
+  }
+
+  const edgeCacheKey = new Request(
+    `https://cache.linereader.internal/suggest/v1/${encodeURIComponent(raw)}`
+  );
+  const edgeCache = typeof caches !== "undefined" ? caches.default : null;
+  if (edgeCache) {
+    try {
+      const hit = await edgeCache.match(edgeCacheKey);
+      if (hit) return hit;
+    } catch (_) {}
+  }
+
+  const suggestions = [];
+  if (env && env.DB) {
+    try {
+      const lastCode = raw.charCodeAt(raw.length - 1);
+      const upperBound = raw.slice(0, -1) + String.fromCharCode(lastCode + 1);
+      const { results } = await env.DB
+        .prepare(
+          `SELECT word, meanings_json
+           FROM corpus_lexicon
+           WHERE word >= ? AND word < ? AND meanings_json != '[]'
+           ORDER BY freq_rank ASC, word ASC
+           LIMIT 8`
+        )
+        .bind(raw, upperBound)
+        .all();
+
+      for (const row of results || []) {
+        const w = String(row.word || "").trim();
+        if (!w) continue;
+        let preview = "";
+        try {
+          const parsed = JSON.parse(row.meanings_json || "[]");
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            preview = parsed
+              .slice(0, 2)
+              .map((m) => String(m || "").trim())
+              .filter(Boolean)
+              .join(", ");
+          }
+        } catch (_) {}
+        if (preview) {
+          suggestions.push({ word: w, preview });
+        }
+      }
+    } catch (_) {}
+  }
+
+  const resp = new Response(JSON.stringify({ ok: true, suggestions }), {
+    status: 200,
+    headers: {
+      ...CORS_HEADERS,
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "public, max-age=86400, s-maxage=604800",
+    },
+  });
+  if (edgeCache && suggestions.length > 0) {
+    try {
+      edgeCache.put(edgeCacheKey, resp.clone()).catch(() => {});
+    } catch (_) {}
+  }
+  return resp;
+}
+
+async function handleReportMissingWord(request, env) {
+  let rawWord = "";
+  try {
+    const body = await safeReadJson(request);
+    rawWord = String(body?.word || "");
+  } catch (_) {}
+
+  const word = rawWord.trim().toLowerCase();
+  if (word.length < 2 || word.length > 32 || !/^[a-z]+$/.test(word)) {
+    return jsonResponse({ ok: false, error: "invalid_word" }, 400);
+  }
+
+  if (env && env.DB) {
+    try {
+      await ensureSchema(env.DB);
+      const nowIso = new Date().toISOString();
+      await env.DB
+        .prepare(
+          `INSERT INTO missing_word_reports (word, report_count, first_reported_at, last_reported_at)
+           VALUES (?, 1, ?, ?)
+           ON CONFLICT(word) DO UPDATE SET
+             report_count = report_count + 1,
+             last_reported_at = excluded.last_reported_at`
+        )
+        .bind(word, nowIso, nowIso)
+        .run();
+    } catch (err) {
+      return jsonResponse({ ok: false, error: String(err?.message || err) }, 500);
+    }
+  }
+
+  return jsonResponse({ ok: true, word });
+}
+
 /* ---------------- Kullanıcı Yetki & Kod İşlemleri ---------------- */
 
 async function ensureSchema(db) {
@@ -738,6 +854,14 @@ async function ensureSchema(db) {
         examples_json TEXT NOT NULL DEFAULT '[]',
         freq_rank INTEGER NOT NULL DEFAULT 999999,
         updated_at TEXT NOT NULL
+      )
+    `),
+    db.prepare(`
+      CREATE TABLE IF NOT EXISTS missing_word_reports (
+        word TEXT PRIMARY KEY,
+        report_count INTEGER NOT NULL DEFAULT 1,
+        first_reported_at TEXT NOT NULL,
+        last_reported_at TEXT NOT NULL
       )
     `),
   ]);
@@ -2395,6 +2519,33 @@ async function handleDeveloperPanelRequest(request, env, verifiedUser, path, met
     );
   }
 
+  // 7) Bildirilen Eksik Kelimeler (Geliştirici Paneli)
+  if (path === "/dev/missing-words") {
+    if (method === "GET") {
+      const { results } = await env.DB
+        .prepare(
+          `SELECT word, report_count, first_reported_at, last_reported_at
+           FROM missing_word_reports
+           ORDER BY report_count DESC, last_reported_at DESC
+           LIMIT 200`
+        )
+        .all();
+      return jsonResponse({ ok: true, words: results || [] });
+    }
+    if (method === "DELETE") {
+      const body = await safeReadJson(request);
+      const word = String(body?.word || "").trim().toLowerCase();
+      if (!word) {
+        return jsonResponse({ ok: false, message: "Kelime belirtilmedi." }, 400);
+      }
+      await env.DB
+        .prepare("DELETE FROM missing_word_reports WHERE word = ?")
+        .bind(word)
+        .run();
+      return jsonResponse({ ok: true, message: `"${word}" listeden kaldırıldı.` });
+    }
+  }
+
   return jsonResponse({ ok: false, error: "not_found" }, 404);
 }
 
@@ -3462,6 +3613,31 @@ async function handleAdminRequest(request, env, path, method) {
       if (!code) return jsonResponse({ ok: false, message: "Kod belirtilmedi." }, 400);
       await env.DB.prepare("DELETE FROM access_codes WHERE code = ?").bind(code).run();
       return jsonResponse({ ok: true, message: `"${code}" silindi.` });
+    }
+  }
+
+  // Bildirilen eksik kelimeler (PC Admin Paneli)
+  if (path === "/admin/missing-words") {
+    if (method === "GET") {
+      const { results } = await env.DB
+        .prepare(
+          `SELECT word, report_count, first_reported_at, last_reported_at
+           FROM missing_word_reports
+           ORDER BY report_count DESC, last_reported_at DESC
+           LIMIT 200`
+        )
+        .all();
+      return jsonResponse({ ok: true, words: results || [] });
+    }
+    if (method === "DELETE") {
+      const body = await safeReadJson(request);
+      const word = String(body?.word || "").trim().toLowerCase();
+      if (!word) return jsonResponse({ ok: false, message: "Kelime belirtilmedi." }, 400);
+      await env.DB
+        .prepare("DELETE FROM missing_word_reports WHERE word = ?")
+        .bind(word)
+        .run();
+      return jsonResponse({ ok: true, message: `"${word}" listeden kaldırıldı.` });
     }
   }
 

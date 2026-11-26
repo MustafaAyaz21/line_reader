@@ -4,6 +4,7 @@ import '../../../core/localization/app_strings.dart';
 import '../../../core/settings/display_preferences_controller.dart';
 import '../../../core/settings/ipa_accent_controller.dart';
 import '../../translation/models/word_lexicon_info.dart';
+import '../models/word_search_detail.dart';
 
 /// Amerikan (US) ve İngiliz (UK) doğrulanmış IPA okunuşlarını kullanıcının
 /// seçtiği moda (`both`, `usOnly`, `ukOnly`, `off`) göre kompakt haplar halinde gösterir.
@@ -389,11 +390,17 @@ class DidYouMeanCard extends StatelessWidget {
     required this.misspelledWord,
     required this.suggestions,
     required this.onSelectSuggestion,
+    this.onReportMissingWord,
+    this.isReportingMissing = false,
+    this.hasReportedMissing = false,
   });
 
   final String misspelledWord;
   final List<String> suggestions;
   final ValueChanged<String> onSelectSuggestion;
+  final VoidCallback? onReportMissingWord;
+  final bool isReportingMissing;
+  final bool hasReportedMissing;
 
   @override
   Widget build(BuildContext context) {
@@ -485,8 +492,151 @@ class DidYouMeanCard extends StatelessWidget {
                   ),
                 ),
               ],
+              if (onReportMissingWord != null) ...<Widget>[
+                const SizedBox(height: 16),
+                Divider(height: 1, color: colorScheme.outlineVariant.withAlpha(120)),
+                const SizedBox(height: 12),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        s.t(
+                          'Bu kelime gerçekte varsa bize bildirin:',
+                          'If this is a valid word, let us know:',
+                        ),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      key: const ValueKey<String>('report_missing_word_button'),
+                      onPressed: (isReportingMissing || hasReportedMissing)
+                          ? null
+                          : onReportMissingWord,
+                      icon: isReportingMissing
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(
+                              hasReportedMissing
+                                  ? Icons.check_rounded
+                                  : Icons.flag_outlined,
+                              size: 16,
+                            ),
+                      label: Text(
+                        hasReportedMissing
+                            ? s.t('Bildirildi', 'Reported')
+                            : s.t('Bildir', 'Report'),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Arama çubuğunun hemen altında kullanıcı yazarken gösterilen,
+/// sol tarafta İngilizce kelimeyi sağ tarafta Türkçe anlam özetini sunan liste.
+class WordPrefixSuggestionsList extends StatelessWidget {
+  const WordPrefixSuggestionsList({
+    super.key,
+    required this.suggestions,
+    required this.onSelectWord,
+  });
+
+  final List<WordPrefixSuggestion> suggestions;
+  final ValueChanged<String> onSelectWord;
+
+  @override
+  Widget build(BuildContext context) {
+    if (suggestions.isEmpty) return const SizedBox.shrink();
+
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Container(
+      key: const ValueKey<String>('word_prefix_suggestions_list'),
+      constraints: const BoxConstraints(maxHeight: 280),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colorScheme.outlineVariant.withAlpha(140)),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: Colors.black.withAlpha(24),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: ListView.separated(
+          shrinkWrap: true,
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          itemCount: suggestions.length,
+          separatorBuilder: (_, __) => Divider(
+            height: 1,
+            color: colorScheme.outlineVariant.withAlpha(60),
+          ),
+          itemBuilder: (context, index) {
+            final item = suggestions[index];
+            return InkWell(
+              key: ValueKey<String>('prefix_suggestion_${item.word}'),
+              onTap: () => onSelectWord(item.word),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                child: Row(
+                  children: <Widget>[
+                    Icon(
+                      Icons.search_rounded,
+                      size: 16,
+                      color: colorScheme.primary.withAlpha(180),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      item.word,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        item.turkishPreview,
+                        textAlign: TextAlign.end,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ),
     );

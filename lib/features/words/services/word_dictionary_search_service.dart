@@ -1291,6 +1291,79 @@ Respond ONLY with valid JSON:
     };
   }
 
+  /// Kullanıcı arama çubuğuna yazarken D1 sözlüğünden anlık önek önerileri + Türkçe özet getirir.
+  Future<List<WordPrefixSuggestion>> fetchPrefixSuggestions(
+    String rawPrefix,
+  ) async {
+    final prefix = rawPrefix.trim().toLowerCase();
+    if (prefix.length < 2 || !RegExp(r'^[a-z]+$').hasMatch(prefix)) {
+      return const <WordPrefixSuggestion>[];
+    }
+
+    final endpoints = <String>[
+      '${ApiConfig.wordSuggestWorkerUrl}?q=${Uri.encodeQueryComponent(prefix)}',
+      if (!kIsWeb)
+        '${ApiConfig.browserAiFallbackEndpoint}/suggest?q=${Uri.encodeQueryComponent(prefix)}',
+    ];
+
+    for (final endpoint in endpoints) {
+      try {
+        final response = await _httpClient
+            .get(Uri.parse(endpoint))
+            .timeout(const Duration(milliseconds: 2500));
+        if (response.statusCode != 200) continue;
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        if (decoded is! Map<String, dynamic>) continue;
+        final rawList = decoded['suggestions'];
+        if (rawList is! List<dynamic>) continue;
+
+        final results = <WordPrefixSuggestion>[];
+        for (final item in rawList) {
+          if (item is! Map<String, dynamic>) continue;
+          final word = (item['word'] ?? '').toString().trim();
+          final preview = (item['preview'] ?? '').toString().trim();
+          if (word.isEmpty || preview.isEmpty) continue;
+          results.add(
+            WordPrefixSuggestion(word: word, turkishPreview: preview),
+          );
+        }
+        return results;
+      } catch (_) {}
+    }
+    return const <WordPrefixSuggestion>[];
+  }
+
+  /// Sözlükte bulunmayan bir kelimeyi geliştirici ekibine D1 üzerinden bildirir.
+  Future<bool> reportMissingWord(String rawWord) async {
+    final word = rawWord.trim().toLowerCase();
+    if (word.length < 2 || !RegExp(r'^[a-z]+$').hasMatch(word)) {
+      return false;
+    }
+
+    final endpoints = <String>[
+      ApiConfig.reportMissingWordWorkerUrl,
+      if (!kIsWeb) '${ApiConfig.browserAiFallbackEndpoint}/report-missing-word',
+    ];
+
+    for (final endpoint in endpoints) {
+      try {
+        final response = await _httpClient
+            .post(
+              Uri.parse(endpoint),
+              headers: const <String, String>{
+                'Content-Type': 'application/json; charset=utf-8',
+              },
+              body: jsonEncode(<String, Object?>{'word': word}),
+            )
+            .timeout(const Duration(seconds: 4));
+        if (response.statusCode == 200) {
+          return true;
+        }
+      } catch (_) {}
+    }
+    return false;
+  }
+
   void dispose() {
     if (_ownsClient) {
       _httpClient.close();

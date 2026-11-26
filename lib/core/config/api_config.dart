@@ -83,6 +83,14 @@ abstract final class ApiConfig {
   static const String wordExamplesWorkerUrl =
       'https://linereader-ai.xreasayaz21.workers.dev/examples';
 
+  /// Kelime arama çubuğu otomatik tamamlama uç noktası (D1 önek araması, < 15 ms).
+  static const String wordSuggestWorkerUrl =
+      'https://linereader-ai.xreasayaz21.workers.dev/suggest';
+
+  /// Sözlükte bulunamayan eksik kelimeleri bildirme uç noktası.
+  static const String reportMissingWordWorkerUrl =
+      'https://linereader-ai.xreasayaz21.workers.dev/report-missing-word';
+
   /// Yedek ücretsiz insan çevirili cümle korpusu (Tatoeba).
   static const String tatoebaSearchBaseUrl =
       'https://tatoeba.org/en/api_v0/search';

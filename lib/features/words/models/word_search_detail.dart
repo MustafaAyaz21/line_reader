@@ -40,3 +40,14 @@ class WordSearchDetail {
   /// Google mantığıyla önerilen doğru İngilizce kelime adayları (`elone` → `alone`).
   final List<String> suggestions;
 }
+
+/// Arama çubuğunda kullanıcı yazarken gösterilen anlık önek önerisi.
+class WordPrefixSuggestion {
+  const WordPrefixSuggestion({
+    required this.word,
+    required this.turkishPreview,
+  });
+
+  final String word;
+  final String turkishPreview;
+}
