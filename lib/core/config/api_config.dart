@@ -64,7 +64,6 @@ abstract final class ApiConfig {
       return const <String>[
         'https://linereader-ai.xreasayaz21.workers.dev/dict',
         'https://getlinereader.com/api/dict',
-        '/api/dict',
       ];
     }
     return const <String>[

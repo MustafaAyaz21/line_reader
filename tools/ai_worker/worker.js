@@ -207,28 +207,49 @@ async function handleDictionaryProxy(request, env, url) {
       });
     }
 
-    // Google Translate Cloudflare IP'sini engellediyse (429 / 403), Cloudflare AI ile anında 10-15 anlam üret!
+    // Google Translate Cloudflare IP'sini engellediyse (429 / 403):
+    // Tek kelimeyse önce İngilizce sözlükte gerçekten var mı doğrula (yazım hatasını yakalamak için!)
+    const isSingleEnglishWord = /^[a-zA-Z]+$/.test(query) && sl === "en" && tl === "tr";
+    if (isSingleEnglishWord) {
+      try {
+        const dictCheck = await fetch(
+          `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(query.toLowerCase())}`
+        );
+        if (dictCheck.status === 404) {
+          // Kelime İngilizce sözlükte YOK -> Yazım hatası! Datamuse ile doğru kelime önerisi döndür.
+          let suggestion = null;
+          try {
+            const dmRes = await fetch(
+              `https://api.datamuse.com/words?sp=${encodeURIComponent(query.toLowerCase())}&max=3`
+            );
+            if (dmRes.ok) {
+              const dmData = await dmRes.json();
+              if (Array.isArray(dmData) && dmData.length > 0 && dmData[0]?.word) {
+                suggestion = String(dmData[0].word).trim().toLowerCase();
+              }
+            }
+          } catch (_) {}
+          // Google Translate dt=qca (didYouMean) formatında yanıt dön (hasBilingualDict = false)
+          const didYouMeanPayload = [
+            null,
+            null,
+            "en",
+            null,
+            null,
+            null,
+            null,
+            suggestion ? [[suggestion]] : []
+          ];
+          return jsonResponse(didYouMeanPayload, 200);
+        }
+      } catch (_) {}
+    }
+
+    // Kelime geçerli bir İngilizce kelime (veya çok kelimeli ifade) -> Cloudflare AI ile 12-15 zengin Türkçe anlam üret!
     const aiBundle = await generateAiDictionaryBundle(env, query, sl, tl);
     if (aiBundle) {
       return jsonResponse(aiBundle, 200);
     }
-
-    // Son çare: MyMemory ücretsiz çeviri servisi
-    try {
-      const mmUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(query)}&langpair=${sl}|${tl}`;
-      const mmRes = await fetch(mmUrl);
-      if (mmRes.ok) {
-        const mmData = await mmRes.json();
-        const trText = String(mmData?.responseData?.translatedText || "").trim();
-        if (trText && trText.toLowerCase() !== query.toLowerCase()) {
-          const fallbackBundle = [
-            [[trText, query, null, null, 10]],
-            [["noun", [trText]]]
-          ];
-          return jsonResponse(fallbackBundle, 200);
-        }
-      }
-    } catch (_) {}
 
     return jsonResponse({ error: "upstream_unavailable" }, 502);
   } catch (err) {
@@ -238,31 +259,58 @@ async function handleDictionaryProxy(request, env, url) {
 
 async function generateAiDictionaryBundle(env, word, sl = "en", tl = "tr") {
   if (!env || !env.AI) return null;
-  const systemPrompt = `You are an English-to-Turkish dictionary API.
-Given the English word or expression, return ONLY a valid JSON array in Google Translate dt=bd format:
-[
-  [["<primary_turkish_translation>", "${word}", null, null, 10]],
-  [
-    ["noun", ["<meaning_1>", "<meaning_2>", "<meaning_3>", "<meaning_4>", "<meaning_5>"]],
-    ["verb", ["<verb_meaning_1>", "<verb_meaning_2>"]]
-  ]
-]
-Use valid Turkish lowercase dictionary forms (for verbs use -mak/-mek). Strictly output JSON array only, no markdown, no explanation.`;
+  const systemPrompt = `You are a comprehensive English-to-Turkish bilingual dictionary.
+Given the English word or phrase, return ONLY a valid JSON object with 12 to 15 distinct Turkish dictionary meanings grouped by part of speech:
+{
+  "primary": "<most common Turkish meaning>",
+  "noun": ["<meaning 1>", "<meaning 2>", ...],
+  "verb": ["<infinitive -mak/-mek 1>", ...],
+  "adjective": ["<adj meaning 1>", ...],
+  "adverb": ["<adv meaning 1>", ...]
+}
+Rules:
+- Total meanings across all arrays MUST be 10 to 15 distinct Turkish words/short phrases (1-3 words each, lowercase).
+- Do NOT repeat the same meaning.
+- Leave unused part-of-speech arrays empty [].
+- Output ONLY valid JSON, no markdown, no extra text.`;
 
   try {
     const aiRes = await env.AI.run(PRIMARY_AI_MODEL, {
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: `Word: "${word}"` },
+        { role: "user", content: `English word: "${word}"` },
       ],
-      max_tokens: 350,
+      max_tokens: 450,
       temperature: 0.1,
     });
-    const raw = String(aiRes?.response || "").trim().replace(/```json/g, "").replace(/```/g, "").trim();
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length >= 2) {
-      return parsed;
+    const raw = String(aiRes?.response || "").trim();
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+    const obj = JSON.parse(jsonMatch[0]);
+    if (!obj || typeof obj !== "object") return null;
+
+    const primary = String(obj.primary || "").trim();
+    const dictGroups = [];
+    for (const pos of ["noun", "verb", "adjective", "adverb"]) {
+      const arr = Array.isArray(obj[pos])
+        ? obj[pos].map((x) => String(x || "").trim()).filter((x) => x.length > 0)
+        : [];
+      if (arr.length > 0) {
+        dictGroups.push([pos, arr]);
+      }
     }
+
+    const fallbackPrimary = primary || (dictGroups[0]?.[1]?.[0] ?? "");
+    if (!fallbackPrimary) return null;
+    if (dictGroups.length === 0) {
+      dictGroups.push(["noun", [fallbackPrimary]]);
+    }
+
+    // Google Translate dt=bd formatına çevir
+    return [
+      [[fallbackPrimary, word, null, null, 10]],
+      dictGroups,
+    ];
   } catch (_) {}
   return null;
 }

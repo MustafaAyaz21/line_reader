@@ -133,27 +133,13 @@ class _ListWordsScreenState extends State<ListWordsScreen> {
     TtsService ttsService,
   ) {
     if (list == null) return;
-    if (words.length < WordLearningHubScreen.minWordsRequired) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(
-              'Öğrenme modları için listede en az ${WordLearningHubScreen.minWordsRequired} kelime olmalıdır (Şu an ${words.length} kelime var).',
-            ),
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      return;
-    }
 
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => WordLearningHubScreen(
-          wordList: list,
-          words: words,
+          controller: widget.controller,
           ttsService: ttsService,
+          initialListId: list.id,
         ),
       ),
     );

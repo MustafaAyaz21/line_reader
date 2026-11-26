@@ -39,7 +39,9 @@ class WordDictionarySearchService {
   static const int _targetMinMeanings = 10;
   static const int _targetMaxMeanings = 15;
   static const int _targetExamplesCount = 3;
-  static const Duration _timeout = Duration(seconds: 14);
+  static const Duration _timeout = Duration(seconds: 5);
+  static final Map<String, WordSearchDetail> _sessionCache =
+      <String, WordSearchDetail>{};
 
   static const String _geminiSystemPrompt = '''
 You are an English-to-Turkish dictionary assistant for vocabulary learners.
@@ -74,6 +76,11 @@ Respond ONLY with valid JSON:
         type: TranslationErrorType.invalidResponse,
         message: 'Lütfen geçerli bir İngilizce kelime yazın.',
       );
+    }
+
+    final cached = _sessionCache[normalizedWord];
+    if (cached != null) {
+      return cached;
     }
 
     final collectedMeanings = <MeaningEntry>[];
@@ -189,18 +196,19 @@ Respond ONLY with valid JSON:
             earlyLocal != null ||
             knownInLexicon;
 
-        // Yalnızca arama servisi açıkça bir yazım düzeltmesi önerdiyse ("elone" -> "alone")
-        // "Bunu mu aratmak istediniz?" kartını göster. Ağ gecikmesinde geçerli kelimeleri
-        // asla hatalı yazılmış gibi gösterme!
+        // Yalnızca gerçek İngilizce sözlüklerin hiçbirinde bulunmuyorsa VEYA
+        // arama servisi açıkça bir yazım düzeltmesi önerdiyse ("educatiom" -> "education")
+        // "Bunu mu aratmak istediniz?" kartını göster.
         if (isSingleWord &&
-            hasSuggestionFromGoogle &&
-            dictBundle == null &&
-            !hasBilingualDict) {
+            (!isValidKnownWord ||
+                (hasSuggestionFromGoogle &&
+                    dictBundle == null &&
+                    !hasBilingualDict))) {
           final suggestions = await _collectSpellingSuggestions(
             query: normalizedWord,
             googleSuggestion: googleSuggestion,
           );
-          if (suggestions.isNotEmpty) {
+          if (suggestions.isNotEmpty || !isValidKnownWord) {
             return WordSearchDetail(
               word: normalizedWord,
               meanings: const <MeaningEntry>[],
@@ -217,9 +225,9 @@ Respond ONLY with valid JSON:
           }
         }
 
-        // Hâlâ 10'dan az anlam varsa İngilizce eşanlamlılar ve sözcük türü varyasyonlarını çevir
-        // (yalnızca geçerli olduğu doğrulanan kelimelerde!).
-        if (collectedMeanings.length < _targetMinMeanings) {
+        // Hâlâ 4'ten az anlam varsa İngilizce eşanlamlılar ve sözcük türü varyasyonlarını çevir
+        // (yalnızca geçerli olduğu doğrulanan kelimelerde; 4+ anlam zaten varsa gereksiz ağ turunu atla).
+        if (collectedMeanings.length < 4) {
           final extraTerms = <String>[
             if (dictBundle != null) ...dictBundle.synonyms,
             if (!normalizedWord.contains(' ') && isValidKnownWord) ...<String>[
@@ -378,8 +386,9 @@ Respond ONLY with valid JSON:
       }
     }
 
-    if (collectedMeanings.isEmpty) {
-      // 4) Son çare: Yedek ücretsiz MyMemory API'sinden doğrudan anlam al
+    if (collectedMeanings.isEmpty && !isSingleWord) {
+      // Yalnızca çok kelimeli ifadeler için yedek çeviri servisine başvur;
+      // tek kelimelerde yazım hatasını gizlememek için MyMemory kullanma.
       try {
         final fallback = await _fetchFallbackDirectTranslation(normalizedWord);
         if (fallback != null && fallback.isNotEmpty) {
@@ -419,12 +428,16 @@ Respond ONLY with valid JSON:
       } catch (_) {}
     }
 
-    return WordSearchDetail(
+    final result = WordSearchDetail(
       word: normalizedWord,
       meanings: List<MeaningEntry>.unmodifiable(collectedMeanings),
       examples: List<WordExampleSentence>.unmodifiable(collectedExamples),
       lexiconInfo: lexiconInfo,
     );
+    if (result.meanings.isNotEmpty) {
+      _sessionCache[normalizedWord] = result;
+    }
+    return result;
   }
 
   Future<List<String>> _collectSpellingSuggestions({
@@ -465,7 +478,7 @@ Respond ONLY with valid JSON:
   Future<List<String>> _fetchDatamuseSpellingSuggestions(String query) async {
     try {
       final uri = Uri.parse(
-        'https://api.datamuse.com/sug?s=${Uri.encodeQueryComponent(query)}&max=5',
+        'https://api.datamuse.com/words?sp=${Uri.encodeQueryComponent(query)}&max=5',
       );
       final response =
           await _httpClient.get(uri).timeout(const Duration(seconds: 4));
@@ -832,7 +845,8 @@ Respond ONLY with valid JSON:
       final uri = Uri.parse(
         '${ApiConfig.freeDictionaryBaseUrl}/${Uri.encodeComponent(word)}',
       );
-      final response = await _httpClient.get(uri).timeout(_timeout);
+      final response =
+          await _httpClient.get(uri).timeout(const Duration(seconds: 4));
       if (response.statusCode != 200) return null;
 
       final decoded = jsonDecode(
@@ -1067,6 +1081,8 @@ Respond ONLY with valid JSON:
 
   /// Tatoeba açık korpusundan insan çevirili İngilizce–Türkçe örnek cümleler çeker.
   Future<List<WordExampleSentence>> _fetchTatoebaExamples(String word) async {
+    // Tatoeba API'si tarayıcı CORS başlığı vermediği için Web'de doğrudan atla.
+    if (kIsWeb) return const <WordExampleSentence>[];
     try {
       final queryValue = word.contains(' ') ? '"$word"' : word;
       final uri = Uri.parse(ApiConfig.tatoebaSearchBaseUrl).replace(

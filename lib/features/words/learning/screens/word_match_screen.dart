@@ -4,18 +4,21 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/app_theme_backdrop.dart';
 import '../../../../core/tts/tts_service.dart';
 import '../../models/saved_word.dart';
-import '../../models/word_list.dart';
 
-/// Anlam Eşleştirme Ekranı.
+/// Anlam Eşleştirme Ekranı — Seçenek 1: İki Sütunlu Köprü.
+/// Sol sütunda İngilizce kelimeler, sağ sütunda Türkçe karşılıkları yer alır.
+/// Hem mobilde hem masaüstünde devasa kutular olmadan tek ekrana sığar.
 class WordMatchScreen extends StatefulWidget {
   const WordMatchScreen({
     super.key,
-    required this.wordList,
+    required this.title,
+    required this.accentColor,
     required this.words,
     required this.ttsService,
   });
 
-  final WordList wordList;
+  final String title;
+  final Color accentColor;
   final List<SavedWord> words;
   final TtsService ttsService;
 
@@ -23,26 +26,25 @@ class WordMatchScreen extends StatefulWidget {
   State<WordMatchScreen> createState() => _WordMatchScreenState();
 }
 
-class _MatchItem {
-  _MatchItem({
-    required this.id,
-    required this.wordId,
+class _MatchNode {
+  _MatchNode({
+    required this.pairId,
     required this.text,
-    required this.isEnglish,
   });
 
-  final String id;
-  final int wordId;
+  final int pairId;
   final String text;
-  final bool isEnglish;
   bool isMatched = false;
 }
 
 class _WordMatchScreenState extends State<WordMatchScreen> {
-  late List<_MatchItem> _tiles;
-  _MatchItem? _firstSelected;
-  _MatchItem? _secondSelected;
+  late List<_MatchNode> _leftColumn; // İngilizce kelimeler
+  late List<_MatchNode> _rightColumn; // Türkçe anlamlar
+
+  _MatchNode? _selectedLeft;
+  _MatchNode? _selectedRight;
   bool _isLock = false;
+  bool _isErrorFlash = false;
   int _moves = 0;
   bool _isFinished = false;
 
@@ -54,76 +56,85 @@ class _WordMatchScreenState extends State<WordMatchScreen> {
 
   void _setupGame() {
     final pool = List<SavedWord>.from(widget.words)..shuffle();
-    // En fazla 6 kelime çifti (12 kart) seç
     final selectedWords = pool.take(6).toList();
 
-    final tiles = <_MatchItem>[];
+    final left = <_MatchNode>[];
+    final right = <_MatchNode>[];
+
     for (int i = 0; i < selectedWords.length; i++) {
       final w = selectedWords[i];
-      final wordId = w.id ?? i;
-      tiles.add(_MatchItem(id: 'en_$wordId', wordId: wordId, text: w.word, isEnglish: true));
-      tiles.add(_MatchItem(id: 'tr_$wordId', wordId: wordId, text: w.meaning, isEnglish: false));
+      left.add(_MatchNode(pairId: i, text: w.word));
+      right.add(_MatchNode(pairId: i, text: w.meaning));
     }
 
-    tiles.shuffle();
+    left.shuffle();
+    right.shuffle();
 
     setState(() {
-      _tiles = tiles;
-      _firstSelected = null;
-      _secondSelected = null;
+      _leftColumn = left;
+      _rightColumn = right;
+      _selectedLeft = null;
+      _selectedRight = null;
       _isLock = false;
+      _isErrorFlash = false;
       _moves = 0;
       _isFinished = false;
     });
   }
 
-  void _onTileTap(_MatchItem item) {
-    if (_isLock || item.isMatched || item == _firstSelected) return;
+  void _onTapLeft(_MatchNode node) {
+    if (_isLock || node.isMatched) return;
+    widget.ttsService.toggleSpeak(
+      text: node.text,
+      target: TtsSpeakingTarget.word,
+    );
+    setState(() {
+      _selectedLeft = (_selectedLeft == node) ? null : node;
+    });
+    _checkPair();
+  }
 
-    if (_firstSelected == null) {
-      setState(() {
-        _firstSelected = item;
+  void _onTapRight(_MatchNode node) {
+    if (_isLock || node.isMatched) return;
+    setState(() {
+      _selectedRight = (_selectedRight == node) ? null : node;
+    });
+    _checkPair();
+  }
+
+  void _checkPair() {
+    final left = _selectedLeft;
+    final right = _selectedRight;
+    if (left == null || right == null) return;
+
+    setState(() {
+      _isLock = true;
+      _moves++;
+    });
+
+    if (left.pairId == right.pairId) {
+      Future<void>.delayed(const Duration(milliseconds: 280), () {
+        if (!mounted) return;
+        setState(() {
+          left.isMatched = true;
+          right.isMatched = true;
+          _selectedLeft = null;
+          _selectedRight = null;
+          _isLock = false;
+          _isFinished = _leftColumn.every((n) => n.isMatched);
+        });
       });
-      if (item.isEnglish) {
-        widget.ttsService.toggleSpeak(text: item.text, target: TtsSpeakingTarget.word);
-      }
     } else {
-      setState(() {
-        _secondSelected = item;
-        _isLock = true;
-        _moves++;
+      setState(() => _isErrorFlash = true);
+      Future<void>.delayed(const Duration(milliseconds: 550), () {
+        if (!mounted) return;
+        setState(() {
+          _selectedLeft = null;
+          _selectedRight = null;
+          _isErrorFlash = false;
+          _isLock = false;
+        });
       });
-
-      if (item.isEnglish) {
-        widget.ttsService.toggleSpeak(text: item.text, target: TtsSpeakingTarget.word);
-      }
-
-      // Eşleşme kontrolü
-      final isMatch = _firstSelected!.wordId == item.wordId &&
-          _firstSelected!.isEnglish != item.isEnglish;
-
-      if (isMatch) {
-        Future<void>.delayed(const Duration(milliseconds: 300), () {
-          if (!mounted) return;
-          setState(() {
-            _firstSelected!.isMatched = true;
-            _secondSelected!.isMatched = true;
-            _firstSelected = null;
-            _secondSelected = null;
-            _isLock = false;
-            _isFinished = _tiles.every((t) => t.isMatched);
-          });
-        });
-      } else {
-        Future<void>.delayed(const Duration(milliseconds: 650), () {
-          if (!mounted) return;
-          setState(() {
-            _firstSelected = null;
-            _secondSelected = null;
-            _isLock = false;
-          });
-        });
-      }
     }
   }
 
@@ -133,14 +144,14 @@ class _WordMatchScreenState extends State<WordMatchScreen> {
     final colorScheme = theme.colorScheme;
     final visuals = AppThemeVisuals.of(context);
 
-    final remaining = _tiles.where((t) => !t.isMatched).length ~/ 2;
+    final remaining = _leftColumn.where((t) => !t.isMatched).length;
 
     return AppThemeBackdrop(
       child: Scaffold(
         backgroundColor: visuals.hasBackdrop ? Colors.transparent : null,
         appBar: AppBar(
           title: Text(
-            'Anlam Eşleştirme • ${widget.wordList.name}',
+            'Anlam Eşleştirme • ${widget.title}',
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
@@ -155,112 +166,129 @@ class _WordMatchScreenState extends State<WordMatchScreen> {
         body: SafeArea(
           child: _isFinished
               ? _buildFinishedView(context, theme, colorScheme)
-              : Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              : Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 680),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Text(
-                            'Kalan Çift: $remaining',
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w800,
-                            ),
+                          // Üst Bilgi Çubuğu
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Kalan Çift: $remaining',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: colorScheme.surfaceContainerHighest,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'Hamle: $_moves',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: colorScheme.surfaceContainerHighest,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              'Hamle: $_moves',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                fontWeight: FontWeight.w700,
+                          const SizedBox(height: 16),
+
+                          // Sütun Başlıkları
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'İNGİLİZCE',
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1.1,
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'TÜRKÇE KARŞILIĞI',
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1.1,
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+
+                          // İki Sütunlu Kompakt Eşleştirme Listesi
+                          Expanded(
+                            child: SingleChildScrollView(
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Sol Sütun (İngilizce)
+                                  Expanded(
+                                    child: Column(
+                                      children: _leftColumn.map((node) {
+                                        final isSelected = _selectedLeft == node;
+                                        return Padding(
+                                          padding:
+                                              const EdgeInsets.only(bottom: 10),
+                                          child: _buildColumnTile(
+                                            context: context,
+                                            colorScheme: colorScheme,
+                                            node: node,
+                                            isSelected: isSelected,
+                                            isBold: true,
+                                            onTap: () => _onTapLeft(node),
+                                          ),
+                                        );
+                                      }).toList(),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  // Sağ Sütun (Türkçe)
+                                  Expanded(
+                                    child: Column(
+                                      children: _rightColumn.map((node) {
+                                        final isSelected = _selectedRight == node;
+                                        return Padding(
+                                          padding:
+                                              const EdgeInsets.only(bottom: 10),
+                                          child: _buildColumnTile(
+                                            context: context,
+                                            colorScheme: colorScheme,
+                                            node: node,
+                                            isSelected: isSelected,
+                                            isBold: false,
+                                            onTap: () => _onTapRight(node),
+                                          ),
+                                        );
+                                      }).toList(),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
-                      Expanded(
-                        child: GridView.builder(
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            childAspectRatio: 2.2,
-                            crossAxisSpacing: 10,
-                            mainAxisSpacing: 10,
-                          ),
-                          itemCount: _tiles.length,
-                          itemBuilder: (context, index) {
-                            final item = _tiles[index];
-                            if (item.isMatched) {
-                              return const SizedBox.shrink();
-                            }
-
-                            final isFirst = _firstSelected == item;
-                            final isSecond = _secondSelected == item;
-                            final isSelected = isFirst || isSecond;
-
-                            Color borderColor = colorScheme.outlineVariant.withValues(alpha: 0.6);
-                            Color bgColor = colorScheme.brightness == Brightness.dark
-                                ? const Color(0xFF171D28)
-                                : Colors.white;
-
-                            if (isSelected) {
-                              if (_secondSelected != null) {
-                                final match = _firstSelected!.wordId == _secondSelected!.wordId &&
-                                    _firstSelected!.isEnglish != _secondSelected!.isEnglish;
-                                if (match) {
-                                  borderColor = const Color(0xFF10B981);
-                                  bgColor = const Color(0xFF10B981).withValues(alpha: 0.2);
-                                } else {
-                                  borderColor = const Color(0xFFEF4444);
-                                  bgColor = const Color(0xFFEF4444).withValues(alpha: 0.2);
-                                }
-                              } else {
-                                borderColor = const Color(0xFFF59E0B);
-                                bgColor = const Color(0xFFF59E0B).withValues(alpha: 0.15);
-                              }
-                            }
-
-                            return InkWell(
-                              onTap: () => _onTileTap(item),
-                              borderRadius: BorderRadius.circular(16),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                alignment: Alignment.center,
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: bgColor,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: borderColor, width: 1.5),
-                                  boxShadow: [
-                                    if (isSelected)
-                                      BoxShadow(
-                                        color: borderColor.withValues(alpha: 0.3),
-                                        blurRadius: 10,
-                                      ),
-                                  ],
-                                ),
-                                child: Text(
-                                  item.text,
-                                  textAlign: TextAlign.center,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: item.isEnglish ? 14 : 12,
-                                    fontWeight: item.isEnglish ? FontWeight.w800 : FontWeight.w600,
-                                    color: colorScheme.onSurface,
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
         ),
@@ -268,61 +296,168 @@ class _WordMatchScreenState extends State<WordMatchScreen> {
     );
   }
 
-  Widget _buildFinishedView(BuildContext context, ThemeData theme, ColorScheme colorScheme) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+  Widget _buildColumnTile({
+    required BuildContext context,
+    required ColorScheme colorScheme,
+    required _MatchNode node,
+    required bool isSelected,
+    required bool isBold,
+    required VoidCallback onTap,
+  }) {
+    final baseSurface = colorScheme.brightness == Brightness.dark
+        ? const Color(0xFF171D28)
+        : Colors.white;
+
+    Color borderColor = colorScheme.outlineVariant.withValues(alpha: 0.6);
+    Color bgColor = baseSurface;
+    Color textColor = colorScheme.onSurface;
+    IconData trailingIcon = Icons.radio_button_unchecked_rounded;
+    Color iconColor = colorScheme.onSurfaceVariant.withValues(alpha: 0.4);
+
+    if (node.isMatched) {
+      borderColor = const Color(0xFF10B981).withValues(alpha: 0.5);
+      bgColor = const Color(0xFF10B981).withValues(alpha: 0.14);
+      textColor = const Color(0xFF10B981);
+      trailingIcon = Icons.check_circle_rounded;
+      iconColor = const Color(0xFF10B981);
+    } else if (isSelected) {
+      if (_isErrorFlash) {
+        borderColor = const Color(0xFFEF4444);
+        bgColor = const Color(0xFFEF4444).withValues(alpha: 0.15);
+        textColor = const Color(0xFFEF4444);
+        trailingIcon = Icons.cancel_rounded;
+        iconColor = const Color(0xFFEF4444);
+      } else {
+        borderColor = const Color(0xFFF59E0B);
+        bgColor = const Color(0xFFF59E0B).withValues(alpha: 0.14);
+        textColor = const Color(0xFFF59E0B);
+        trailingIcon = Icons.circle;
+        iconColor = const Color(0xFFF59E0B);
+      }
+    }
+
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 250),
+      opacity: node.isMatched ? 0.45 : 1.0,
+      child: InkWell(
+        onTap: node.isMatched ? null : onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          constraints: const BoxConstraints(minHeight: 54),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: borderColor,
+              width: isSelected ? 1.8 : 1.2,
+            ),
+          ),
+          child: Row(
             children: [
-              Container(
-                width: 76,
-                height: 76,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.celebration_rounded,
-                  color: Color(0xFF10B981),
-                  size: 40,
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                'Tüm Çiftler Eşleşti!',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '$_moves hamlede panoyu temizlediniz.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 28),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton.icon(
-                  onPressed: _setupGame,
-                  icon: const Icon(Icons.replay_rounded),
-                  label: const Text('Yeni Tur Başlat'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: widget.wordList.color,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
+              Expanded(
+                child: Text(
+                  node.text,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: isBold ? 14 : 12.5,
+                    fontWeight: isBold ? FontWeight.w800 : FontWeight.w600,
+                    color: textColor,
                   ),
                 ),
               ),
+              const SizedBox(width: 8),
+              Icon(trailingIcon, size: 16, color: iconColor),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFinishedView(
+    BuildContext context,
+    ThemeData theme,
+    ColorScheme colorScheme,
+  ) {
+    final surfaceColor = colorScheme.brightness == Brightness.dark
+        ? const Color(0xFF171D28)
+        : Colors.white;
+
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 460),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: surfaceColor,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.celebration_rounded,
+                    color: Color(0xFF10B981),
+                    size: 38,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Tüm Çiftler Eşleşti!',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '$_moves hamlede tüm eşleşmeleri tamamladınız.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: _setupGame,
+                    icon: const Icon(Icons.replay_rounded),
+                    label: const Text('Yeni Tur Başlat'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: widget.accentColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

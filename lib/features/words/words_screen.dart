@@ -18,6 +18,7 @@ import '../translation/services/word_translation_service.dart';
 import '../update/controllers/app_update_controller.dart';
 import '../update/widgets/update_action_button.dart';
 import 'controllers/words_controller.dart';
+import 'learning/screens/word_learning_hub_screen.dart';
 import 'list_words_screen.dart';
 import 'models/saved_word.dart';
 import 'models/word_list.dart';
@@ -102,6 +103,22 @@ class _WordsScreenState extends State<WordsScreen> {
   final Set<int> _selectedMeaningIndices = <int>{};
   final Set<String> _selectedSynonyms = <String>{};
   final Set<String> _selectedAntonyms = <String>{};
+  TtsService? _fallbackTtsService;
+
+  TtsService _resolveTtsService() {
+    return widget.ttsService ?? (_fallbackTtsService ??= TtsService());
+  }
+
+  void _openLearningHub() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => WordLearningHubScreen(
+          controller: widget.controller,
+          ttsService: _resolveTtsService(),
+        ),
+      ),
+    );
+  }
 
   bool get _isSearchPanelOpen =>
       _isSearchingWord || _searchDetail != null || _searchError != null;
@@ -147,6 +164,7 @@ class _WordsScreenState extends State<WordsScreen> {
     if (_ownsSearchService) {
       _searchService.dispose();
     }
+    _fallbackTtsService?.dispose();
     super.dispose();
   }
 
@@ -1294,6 +1312,11 @@ class _WordsScreenState extends State<WordsScreen> {
           : AppBar(
               title: Text(s.myWordsTitle),
               actions: [
+                IconButton(
+                  onPressed: _openLearningHub,
+                  icon: const Icon(Icons.school_outlined),
+                  tooltip: 'Öğrenme Alanı',
+                ),
                 if (!kIsWeb && widget.updateController != null)
                   UpdateActionButton(controller: widget.updateController!),
                 if (widget.apiKeyController != null &&
@@ -1436,6 +1459,12 @@ class _WordsScreenState extends State<WordsScreen> {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
+                    ),
+                    const Spacer(),
+                    FilledButton.tonalIcon(
+                      onPressed: _openLearningHub,
+                      icon: const Icon(Icons.school_outlined, size: 18),
+                      label: const Text('Öğrenme Alanı'),
                     ),
                   ],
                 ),
