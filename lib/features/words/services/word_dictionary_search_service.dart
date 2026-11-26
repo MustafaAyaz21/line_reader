@@ -189,16 +189,18 @@ Respond ONLY with valid JSON:
             earlyLocal != null ||
             knownInLexicon;
 
+        // Yalnızca arama servisi açıkça bir yazım düzeltmesi önerdiyse ("elone" -> "alone")
+        // "Bunu mu aratmak istediniz?" kartını göster. Ağ gecikmesinde geçerli kelimeleri
+        // asla hatalı yazılmış gibi gösterme!
         if (isSingleWord &&
-            (!isValidKnownWord ||
-                (hasSuggestionFromGoogle &&
-                    dictBundle == null &&
-                    !hasBilingualDict))) {
+            hasSuggestionFromGoogle &&
+            dictBundle == null &&
+            !hasBilingualDict) {
           final suggestions = await _collectSpellingSuggestions(
             query: normalizedWord,
             googleSuggestion: googleSuggestion,
           );
-          if (suggestions.isNotEmpty || !isValidKnownWord) {
+          if (suggestions.isNotEmpty) {
             return WordSearchDetail(
               word: normalizedWord,
               meanings: const <MeaningEntry>[],
@@ -374,6 +376,16 @@ Respond ONLY with valid JSON:
           '[WordDictionarySearchService] Yerel sozluk arama hatasi: $error',
         );
       }
+    }
+
+    if (collectedMeanings.isEmpty) {
+      // 4) Son çare: Yedek ücretsiz MyMemory API'sinden doğrudan anlam al
+      try {
+        final fallback = await _fetchFallbackDirectTranslation(normalizedWord);
+        if (fallback != null && fallback.isNotEmpty) {
+          addMeaning(MeaningEntry(translation: fallback));
+        }
+      } catch (_) {}
     }
 
     if (collectedMeanings.isEmpty) {
@@ -888,6 +900,25 @@ Respond ONLY with valid JSON:
     } catch (_) {
       return null;
     }
+  }
+
+  Future<String?> _fetchFallbackDirectTranslation(String word) async {
+    try {
+      final uri = Uri.parse(
+        '${ApiConfig.myMemoryBaseUrl}?q=${Uri.encodeQueryComponent(word)}&langpair=en|tr',
+      );
+      final res = await _httpClient.get(uri).timeout(const Duration(seconds: 4));
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(res.bodyBytes, allowMalformed: true));
+        final text = decoded?['responseData']?['translatedText'] as String?;
+        if (text != null &&
+            text.trim().isNotEmpty &&
+            text.trim().toLowerCase() != word.toLowerCase()) {
+          return text.trim();
+        }
+      }
+    } catch (_) {}
+    return null;
   }
 
   Future<List<MeaningEntry>> _translateBatchTerms({

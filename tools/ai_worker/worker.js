@@ -185,29 +185,86 @@ async function handleDictionaryProxy(request, env, url) {
       googleUrl.searchParams.set("q", query);
     }
 
-    const res = await fetch(googleUrl.toString(), {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "*/*",
-      },
-    });
+    let res = null;
+    try {
+      res = await fetch(googleUrl.toString(), {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "*/*",
+        },
+      });
+    } catch (_) {}
 
-    if (!res.ok) {
-      return jsonResponse({ error: "upstream_error", status: res.status }, res.status);
+    if (res && res.ok) {
+      const text = await res.text();
+      return new Response(text, {
+        status: 200,
+        headers: {
+          ...CORS_HEADERS,
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "public, max-age=86400, s-maxage=604800",
+        },
+      });
     }
 
-    const text = await res.text();
-    return new Response(text, {
-      status: 200,
-      headers: {
-        ...CORS_HEADERS,
-        "Content-Type": "application/json; charset=utf-8",
-        "Cache-Control": "public, max-age=86400, s-maxage=604800",
-      },
-    });
+    // Google Translate Cloudflare IP'sini engellediyse (429 / 403), Cloudflare AI ile anında 10-15 anlam üret!
+    const aiBundle = await generateAiDictionaryBundle(env, query, sl, tl);
+    if (aiBundle) {
+      return jsonResponse(aiBundle, 200);
+    }
+
+    // Son çare: MyMemory ücretsiz çeviri servisi
+    try {
+      const mmUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(query)}&langpair=${sl}|${tl}`;
+      const mmRes = await fetch(mmUrl);
+      if (mmRes.ok) {
+        const mmData = await mmRes.json();
+        const trText = String(mmData?.responseData?.translatedText || "").trim();
+        if (trText && trText.toLowerCase() !== query.toLowerCase()) {
+          const fallbackBundle = [
+            [[trText, query, null, null, 10]],
+            [["noun", [trText]]]
+          ];
+          return jsonResponse(fallbackBundle, 200);
+        }
+      }
+    } catch (_) {}
+
+    return jsonResponse({ error: "upstream_unavailable" }, 502);
   } catch (err) {
     return jsonResponse({ error: "proxy_failed", details: String(err) }, 500);
   }
+}
+
+async function generateAiDictionaryBundle(env, word, sl = "en", tl = "tr") {
+  if (!env || !env.AI) return null;
+  const systemPrompt = `You are an English-to-Turkish dictionary API.
+Given the English word or expression, return ONLY a valid JSON array in Google Translate dt=bd format:
+[
+  [["<primary_turkish_translation>", "${word}", null, null, 10]],
+  [
+    ["noun", ["<meaning_1>", "<meaning_2>", "<meaning_3>", "<meaning_4>", "<meaning_5>"]],
+    ["verb", ["<verb_meaning_1>", "<verb_meaning_2>"]]
+  ]
+]
+Use valid Turkish lowercase dictionary forms (for verbs use -mak/-mek). Strictly output JSON array only, no markdown, no explanation.`;
+
+  try {
+    const aiRes = await env.AI.run(PRIMARY_AI_MODEL, {
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: `Word: "${word}"` },
+      ],
+      max_tokens: 350,
+      temperature: 0.1,
+    });
+    const raw = String(aiRes?.response || "").trim().replace(/```json/g, "").replace(/```/g, "").trim();
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length >= 2) {
+      return parsed;
+    }
+  } catch (_) {}
+  return null;
 }
 
 /* ---------------- Herkese Açık Web Arama Köprüsü (DuckDuckGo HTML Proxy) ---------------- */
@@ -1095,7 +1152,7 @@ async function handlePasswordResetRequest(request, env) {
 
     // 2) Firebase Auth Identity Toolkit'ten güvenli şifre sıfırlama linkini (oobLink) üret
     const oobRes = await fetch(
-      `https://identitytoolkit.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/accounts:sendOobCode`,
+      "https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode",
       {
         method: "POST",
         headers: {
