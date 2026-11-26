@@ -153,9 +153,19 @@ class AuthController extends ChangeNotifier {
       }
 
       final cachedEnt = await _localStore.loadCachedEntitlement();
+      final persistedVerifiedUid = await _loadPersistedVerifiedUid();
       final current = _backend.currentUser;
       if (current != null) {
         _user = current;
+        if (persistedVerifiedUid != null &&
+            persistedVerifiedUid == current.uid) {
+          _d1EmailVerified = true;
+        }
+        if (!current.emailVerified && !_d1EmailVerified) {
+          // Yerel önbellek boşsa (ör. yeni cihaz / sayfa yenileme) OTP ekranına
+          // atmadan önce Cloudflare D1 (/me) üzerinden doğrulama durumunu sor.
+          await _checkRemoteD1EmailVerified();
+        }
         if (current.emailVerified || _d1EmailVerified) {
           _status = AuthSessionStatus.authenticated;
           _isUnlimited = cachedEnt.isUnlimited;
@@ -185,9 +195,19 @@ class AuthController extends ChangeNotifier {
       _enforceSpecialThemeFallback();
 
       await _authSub?.cancel();
-      _authSub = _backend.authStateChanges.listen((nextUser) {
+      _authSub = _backend.authStateChanges.listen((nextUser) async {
+        if (_isDisposed) return;
         if (nextUser != null) {
           _user = nextUser;
+          if (!nextUser.emailVerified && !_d1EmailVerified) {
+            final savedUid = await _loadPersistedVerifiedUid();
+            if (savedUid != null && savedUid == nextUser.uid) {
+              _d1EmailVerified = true;
+            } else {
+              await _checkRemoteD1EmailVerified();
+            }
+          }
+          if (_isDisposed || _user?.uid != nextUser.uid) return;
           if (nextUser.emailVerified || _d1EmailVerified) {
             _status = AuthSessionStatus.authenticated;
             _safeNotify();
@@ -437,6 +457,13 @@ class AuthController extends ChangeNotifier {
       );
       if (result.isSuccess && result.user != null) {
         _user = result.user;
+        final persistedUid = await _loadPersistedVerifiedUid();
+        if (persistedUid != null && persistedUid == result.user!.uid) {
+          _d1EmailVerified = true;
+        }
+        if (!result.user!.emailVerified && !_d1EmailVerified) {
+          await _checkRemoteD1EmailVerified();
+        }
         if (result.user!.emailVerified || _d1EmailVerified) {
           _status = AuthSessionStatus.authenticated;
           _sessionLookupCount = 0;
@@ -562,6 +589,7 @@ class AuthController extends ChangeNotifier {
       }
 
       _d1EmailVerified = true;
+      await _savePersistedVerifiedUid(_user?.uid);
       _status = AuthSessionStatus.authenticated;
       _sessionLookupCount = 0;
       await _localStore.setGuestModeEnabled(false);
@@ -576,15 +604,69 @@ class AuthController extends ChangeNotifier {
     }
   }
 
+  Future<String?> _loadPersistedVerifiedUid() async {
+    try {
+      final store = _localStore;
+      if (store is AuthLocalRepository) {
+        return await store.loadVerifiedEmailUid();
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<void> _savePersistedVerifiedUid(String? uid) async {
+    try {
+      final store = _localStore;
+      if (store is AuthLocalRepository) {
+        await store.saveVerifiedEmailUid(uid);
+      }
+    } catch (_) {}
+  }
+
+  Future<bool> _checkRemoteD1EmailVerified() async {
+    try {
+      final token = await getIdToken();
+      if (token == null || token.trim().isEmpty) return false;
+      final remote = await _entitlementClient.fetchEntitlement(token);
+      if (remote != null && remote.emailVerified) {
+        _d1EmailVerified = true;
+        await _savePersistedVerifiedUid(_user?.uid);
+        _isUnlimited = remote.isUnlimited;
+        _hasSpecialThemes = remote.effectiveSpecialThemes;
+        _entitlementCodeUsed = remote.codeUsed;
+        _entitlementRole = remote.isAuthorizedStaff
+            ? 'admin'
+            : (remote.isUnlimited ? 'premium' : null);
+        await _localStore.saveCachedEntitlement(
+          isUnlimited: _isUnlimited,
+          codeUsed: _entitlementCodeUsed,
+          role: _entitlementRole,
+          hasSpecialThemes: _hasSpecialThemes,
+        );
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
   /// Sunucudan kullanıcının e-posta doğrulamasını tamamlayıp tamamlamadığını
   /// sessizce kontrol eder; doğrulandıysa oturumu otomatik aktif eder.
   Future<bool> checkEmailVerified() async {
     try {
       if (_d1EmailVerified) return true;
+      if (await _checkRemoteD1EmailVerified()) {
+        _status = AuthSessionStatus.authenticated;
+        _sessionLookupCount = 0;
+        await _localStore.setGuestModeEnabled(false);
+        _safeNotify();
+        return true;
+      }
       final reloaded = await _backend.reloadCurrentUser();
       if (reloaded == null) return false;
       _user = reloaded;
       if (reloaded.emailVerified) {
+        _d1EmailVerified = true;
+        await _savePersistedVerifiedUid(reloaded.uid);
         _status = AuthSessionStatus.authenticated;
         _sessionLookupCount = 0;
         await _localStore.setGuestModeEnabled(false);

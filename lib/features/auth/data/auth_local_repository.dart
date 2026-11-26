@@ -42,8 +42,22 @@ class AuthLocalRepository implements AuthLocalStore {
   static const String _entitlementRoleKey = 'auth_entitlement_role';
   static const String _entitlementSpecialThemesKey =
       'auth_entitlement_special_themes';
+  static const String _verifiedEmailUidKey = 'auth_d1_verified_email_uid';
 
   final SettingsRepository _settingsRepository;
+
+  Future<String?> loadVerifiedEmailUid() async {
+    final val = await _settingsRepository.getString(_verifiedEmailUidKey);
+    if (val == null || val.trim().isEmpty) return null;
+    return val.trim();
+  }
+
+  Future<void> saveVerifiedEmailUid(String? uid) async {
+    await _settingsRepository.saveString(
+      _verifiedEmailUidKey,
+      (uid ?? '').trim(),
+    );
+  }
 
   @override
   Future<bool> isGuestModeEnabled() async {
