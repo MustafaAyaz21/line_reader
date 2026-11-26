@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/localization/app_strings.dart';
@@ -14,6 +17,7 @@ import '../controllers/articles_controller.dart';
 import '../data/article_reader_repository.dart';
 import '../models/article.dart';
 import '../models/article_level.dart';
+import '../services/offline_articles_service.dart';
 import '../widgets/new_articles_banner.dart';
 import 'article_reader_screen.dart';
 
@@ -63,6 +67,7 @@ class _LevelArticlesScreenState extends State<LevelArticlesScreen> {
     super.initState();
     widget.controller.startLiveCheck();
     _progressController.load();
+    OfflineArticlesService.shared.ensureInitialized();
   }
 
   @override
@@ -99,6 +104,76 @@ class _LevelArticlesScreenState extends State<LevelArticlesScreen> {
     }
   }
 
+  Future<void> _handleDownloadArticle(Article article) async {
+    final result = await OfflineArticlesService.shared.downloadArticle(article);
+    if (!mounted) return;
+    final colorScheme = Theme.of(context).colorScheme;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(result.message),
+          backgroundColor: result.ok ? null : colorScheme.error,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+  }
+
+  Future<void> _handleDeleteOfflineArticle(Article article) async {
+    final s = context.l10n;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        final colorScheme = Theme.of(dialogContext).colorScheme;
+        return AlertDialog(
+          title: Text(s.t('Makaleyi Sil', 'Delete Article')),
+          content: Text(
+            s.t(
+              'Bu makaleyi cihazdan silmek istiyor musunuz?',
+              'Do you want to delete this article from your device?',
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(s.t('Vazgeç', 'Cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: colorScheme.error,
+                foregroundColor: colorScheme.onError,
+              ),
+              child: Text(s.t('Sil', 'Delete')),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) return;
+    final deleted =
+        await OfflineArticlesService.shared.deleteOfflineArticle(article.id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            deleted
+                ? s.t('Makale cihazdan silindi.', 'Article deleted from device.')
+                : s.t(
+                    'Makale silinemedi.',
+                    'Could not delete article from device.',
+                  ),
+          ),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+  }
+
   void _openArticleReader(Article article) {
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
@@ -127,6 +202,7 @@ class _LevelArticlesScreenState extends State<LevelArticlesScreen> {
       listenable: Listenable.merge(<Listenable>[
         widget.controller,
         _progressController,
+        OfflineArticlesService.shared,
       ]),
       builder: (context, _) {
         final levelArticles = widget.controller.articles
@@ -171,10 +247,27 @@ class _LevelArticlesScreenState extends State<LevelArticlesScreen> {
                                         .progressForArticle(article.id)
                                         ?.isCompleted ??
                                     false;
+                                final offlineService =
+                                    OfflineArticlesService.shared;
+                                final isDownloaded =
+                                    offlineService.isDownloaded(article.id);
+                                final isDownloading =
+                                    offlineService.isDownloading(article.id);
+                                final localCoverPath =
+                                    offlineService.localCoverPath(article.id);
                                 return _LevelArticleCard(
                                   article: article,
                                   accentColor: level.accentColor,
                                   isCompleted: isCompleted,
+                                  isOfflineSupported:
+                                      offlineService.isSupported,
+                                  isDownloaded: isDownloaded,
+                                  isDownloading: isDownloading,
+                                  localCoverPath: localCoverPath,
+                                  onDownloadTap: () =>
+                                      _handleDownloadArticle(article),
+                                  onDeleteTap: () =>
+                                      _handleDeleteOfflineArticle(article),
                                   onTap: () => _openArticleReader(article),
                                 );
                               },
@@ -275,13 +368,41 @@ class _LevelArticleCard extends StatelessWidget {
     required this.article,
     required this.accentColor,
     this.isCompleted = false,
+    this.isOfflineSupported = false,
+    this.isDownloaded = false,
+    this.isDownloading = false,
+    this.localCoverPath,
+    this.onDownloadTap,
+    this.onDeleteTap,
     required this.onTap,
   });
 
   final Article article;
   final Color accentColor;
   final bool isCompleted;
+  final bool isOfflineSupported;
+  final bool isDownloaded;
+  final bool isDownloading;
+  final String? localCoverPath;
+  final VoidCallback? onDownloadTap;
+  final VoidCallback? onDeleteTap;
   final VoidCallback onTap;
+
+  Widget _buildFallbackThumb() {
+    return Container(
+      width: 72,
+      height: 72,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: <Color>[accentColor.withAlpha(60), accentColor.withAlpha(25)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      alignment: Alignment.center,
+      child: Icon(Icons.auto_stories_rounded, size: 24, color: accentColor),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -340,25 +461,23 @@ class _LevelArticleCard extends StatelessWidget {
                   const SizedBox(width: 14),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(10),
-                    child: Image.network(
-                      article.displayImageUrl,
-                      width: 72,
-                      height: 72,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, _, __) => Container(
-                        width: 72,
-                        height: 72,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [accentColor.withAlpha(60), accentColor.withAlpha(25)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
+                    child: (!kIsWeb &&
+                            localCoverPath != null &&
+                            localCoverPath!.isNotEmpty)
+                        ? Image.file(
+                            File(localCoverPath!),
+                            width: 72,
+                            height: 72,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => _buildFallbackThumb(),
+                          )
+                        : Image.network(
+                            article.displayImageUrl,
+                            width: 72,
+                            height: 72,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => _buildFallbackThumb(),
                           ),
-                        ),
-                        alignment: Alignment.center,
-                        child: Icon(Icons.auto_stories_rounded, size: 24, color: accentColor),
-                      ),
-                    ),
                   ),
                 ],
               ),
@@ -415,6 +534,62 @@ class _LevelArticleCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
+                  if (isOfflineSupported) ...<Widget>[
+                    if (isDownloading)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8),
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    else if (isDownloaded)
+                      IconButton(
+                        key: ValueKey<String>(
+                          'article_offline_delete_${article.id}',
+                        ),
+                        tooltip: s.t(
+                          'Cihazda indirili (silmek için dokunun)',
+                          'Downloaded (tap to remove)',
+                        ),
+                        onPressed: onDeleteTap,
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 34,
+                          minHeight: 34,
+                        ),
+                        icon: Icon(
+                          Icons.offline_pin_rounded,
+                          size: 20,
+                          color: completedColor,
+                        ),
+                      )
+                    else
+                      IconButton(
+                        key: ValueKey<String>(
+                          'article_offline_download_${article.id}',
+                        ),
+                        tooltip: s.t(
+                          'Çevrimdışı indir',
+                          'Download for offline',
+                        ),
+                        onPressed: onDownloadTap,
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 34,
+                          minHeight: 34,
+                        ),
+                        icon: Icon(
+                          Icons.download_for_offline_outlined,
+                          size: 20,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    const SizedBox(width: 4),
+                  ],
                   Icon(
                     Icons.arrow_forward_ios_rounded,
                     size: 14,

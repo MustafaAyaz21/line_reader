@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/sync/cloud_sync_service.dart';
 
@@ -8,6 +9,7 @@ import '../../core/database/app_database.dart';
 import '../../core/localization/app_locale.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/platform/process_text_channel.dart';
+import '../../core/platform/web_back_bridge.dart';
 import '../../core/settings/api_key_controller.dart';
 import '../../core/settings/display_preferences_controller.dart';
 import '../../core/settings/ipa_accent_controller.dart';
@@ -60,6 +62,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _selectedIndex = _mainMenuTabIndex;
   bool _isBrowserOpen = false;
   bool? _hasOpenedBrowser;
+  late final PageController _mobilePageController;
+  bool _isProgrammaticPageChange = false;
+  bool _wasSwipeNavigation = false;
+  DateTime? _lastBackPressedAt;
 
   WordsController? _wordsController;
   ApiKeyController? _apiKeyController;
@@ -76,6 +82,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    _mobilePageController = PageController()
+      ..addListener(_handleMobilePageScroll);
     WidgetsBinding.instance.addObserver(this);
     _ensureInitialized();
     IpaAccentController.shared.load();
@@ -245,6 +253,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _selectedIndex = _wordsTabIndex;
       _isBrowserOpen = false;
     });
+    if (_mobilePageController.hasClients) {
+      _isProgrammaticPageChange = true;
+      _mobilePageController.jumpToPage(_stackWordsIndex);
+      _isProgrammaticPageChange = false;
+    }
     _wordsController!.loadLists();
     _wordsSearchTriggerController!.triggerSearch(query);
   }
@@ -284,6 +297,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _authController?.dispose();
     _fallbackLocaleController?.dispose();
     _wordsSearchTriggerController?.dispose();
+    _mobilePageController
+      ..removeListener(_handleMobilePageScroll)
+      ..dispose();
     super.dispose();
   }
 
@@ -339,20 +355,113 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await _browserTranslationService!.clearCache();
   }
 
-  void _openBrowser() {
+  void _handleMobilePageScroll() {
+    if (!mounted || _isProgrammaticPageChange) return;
+    if (!_mobilePageController.hasClients) return;
+    final page = _mobilePageController.page;
+    if (page == null) return;
+    // Kullanıcı Makaleler'den Tarayıcı'ya doğru kaydırmaya başladığında
+    // tarayıcıyı önceden hazırla ki kaydırma sırasında boş görünmesin.
+    if (page > 0.05 && !(_hasOpenedBrowser ?? false)) {
+      setState(() {
+        _hasOpenedBrowser = true;
+      });
+    }
+  }
+
+  void _onMobilePageChanged(int index) {
+    if (_isProgrammaticPageChange) return;
     _ensureInitialized();
-    setState(() {
-      _hasOpenedBrowser = true;
-      _selectedIndex = _mainMenuTabIndex;
-      _isBrowserOpen = true;
+    if (index == _stackMainMenuIndex) {
+      setState(() {
+        _selectedIndex = _mainMenuTabIndex;
+        _isBrowserOpen = false;
+      });
+    } else if (index == _stackBrowserIndex) {
+      setState(() {
+        _hasOpenedBrowser = true;
+        _selectedIndex = _mainMenuTabIndex;
+        _isBrowserOpen = true;
+      });
+    } else if (index == _stackWordsIndex) {
+      setState(() {
+        _selectedIndex = _wordsTabIndex;
+        _isBrowserOpen = false;
+      });
+      if (_wordsController != null &&
+          _wordsController!.lists.isEmpty &&
+          !_wordsController!.isLoading) {
+        _wordsController!.loadLists();
+      }
+    }
+  }
+
+  void _animateToMobilePage(int targetIndex) {
+    if (!_mobilePageController.hasClients) return;
+    final currentPage = _mobilePageController.page?.round();
+    if (currentPage == targetIndex) return;
+    _isProgrammaticPageChange = true;
+    _mobilePageController
+        .animateToPage(
+          targetIndex,
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeOutCubic,
+        )
+        .whenComplete(() {
+      if (mounted) {
+        _isProgrammaticPageChange = false;
+      }
     });
+  }
+
+  void _switchToStackIndex(
+    int targetStackIndex, {
+    bool recordHistory = true,
+  }) {
+    _ensureInitialized();
+    final previousStackIndex = _activeStackIndex;
+    if (previousStackIndex == targetStackIndex) return;
+
+    if (kIsWeb && recordHistory) {
+      WebBackBridge.shared.pushEntry(
+        onBack: () {
+          if (!mounted) return;
+          _switchToStackIndex(previousStackIndex, recordHistory: false);
+        },
+      );
+    }
+
+    setState(() {
+      if (targetStackIndex == _stackBrowserIndex) {
+        _hasOpenedBrowser = true;
+        _selectedIndex = _mainMenuTabIndex;
+        _isBrowserOpen = true;
+      } else if (targetStackIndex == _stackWordsIndex) {
+        _selectedIndex = _wordsTabIndex;
+        _isBrowserOpen = false;
+      } else {
+        _selectedIndex = _mainMenuTabIndex;
+        _isBrowserOpen = false;
+      }
+    });
+
+    _animateToMobilePage(targetStackIndex);
+
+    if (targetStackIndex == _stackWordsIndex &&
+        _wordsController != null &&
+        _wordsController!.lists.isEmpty &&
+        !_wordsController!.isLoading) {
+      _wordsController!.loadLists();
+    }
+  }
+
+  void _openBrowser() {
+    _switchToStackIndex(_stackBrowserIndex);
   }
 
   void _returnToMainMenu() {
     if (!_isBrowserOpen) return;
-    setState(() {
-      _isBrowserOpen = false;
-    });
+    _switchToStackIndex(_stackMainMenuIndex);
   }
 
   Future<void> _handleBrowserSystemBack() async {
@@ -364,15 +473,54 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  void _handleMobileRootSystemBack() {
+    if (_selectedIndex == _mainMenuTabIndex && _isBrowserOpen) {
+      _handleBrowserSystemBack();
+      return;
+    }
+
+    if (_selectedIndex == _wordsTabIndex) {
+      final closedSearch =
+          _wordsSearchTriggerController?.handleSystemBack() ?? false;
+      if (!closedSearch) {
+        _switchToStackIndex(_stackMainMenuIndex);
+      }
+      return;
+    }
+
+    // Makaleler (Ana Menü) ekranındayken ilk geri basışta çıkış uyarısı göster,
+    // 2 saniye içinde ikinci basışta uygulamadan çık.
+    final now = DateTime.now();
+    if (_lastBackPressedAt == null ||
+        now.difference(_lastBackPressedAt!) > const Duration(seconds: 2)) {
+      _lastBackPressedAt = now;
+      final s = context.l10n;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              s.t(
+                'Çıkmak için tekrar geri tuşuna basın',
+                'Press back again to exit',
+              ),
+            ),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      return;
+    }
+
+    SystemNavigator.pop();
+  }
+
   void _onDestinationSelected(int index) {
     _ensureInitialized();
 
     if (index == 0) {
       // Makaleler / Ana Menü
-      setState(() {
-        _selectedIndex = _mainMenuTabIndex;
-        _isBrowserOpen = false;
-      });
+      _switchToStackIndex(_stackMainMenuIndex);
       return;
     }
 
@@ -384,11 +532,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     if (index == 2) {
       // Kelimelerim
-      setState(() {
-        _selectedIndex = _wordsTabIndex;
-        _isBrowserOpen = false;
-      });
-      _wordsController?.loadLists();
+      _switchToStackIndex(_stackWordsIndex);
       return;
     }
 
@@ -457,69 +601,101 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
         final s = context.l10n;
         final visuals = AppThemeVisuals.of(context);
-        final canPopNormally =
-            !(_selectedIndex == _mainMenuTabIndex && _isBrowserOpen);
 
         final isWideScreen = MediaQuery.of(context).size.width >= 840;
+        final useSwipeNavigation = !kIsWeb && !isWideScreen;
 
-        final bodyContent = IndexedStack(
-          index: _activeStackIndex,
-          children: <Widget>[
-            MainMenuScreen(
-              key: const ValueKey<String>('main_menu_screen'),
-              onOpenBrowser: _openBrowser,
-              apiKeyController: _apiKeyController!,
-              localeController: localeController,
-              authController: authController,
-              updateController: _updateController!,
-              articlesController: _articlesController!,
-              translationService: _articleTranslationService!,
-              ttsService: _ttsService,
-              onAddWord: _handleAddWord,
-              onAddWordWithLexicon: _handleAddWordWithLexicon,
-              loadWordLists: _handleLoadWordLists,
-              onCreateWordList: _handleCreateWordList,
-              onClearCache: _handleClearTranslationCache,
-            ),
-            if ((_hasOpenedBrowser ?? false) || _isBrowserOpen)
-              BrowserScreen(
-                key: const ValueKey<String>('browser_screen'),
-                onAddWord: _handleAddWord,
-                onAddWordWithLexicon: _handleAddWordWithLexicon,
-                loadWordLists: _handleLoadWordLists,
-                onCreateWordList: _handleCreateWordList,
-                translationService: _browserTranslationService!,
-                ttsService: _ttsService,
-                authController: authController,
-                onReturnToMenu: _returnToMainMenu,
-                backController: _browserBackController,
-              )
-            else
-              const SizedBox.shrink(),
-            WordsScreen(
-              key: const ValueKey<String>('words_screen'),
-              controller: _wordsController!,
-              apiKeyController: _apiKeyController!,
-              localeController: localeController,
-              authController: authController,
-              updateController: _updateController!,
-              ttsService: _ttsService,
-              onClearCache: _handleClearTranslationCache,
-              searchTriggerController: _wordsSearchTriggerController,
-            ),
-          ],
+        if (useSwipeNavigation && !_wasSwipeNavigation) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _mobilePageController.hasClients) {
+              final target = _activeStackIndex;
+              if (_mobilePageController.page?.round() != target) {
+                _isProgrammaticPageChange = true;
+                _mobilePageController.jumpToPage(target);
+                _isProgrammaticPageChange = false;
+              }
+            }
+          });
+        }
+        _wasSwipeNavigation = useSwipeNavigation;
+
+        final mainMenuPage = RepaintBoundary(
+          child: MainMenuScreen(
+            key: const ValueKey<String>('main_menu_screen'),
+            onOpenBrowser: _openBrowser,
+            apiKeyController: _apiKeyController!,
+            localeController: localeController,
+            authController: authController,
+            updateController: _updateController!,
+            articlesController: _articlesController!,
+            translationService: _articleTranslationService!,
+            ttsService: _ttsService,
+            onAddWord: _handleAddWord,
+            onAddWordWithLexicon: _handleAddWordWithLexicon,
+            loadWordLists: _handleLoadWordLists,
+            onCreateWordList: _handleCreateWordList,
+            onClearCache: _handleClearTranslationCache,
+          ),
         );
 
+        final browserPage = ((_hasOpenedBrowser ?? false) || _isBrowserOpen)
+            ? RepaintBoundary(
+                child: BrowserScreen(
+                  key: const ValueKey<String>('browser_screen'),
+                  onAddWord: _handleAddWord,
+                  onAddWordWithLexicon: _handleAddWordWithLexicon,
+                  loadWordLists: _handleLoadWordLists,
+                  onCreateWordList: _handleCreateWordList,
+                  translationService: _browserTranslationService!,
+                  ttsService: _ttsService,
+                  authController: authController,
+                  onReturnToMenu: _returnToMainMenu,
+                  backController: _browserBackController,
+                ),
+              )
+            : const SizedBox.shrink();
+
+        final wordsPage = RepaintBoundary(
+          child: WordsScreen(
+            key: const ValueKey<String>('words_screen'),
+            controller: _wordsController!,
+            apiKeyController: _apiKeyController!,
+            localeController: localeController,
+            authController: authController,
+            updateController: _updateController!,
+            ttsService: _ttsService,
+            onClearCache: _handleClearTranslationCache,
+            searchTriggerController: _wordsSearchTriggerController,
+          ),
+        );
+
+        final bodyContent = useSwipeNavigation
+            ? PageView(
+                controller: _mobilePageController,
+                onPageChanged: _onMobilePageChanged,
+                children: <Widget>[
+                  _KeepAlivePage(child: mainMenuPage),
+                  _KeepAlivePage(child: browserPage),
+                  _KeepAlivePage(child: wordsPage),
+                ],
+              )
+            : IndexedStack(
+                index: _activeStackIndex,
+                children: <Widget>[
+                  mainMenuPage,
+                  browserPage,
+                  wordsPage,
+                ],
+              );
+
         return PopScope(
-          canPop: canPopNormally,
+          canPop: kIsWeb,
           onPopInvokedWithResult: (didPop, _) {
-            if (!didPop &&
-                _selectedIndex == _mainMenuTabIndex &&
-                _isBrowserOpen) {
-              _handleBrowserSystemBack();
-            }
+            if (didPop || kIsWeb) return;
+            _handleMobileRootSystemBack();
           },
           child: AppThemeBackdrop(
+            transitionKey: _activeStackIndex,
             showForegroundOverlay:
                 _selectedIndex == _mainMenuTabIndex && !_isBrowserOpen,
             child: Scaffold(
@@ -530,18 +706,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         _DesktopSidebar(
                           selectedIndex: _selectedIndex,
                           isBrowserOpen: _isBrowserOpen,
-                          onSelectMainMenu: () {
-                            setState(() {
-                              _selectedIndex = _mainMenuTabIndex;
-                              _isBrowserOpen = false;
-                            });
-                          },
+                          onSelectMainMenu: () =>
+                              _switchToStackIndex(_stackMainMenuIndex),
                           onOpenBrowser: _openBrowser,
                           onSelectWords: () {
-                            setState(() {
-                              _selectedIndex = _wordsTabIndex;
-                              _isBrowserOpen = false;
-                            });
+                            _switchToStackIndex(_stackWordsIndex);
                             _wordsController?.loadLists();
                           },
                           onOpenSettings: () {
@@ -1015,5 +1184,28 @@ class _SidebarItem extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Mobil `PageView` içinde sekmeler arası kaydırma yapılırken alt ekranların
+/// durumunu (kaydırma konumu, WebView vb.) koruyan sarmalayıcı.
+class _KeepAlivePage extends StatefulWidget {
+  const _KeepAlivePage({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_KeepAlivePage> createState() => _KeepAlivePageState();
+}
+
+class _KeepAlivePageState extends State<_KeepAlivePage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
   }
 }

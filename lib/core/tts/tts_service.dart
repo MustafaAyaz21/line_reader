@@ -5,7 +5,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
+import '../settings/ipa_accent_controller.dart';
 import 'gemini_audio_service.dart';
+import 'pronunciation_audio_service.dart';
 
 /// Şu an hangi metnin sesli okunduğunu belirtir.
 enum TtsSpeakingTarget {
@@ -14,14 +16,14 @@ enum TtsSpeakingTarget {
   sentence,
 }
 
-/// Çift modlu sesli okuma (Text-to-Speech) servisi:
-/// - **Gemini Ses Modu**: Kullanıcı geçerli bir Gemini API anahtarı girdiyse
-///   öncelikle Gemini'nin `responseModalities: ["AUDIO"]` ses üretimiyle doğal
-///   İngilizce telaffuz üretip `AudioPlayer` üzerinden çalar.
-/// - **Anahtarsız / Güvenli Yedek Mod**: API anahtarı yoksa veya Gemini ses
-///   çağrısında herhangi bir hata (kota, yetki, model, ağ, boş veri vb.) oluşursa
-///   uygulamayı kilitlemeden sessizce cihazın yerleşik `flutter_tts` (`en-US`)
-///   motoruna düşerek okumayı tamamlar.
+/// Yapay zekâ kullanmayan, US/UK aksan destekli hibrit sesli okuma servisi:
+/// - **Kelimeler için Birincil Mod**: Önce 12 MB üst limitli cihaz önbelleğine
+///   (RAM + disk LRU) bakar; yoksa Cloudflare / ücretsiz açık kaynak gerçek
+///   insan telaffuzunu (US veya UK) çekip önbelleğe alır ve `AudioPlayer` ile
+///   çalar. Limit dolduğunda en eski kayıtlar otomatik silinir.
+/// - **Cümleler ve Çevrimdışı Yedek Mod**: Platforma göre kalibre edilmiş hız
+///   (Web'de `0.95`, mobilde `0.50`) ve cihaz/tarayıcıdaki en doğal US/UK ses
+///   seçimi (`setVoice`) ile yerleşik `flutter_tts` motorunu kullanır.
 class TtsService extends ChangeNotifier {
   TtsService({
     FlutterTts? tts,
@@ -29,35 +31,33 @@ class TtsService extends ChangeNotifier {
     AudioPlayer? audioPlayer,
     String? Function()? geminiApiKeyProvider,
     bool Function()? shouldUseGeminiProvider,
+    PronunciationAudioService? pronunciationAudioService,
+    IpaAccent Function()? accentProvider,
   })  : _tts = tts ?? FlutterTts(),
-        _geminiAudioService = geminiAudioService,
-        _ownsGeminiAudioService = geminiAudioService == null,
         _audioPlayer = audioPlayer,
         _ownsAudioPlayer = audioPlayer == null,
-        _geminiApiKeyProvider = geminiApiKeyProvider,
-        _shouldUseGeminiProvider = shouldUseGeminiProvider;
+        _pronunciationAudioService = pronunciationAudioService,
+        _ownsPronunciationAudioService = pronunciationAudioService == null,
+        _accentProvider = accentProvider;
 
-  static const List<String> _preferredLanguages = <String>[
-    'en-US',
-    'en-GB',
-    'en',
-  ];
-  static const double _defaultSpeechRate = 0.48;
+  static const double _mobileSpeechRate = 0.50;
+  static const double _webSpeechRate = 0.95;
   static const double _defaultVolume = 1.0;
   static const double _defaultPitch = 1.0;
 
   final FlutterTts _tts;
-  final String? Function()? _geminiApiKeyProvider;
-  final bool Function()? _shouldUseGeminiProvider;
+  final IpaAccent Function()? _accentProvider;
 
-  GeminiAudioService? _geminiAudioService;
-  bool? _ownsGeminiAudioService;
+  PronunciationAudioService? _pronunciationAudioService;
+  bool _ownsPronunciationAudioService;
 
   AudioPlayer? _audioPlayer;
-  bool? _ownsAudioPlayer;
+  bool _ownsAudioPlayer;
   StreamSubscription<void>? _playerCompleteSubscription;
 
   bool _isFlutterTtsConfigured = false;
+  IpaAccent? _configuredAccent;
+  bool _hasSelectedNaturalVoice = false;
   bool _isDisposed = false;
   bool _isLoadingAudio = false;
   int _requestGeneration = 0;
@@ -83,19 +83,16 @@ class TtsService extends ChangeNotifier {
     return current.toLowerCase() == text.trim().toLowerCase();
   }
 
-  String? get _activeGeminiKey {
-    final key = _geminiApiKeyProvider?.call()?.trim();
-    if (key == null || key.isEmpty) return null;
-    final allowed = _shouldUseGeminiProvider?.call() ?? true;
-    return allowed ? key : null;
+  IpaAccent _resolveAccent() {
+    return _accentProvider?.call() ?? IpaAccentController.shared.accent;
   }
 
-  GeminiAudioService _resolveGeminiAudioService() {
-    final existing = _geminiAudioService;
+  PronunciationAudioService _resolvePronunciationAudioService() {
+    final existing = _pronunciationAudioService;
     if (existing != null) return existing;
-    final created = GeminiAudioService();
-    _geminiAudioService = created;
-    _ownsGeminiAudioService = true;
+    final created = PronunciationAudioService();
+    _pronunciationAudioService = created;
+    _ownsPronunciationAudioService = true;
     return created;
   }
 
@@ -135,80 +132,81 @@ class TtsService extends ChangeNotifier {
     }
   }
 
-  Future<bool> _ensureFlutterTtsConfigured() async {
-    if (_isFlutterTtsConfigured) return true;
+  Future<bool> _ensureFlutterTtsConfigured({required IpaAccent accent}) async {
+    if (_isFlutterTtsConfigured &&
+        _configuredAccent == accent &&
+        _hasSelectedNaturalVoice) {
+      return true;
+    }
 
     try {
-      _tts.setStartHandler(() {
-        _errorMessage = null;
-        _isLoadingAudio = false;
-        _safeNotifyListeners();
-      });
+      if (!_isFlutterTtsConfigured) {
+        _tts.setStartHandler(() {
+          _errorMessage = null;
+          _isLoadingAudio = false;
+          _safeNotifyListeners();
+        });
 
-      _tts.setCompletionHandler(() {
-        _isLoadingAudio = false;
-        _speakingTarget = TtsSpeakingTarget.none;
-        _speakingText = null;
-        _safeNotifyListeners();
-      });
+        _tts.setCompletionHandler(() {
+          _isLoadingAudio = false;
+          _speakingTarget = TtsSpeakingTarget.none;
+          _speakingText = null;
+          _safeNotifyListeners();
+        });
 
-      _tts.setCancelHandler(() {
-        _isLoadingAudio = false;
-        _speakingTarget = TtsSpeakingTarget.none;
-        _speakingText = null;
-        _safeNotifyListeners();
-      });
+        _tts.setCancelHandler(() {
+          _isLoadingAudio = false;
+          _speakingTarget = TtsSpeakingTarget.none;
+          _speakingText = null;
+          _safeNotifyListeners();
+        });
 
-      _tts.setErrorHandler((dynamic message) {
-        debugPrint('[TtsService] Native TTS hatasi: $message');
-        _isLoadingAudio = false;
-        _speakingTarget = TtsSpeakingTarget.none;
-        _speakingText = null;
-        _errorMessage =
-            'Sesli okuma başlatılamadı. Cihazın TTS motorunu kontrol edin.';
-        _safeNotifyListeners();
-      });
+        _tts.setErrorHandler((dynamic message) {
+          debugPrint('[TtsService] Native TTS hatasi: $message');
+          _isLoadingAudio = false;
+          _speakingTarget = TtsSpeakingTarget.none;
+          _speakingText = null;
+          _errorMessage =
+              'Sesli okuma başlatılamadı. Cihazın TTS motorunu kontrol edin.';
+          _safeNotifyListeners();
+        });
 
-      await _tts.awaitSpeakCompletion(false);
-      await _tts.setSpeechRate(_defaultSpeechRate);
-      await _tts.setVolume(_defaultVolume);
-      await _tts.setPitch(_defaultPitch);
-
-      var languageSelected = false;
-      for (final lang in _preferredLanguages) {
-        try {
-          final available = await _tts.isLanguageAvailable(lang);
-          if (available == true || available == 1) {
-            await _tts.setLanguage(lang);
-            languageSelected = true;
-            break;
-          }
-        } catch (_) {
-          // Sonraki dil seçeneğini dene.
+        if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+          await _preferGoogleAndroidEngine();
         }
-      }
 
-      if (!languageSelected) {
-        try {
-          await _tts.setLanguage('en-US');
-        } catch (_) {
-          // Cihazın varsayılan diliyle devam etmeyi dene.
+        await _tts.awaitSpeakCompletion(false);
+        await _tts.setSpeechRate(
+          kIsWeb ? _webSpeechRate : _mobileSpeechRate,
+        );
+        await _tts.setVolume(_defaultVolume);
+        await _tts.setPitch(_defaultPitch);
+
+        if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+          try {
+            await _tts.setIosAudioCategory(
+              IosTextToSpeechAudioCategory.playback,
+              <IosTextToSpeechAudioCategoryOptions>[
+                IosTextToSpeechAudioCategoryOptions.mixWithOthers,
+                IosTextToSpeechAudioCategoryOptions.defaultToSpeaker,
+              ],
+            );
+          } catch (_) {}
         }
+
+        _isFlutterTtsConfigured = true;
       }
 
-      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
-        try {
-          await _tts.setIosAudioCategory(
-            IosTextToSpeechAudioCategory.playback,
-            <IosTextToSpeechAudioCategoryOptions>[
-              IosTextToSpeechAudioCategoryOptions.mixWithOthers,
-              IosTextToSpeechAudioCategoryOptions.defaultToSpeaker,
-            ],
-          );
-        } catch (_) {}
+      if (_configuredAccent != accent) {
+        await _applyLanguageForAccent(accent);
+        _configuredAccent = accent;
+        _hasSelectedNaturalVoice = false;
       }
 
-      _isFlutterTtsConfigured = true;
+      if (!_hasSelectedNaturalVoice) {
+        _hasSelectedNaturalVoice = await _selectBestVoiceForAccent(accent);
+      }
+
       return true;
     } on MissingPluginException catch (error) {
       debugPrint('[TtsService] MissingPluginException: $error');
@@ -230,9 +228,177 @@ class TtsService extends ChangeNotifier {
     }
   }
 
+  Future<void> _preferGoogleAndroidEngine() async {
+    try {
+      final rawEngines = await _tts.getEngines;
+      if (rawEngines is! List) return;
+      for (final engine in rawEngines) {
+        final name = engine?.toString() ?? '';
+        if (name == 'com.google.android.tts') {
+          await _tts.setEngine(name);
+          return;
+        }
+      }
+    } catch (_) {
+      // Varsayılan sistem motoru ile devam et.
+    }
+  }
+
+  Future<void> _applyLanguageForAccent(IpaAccent accent) async {
+    final candidates = accent == IpaAccent.uk
+        ? const <String>['en-GB', 'en-US', 'en']
+        : const <String>['en-US', 'en-GB', 'en'];
+
+    for (final lang in candidates) {
+      try {
+        final available = await _tts.isLanguageAvailable(lang);
+        if (available == true || available == 1) {
+          await _tts.setLanguage(lang);
+          return;
+        }
+      } catch (_) {}
+    }
+
+    try {
+      await _tts.setLanguage(accent.ttsLocale);
+    } catch (_) {}
+  }
+
+  Future<bool> _selectBestVoiceForAccent(IpaAccent accent) async {
+    try {
+      final rawVoices = await _tts.getVoices;
+      if (rawVoices is! List || rawVoices.isEmpty) {
+        return false;
+      }
+
+      Map<String, String>? bestVoice;
+      var bestScore = -10000;
+
+      for (final item in rawVoices) {
+        if (item is! Map) continue;
+        final name = item['name']?.toString().trim() ?? '';
+        final locale = item['locale']?.toString().trim() ?? '';
+        if (name.isEmpty || locale.isEmpty) continue;
+
+        final normalizedLocale = locale.replaceAll('_', '-').toLowerCase();
+        if (!normalizedLocale.startsWith('en')) continue;
+
+        final score = _scoreNativeVoice(
+          name: name,
+          normalizedLocale: normalizedLocale,
+          accent: accent,
+        );
+        if (score > bestScore) {
+          bestScore = score;
+          bestVoice = <String, String>{
+            'name': name,
+            'locale': locale,
+          };
+        }
+      }
+
+      if (bestVoice != null) {
+        await _tts.setVoice(bestVoice);
+        return true;
+      }
+    } catch (error) {
+      debugPrint('[TtsService] Ses secimi atlandi: $error');
+    }
+    return false;
+  }
+
+  static int _scoreNativeVoice({
+    required String name,
+    required String normalizedLocale,
+    required IpaAccent accent,
+  }) {
+    final lowerName = name.toLowerCase();
+    var score = 0;
+
+    final targetLocale = accent == IpaAccent.uk ? 'en-gb' : 'en-us';
+    final fallbackLocale = accent == IpaAccent.uk ? 'en-us' : 'en-gb';
+
+    if (normalizedLocale == targetLocale) {
+      score += 120;
+    } else if (normalizedLocale.startsWith(targetLocale)) {
+      score += 105;
+    } else if (normalizedLocale == fallbackLocale) {
+      score += 55;
+    } else {
+      score += 20;
+    }
+
+    // Yüksek kaliteli / doğal ses tercihleri (Web, Android, iOS, macOS, Windows)
+    if (lowerName.contains('natural') || lowerName.contains('neural')) {
+      score += 80;
+    }
+    if (lowerName.contains('online')) {
+      score += 35;
+    }
+    if (lowerName.contains('premium') || lowerName.contains('enhanced')) {
+      score += 70;
+    }
+    if (lowerName.contains('siri')) {
+      score += 65;
+    }
+    if (lowerName.contains('google')) {
+      score += 60;
+    }
+    if (lowerName.contains('network') || lowerName.contains('wavenet')) {
+      score += 45;
+    }
+    if (lowerName.contains('en-us-x-') || lowerName.contains('en-gb-x-')) {
+      score += 35;
+    }
+
+    // Doğal bilinen profil isimleri
+    if (accent == IpaAccent.us) {
+      if (lowerName.contains('aria') ||
+          lowerName.contains('jenny') ||
+          lowerName.contains('guy') ||
+          lowerName.contains('samantha') ||
+          lowerName.contains('ava') ||
+          lowerName.contains('allison') ||
+          lowerName.contains('google us english')) {
+        score += 50;
+      }
+    } else {
+      if (lowerName.contains('sonia') ||
+          lowerName.contains('ryan') ||
+          lowerName.contains('libby') ||
+          lowerName.contains('daniel') ||
+          lowerName.contains('serena') ||
+          lowerName.contains('martha') ||
+          lowerName.contains('google uk english')) {
+        score += 50;
+      }
+    }
+
+    // Aşırı robotik / eski sentezleyicileri cezalandır
+    if (lowerName.contains('espeak') ||
+        lowerName.contains('pico') ||
+        lowerName.contains('compact') ||
+        lowerName.contains('eloquence') ||
+        lowerName.contains('fred') ||
+        lowerName.contains('albert') ||
+        lowerName.contains('zarvox') ||
+        lowerName.contains('trinoids') ||
+        lowerName.contains('whisper')) {
+      score -= 120;
+    }
+    if (lowerName.contains('microsoft david') ||
+        lowerName.contains('microsoft zira') ||
+        lowerName.contains('microsoft mark')) {
+      score -= 50;
+    }
+
+    return score;
+  }
+
   /// Verilen metni sesli okur; aynı hedef zaten okunuyorsa/hazırlanıyorsa durdurur.
-  /// Gemini anahtarı aktifse önce Gemini sesini dener, herhangi bir sorunda
-  /// sessizce cihazın yerleşik `flutter_tts` motoruna düşer.
+  /// Kelimelerde önce 12 MB limitli çevrimdışı önbellek + Cloudflare/açık kaynak
+  /// gerçek insan US/UK MP3 kaydını kullanır; bulunamazsa veya cümle ise
+  /// iyileştirilmiş `flutter_tts` motoruna düşer.
   Future<String?> toggleSpeak({
     required String text,
     required TtsSpeakingTarget target,
@@ -252,57 +418,77 @@ class TtsService extends ChangeNotifier {
     final int myGeneration = ++_requestGeneration;
     _errorMessage = null;
 
-    // 1) Gemini API anahtarı aktifse önce Gemini ses üretimini dene.
-    final geminiKey = _activeGeminiKey;
-    if (geminiKey != null) {
-      _speakingTarget = target;
-      _speakingText = trimmed;
-      _isLoadingAudio = true;
-      _safeNotifyListeners();
+    final accent = _resolveAccent();
 
-      final audioBytes = await _resolveGeminiAudioService().synthesize(
-        apiKey: geminiKey,
-        text: trimmed,
-        isSentence: target == TtsSpeakingTarget.sentence,
+    // 1) Kelime telaffuzu için önce gerçek insan MP3 (Önbellek -> Cloudflare -> Açık Kaynak)
+    if (target == TtsSpeakingTarget.word &&
+        PronunciationAudioService.normalizeWordForAudio(trimmed) != null) {
+      final audioService = _resolvePronunciationAudioService();
+
+      // RAM önbelleğinde hazırsa bekleme göstergesi açmadan anında çal.
+      final instantHit = audioService.getCachedFromMemorySync(
+        word: trimmed,
+        accent: accent,
       );
+      if (instantHit != null) {
+        _speakingTarget = target;
+        _speakingText = trimmed;
+        _isLoadingAudio = false;
+        _safeNotifyListeners();
 
-      // İstek sürerken kullanıcı durdurduysa veya panel kapandıysa sessizce çık.
-      if (_isDisposed || myGeneration != _requestGeneration) {
-        return null;
-      }
-
-      if (audioBytes != null && audioBytes.isNotEmpty) {
         final played = await _playAudioBytes(
-          audioBytes: audioBytes,
+          audioBytes: instantHit.bytes,
+          mimeType: instantHit.mimeType,
           generation: myGeneration,
         );
         if (played) {
           return null;
         }
-        // Oynatıcı hata verdiyse aşağıdan güvenli şekilde flutter_tts'e düş.
       } else {
-        debugPrint(
-          '[TtsService] Gemini ses uretilemedi, yerlesik flutter_tts '
-          'motoruna dusuluyor.',
-        );
-      }
+        _speakingTarget = target;
+        _speakingText = trimmed;
+        _isLoadingAudio = true;
+        _safeNotifyListeners();
 
-      if (_isDisposed || myGeneration != _requestGeneration) {
-        return null;
+        final fetched = await audioService.fetchWordAudio(
+          word: trimmed,
+          accent: accent,
+        );
+
+        if (_isDisposed || myGeneration != _requestGeneration) {
+          return null;
+        }
+
+        if (fetched != null && fetched.bytes.isNotEmpty) {
+          final played = await _playAudioBytes(
+            audioBytes: fetched.bytes,
+            mimeType: fetched.mimeType,
+            generation: myGeneration,
+          );
+          if (played) {
+            return null;
+          }
+        }
+
+        if (_isDisposed || myGeneration != _requestGeneration) {
+          return null;
+        }
+        _isLoadingAudio = false;
       }
-      _isLoadingAudio = false;
     }
 
-    // 2) Anahtarsız mod veya Gemini yedeği: cihazın yerleşik flutter_tts motoru.
+    // 2) Cümleler veya çevrimdışı/eksik kelimeler: iyileştirilmiş flutter_tts.
     return _speakWithFlutterTts(
       text: trimmed,
       target: target,
+      accent: accent,
       generation: myGeneration,
     );
   }
 
   Future<bool> _playAudioBytes({
     required Uint8List audioBytes,
+    required String mimeType,
     required int generation,
   }) async {
     try {
@@ -319,7 +505,7 @@ class TtsService extends ChangeNotifier {
       _isLoadingAudio = false;
       _safeNotifyListeners();
 
-      await player.play(BytesSource(audioBytes));
+      await player.play(BytesSource(audioBytes, mimeType: mimeType));
       return true;
     } catch (error) {
       debugPrint(
@@ -334,9 +520,10 @@ class TtsService extends ChangeNotifier {
   Future<String?> _speakWithFlutterTts({
     required String text,
     required TtsSpeakingTarget target,
+    required IpaAccent accent,
     required int generation,
   }) async {
-    final configured = await _ensureFlutterTtsConfigured();
+    final configured = await _ensureFlutterTtsConfigured(accent: accent);
     if (_isDisposed || generation != _requestGeneration) {
       return null;
     }
@@ -434,11 +621,11 @@ class TtsService extends ChangeNotifier {
     _isDisposed = true;
     _requestGeneration++;
     _playerCompleteSubscription?.cancel();
-    if (_ownsAudioPlayer ?? false) {
+    if (_ownsAudioPlayer) {
       _audioPlayer?.dispose();
     }
-    if (_ownsGeminiAudioService ?? false) {
-      _geminiAudioService?.dispose();
+    if (_ownsPronunciationAudioService) {
+      _pronunciationAudioService?.dispose();
     }
     if (_isFlutterTtsConfigured) {
       _tts.stop().catchError((_) {});

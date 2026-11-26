@@ -953,7 +953,7 @@ function Convert-WavBytesToM4aBytes([byte[]]$WavBytes) {
         $netSrc.Flush()
         $src.Seek(0)
 
-        $profile = [Windows.Media.MediaProperties.MediaEncodingProfile]::CreateM4a([Windows.Media.MediaProperties.AudioEncodingQuality]::Medium)
+        $profile = [Windows.Media.MediaProperties.MediaEncodingProfile]::CreateM4a([Windows.Media.MediaProperties.AudioEncodingQuality]::High)
         $transcoder = New-Object Windows.Media.Transcoding.MediaTranscoder
         $prepTask = $asTaskGeneric.MakeGenericMethod([Windows.Media.Transcoding.PrepareTranscodeResult]).Invoke($null, @($transcoder.PrepareStreamTranscodeAsync($src, $dst, $profile)))
         $prepTask.Wait() | Out-Null
@@ -1126,15 +1126,507 @@ function Compute-AudioSentenceSegments([string]$Content, [byte[]]$PcmBytes, [int
     return @($segments)
 }
 
-function Invoke-GeminiGenerateAudio([string]$RawJson) {
-    $cfg = Get-AdminConfig
-    if ([string]::IsNullOrWhiteSpace($cfg.geminiApiKey)) {
+function Convert-Mp3FileToM4aBytes([string]$Mp3Path) {
+    $asTaskGeneric = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
+        $_.Name -eq 'AsTask' -and $_.IsGenericMethodDefinition -and $_.GetParameters().Count -eq 1
+    })[0]
+    $asTaskProgress = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
+        $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncActionWithProgress`1'
+    })[0]
+
+    $null = [Windows.Storage.StorageFile, Windows.Storage, ContentType=WindowsRuntime]
+    $null = [Windows.Media.Transcoding.MediaTranscoder, Windows.Media.Transcoding, ContentType=WindowsRuntime]
+    $null = [Windows.Media.MediaProperties.MediaEncodingProfile, Windows.Media.MediaProperties, ContentType=WindowsRuntime]
+    $null = [Windows.Media.MediaProperties.AudioEncodingQuality, Windows.Media.MediaProperties, ContentType=WindowsRuntime]
+
+    $tempM4a = [System.IO.Path]::ChangeExtension($Mp3Path, ".m4a")
+    try {
+        [System.IO.File]::WriteAllBytes($tempM4a, [byte[]]@())
+        $srcTask = $asTaskGeneric.MakeGenericMethod([Windows.Storage.StorageFile]).Invoke($null, @([Windows.Storage.StorageFile]::GetFileFromPathAsync($Mp3Path)))
+        $srcTask.Wait() | Out-Null
+        $srcFile = $srcTask.Result
+
+        $dstTask = $asTaskGeneric.MakeGenericMethod([Windows.Storage.StorageFile]).Invoke($null, @([Windows.Storage.StorageFile]::GetFileFromPathAsync($tempM4a)))
+        $dstTask.Wait() | Out-Null
+        $dstFile = $dstTask.Result
+
+        $profile = [Windows.Media.MediaProperties.MediaEncodingProfile]::CreateM4a([Windows.Media.MediaProperties.AudioEncodingQuality]::High)
+        $transcoder = New-Object Windows.Media.Transcoding.MediaTranscoder
+        $prepTask = $asTaskGeneric.MakeGenericMethod([Windows.Media.Transcoding.PrepareTranscodeResult]).Invoke($null, @($transcoder.PrepareFileTranscodeAsync($srcFile, $dstFile, $profile)))
+        $prepTask.Wait() | Out-Null
+        $prep = $prepTask.Result
+        if (-not $prep.CanTranscode) {
+            throw "MP3 -> M4A donusumu baslatilamadi ($($prep.FailureReason))."
+        }
+        $runTask = $asTaskProgress.MakeGenericMethod([double]).Invoke($null, @($prep.TranscodeAsync()))
+        $runTask.Wait() | Out-Null
+        return [System.IO.File]::ReadAllBytes($tempM4a)
+    }
+    finally {
+        if (Test-Path $tempM4a) { Remove-Item -Path $tempM4a -Force -ErrorAction SilentlyContinue }
+    }
+}
+
+function Invoke-EdgeNeuralTtsAudio([string]$SafeId, [string]$EdgeVoice, [string]$Content) {
+    $scriptPath = Join-Path $PSScriptRoot "edge_tts.mjs"
+    if (-not (Test-Path $scriptPath)) {
+        return @{ StatusCode = 500; Body = (@{ ok = $false; message = "edge_tts.mjs bulunamadı." } | ConvertTo-Json -Compress) }
+    }
+
+    $tmpDir = [System.IO.Path]::GetTempPath()
+    $stamp = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+    $inJson = Join-Path $tmpDir "lr_edge_${stamp}.json"
+    $outMp3 = Join-Path $tmpDir "lr_edge_${stamp}.mp3"
+    $outMeta = Join-Path $tmpDir "lr_edge_${stamp}.meta.json"
+
+    try {
+        $inPayload = (@{ text = $Content; voice = $EdgeVoice } | ConvertTo-Json -Compress)
+        [System.IO.File]::WriteAllText($inJson, $inPayload, (New-Object System.Text.UTF8Encoding($false)))
+
+        Write-Host "[Podcast Edge Neural] Ses uretiliyor: $EdgeVoice -> $SafeId ..." -ForegroundColor Cyan
+        $nodeOut = & node $scriptPath $inJson $outMp3 $outMeta 2>&1
+        if ($LASTEXITCODE -ne 0 -or -not (Test-Path $outMp3)) {
+            $errText = ($nodeOut | Out-String).Trim()
+            return @{ StatusCode = 502; Body = (@{ ok = $false; message = "Edge Neural TTS hatası: $errText" } | ConvertTo-Json -Compress) }
+        }
+
+        $m4aBytes = Convert-Mp3FileToM4aBytes -Mp3Path $outMp3
+
+        $wordBoundaries = @()
+        $durationMs = 0
+        if (Test-Path $outMeta) {
+            $metaObj = (Get-Content -Path $outMeta -Raw -Encoding UTF8) | ConvertFrom-Json
+            if ($null -ne $metaObj.wordBoundaries) {
+                $wordBoundaries = @($metaObj.wordBoundaries)
+                if ($wordBoundaries.Count -gt 0) {
+                    $lastWb = $wordBoundaries[$wordBoundaries.Count - 1]
+                    $durationMs = [int]($lastWb.offsetMs + $lastWb.durationMs + 250)
+                }
+            }
+        }
+        if ($durationMs -le 0) {
+            $mp3Len = (Get-Item $outMp3).Length
+            $durationMs = [int][math]::Max(1000, [math]::Round(($mp3Len * 8.0) / 96.0))
+        }
+
+        $sentences = Split-ContentIntoSentencesForAudio $Content
+        $segments = @()
+        if ($sentences.Count -gt 0 -and $wordBoundaries.Count -gt 0) {
+            $wbIdx = 0
+            foreach ($s in $sentences) {
+                $sWords = @([regex]::Matches($s, "[A-Za-z0-9']+"))
+                if ($sWords.Count -eq 0 -or $wbIdx -ge $wordBoundaries.Count) { continue }
+                $startMs = [int]$wordBoundaries[$wbIdx].offsetMs
+                $endIdx = [math]::Min($wordBoundaries.Count - 1, $wbIdx + $sWords.Count - 1)
+                $endMs = [int]($wordBoundaries[$endIdx].offsetMs + $wordBoundaries[$endIdx].durationMs)
+                if ($endMs -le $startMs) { $endMs = $startMs + 400 }
+                $segments += @{ text = $s; start_ms = $startMs; end_ms = $endMs }
+                $wbIdx = $endIdx + 1
+            }
+        }
+        if ($segments.Count -eq 0) {
+            $dummyPcm = New-Object byte[] ([int]($durationMs * 48))
+            $segments = Compute-AudioSentenceSegments -Content $Content -PcmBytes $dummyPcm -SampleRate 24000
+        }
+
+        if (-not (Test-Path $ContentAudioDir)) { New-Item -ItemType Directory -Path $ContentAudioDir -Force | Out-Null }
+        if (-not (Test-Path $RootAudioDir)) { New-Item -ItemType Directory -Path $RootAudioDir -Force | Out-Null }
+
+        $fileName = "$SafeId.m4a"
+        [System.IO.File]::WriteAllBytes((Join-Path $ContentAudioDir $fileName), $m4aBytes)
+        [System.IO.File]::WriteAllBytes((Join-Path $RootAudioDir $fileName), $m4aBytes)
+
+        $sizeKb = [math]::Round($m4aBytes.Length / 1024.0, 1)
+        Write-Host "[Podcast Edge Neural] Hazir: $fileName ($sizeKb KB, $([math]::Round($durationMs/1000.0, 1)) sn)" -ForegroundColor Green
+
+        $payload = @{
+            ok                = $true
+            model             = "edge-neural-tts"
+            voice             = $EdgeVoice
+            file_name         = $fileName
+            audio_url         = "https://line-reader.pages.dev/audio/$fileName"
+            local_preview_url = "/audio/$fileName"
+            duration_ms       = $durationMs
+            size_kb           = $sizeKb
+            audio_segments    = $segments
+        }
+        return @{ StatusCode = 200; Body = ($payload | ConvertTo-Json -Depth 8 -Compress) }
+    }
+    finally {
+        Remove-Item -Path $inJson, $outMp3, $outMeta -Force -ErrorAction SilentlyContinue
+    }
+}
+
+$script:ActiveAudioJobs = @{}
+
+function Invoke-KokoroLocalTtsAudio([string]$SafeId, [string]$KokoroVoice, [string]$Content) {
+    $scriptPath = Join-Path $PSScriptRoot "kokoro_tts.mjs"
+    if (-not (Test-Path $scriptPath)) {
+        return @{ StatusCode = 500; Body = (@{ ok = $false; message = "kokoro_tts.mjs bulunamadı." } | ConvertTo-Json -Compress) }
+    }
+
+    $kokoroPkgDir = Join-Path $PSScriptRoot "node_modules\kokoro-js"
+    if (-not (Test-Path $kokoroPkgDir)) {
         return @{
             StatusCode = 400
-            Body       = (@{ ok = $false; needsKey = $true; message = "Önce Gemini API anahtarınızı girip kaydedin." } | ConvertTo-Json -Compress)
+            Body       = (@{ ok = $false; message = "Kokoro TTS henüz kurulmamış. PowerShell'de tools\article_studio klasörüne girip 'npm install' çalıştırın." } | ConvertTo-Json -Compress)
         }
     }
 
+    $tmpDir = [System.IO.Path]::GetTempPath()
+    $jobId = "$([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())"
+    $inJson = Join-Path $tmpDir "lr_kokoro_${jobId}.json"
+    $outWav = Join-Path $tmpDir "lr_kokoro_${jobId}.wav"
+    $outMeta = Join-Path $tmpDir "lr_kokoro_${jobId}.meta.json"
+    $progressJson = Join-Path $tmpDir "lr_kokoro_${jobId}.progress.json"
+    $stderrLog = Join-Path $tmpDir "lr_kokoro_${jobId}.err.log"
+
+    $inPayload = (@{ text = $Content; voice = $KokoroVoice } | ConvertTo-Json -Compress)
+    [System.IO.File]::WriteAllText($inJson, $inPayload, (New-Object System.Text.UTF8Encoding($false)))
+
+    $initProgress = (@{
+        phase     = "starting"
+        completed = 0
+        total     = 0
+        percent   = 2
+        elapsedMs = 0
+        etaMs     = $null
+        message   = "Kokoro AI başlatılıyor..."
+    } | ConvertTo-Json -Compress)
+    [System.IO.File]::WriteAllText($progressJson, $initProgress, (New-Object System.Text.UTF8Encoding($false)))
+
+    Write-Host "[Kokoro Local TTS] Asenkron is baslatildi ($jobId): $KokoroVoice -> $SafeId ..." -ForegroundColor Cyan
+
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = "node"
+    $psi.Arguments = "`"$scriptPath`" `"$inJson`" `"$outWav`" `"$outMeta`" `"$progressJson`""
+    $psi.WorkingDirectory = $PSScriptRoot
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.RedirectStandardError = $false
+    $psi.RedirectStandardOutput = $false
+
+    $proc = New-Object System.Diagnostics.Process
+    $proc.StartInfo = $psi
+    $null = $proc.Start()
+
+    $script:ActiveAudioJobs[$jobId] = @{
+        Process      = $proc
+        SafeId       = $SafeId
+        KokoroVoice  = $KokoroVoice
+        Content      = $Content
+        InJson       = $inJson
+        OutWav       = $outWav
+        OutMeta      = $outMeta
+        ProgressJson = $progressJson
+        StderrLog    = $stderrLog
+        StartedAtMs  = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+    }
+
+    return @{
+        StatusCode = 200
+        Body       = (@{
+            ok         = $true
+            pending    = $true
+            job_id     = $jobId
+            percent    = 2
+            elapsed_ms = 0
+            eta_ms     = $null
+            message    = "Kokoro AI başlatılıyor..."
+        } | ConvertTo-Json -Compress)
+    }
+}
+
+function Get-KokoroAudioJobStatus([string]$JobId) {
+    if ([string]::IsNullOrWhiteSpace($JobId) -or -not $script:ActiveAudioJobs.ContainsKey($JobId)) {
+        return @{
+            StatusCode = 404
+            Body       = (@{ ok = $false; message = "Ses üretim işi bulunamadı ($JobId)." } | ConvertTo-Json -Compress)
+        }
+    }
+
+    $job = $script:ActiveAudioJobs[$JobId]
+    $proc = $job.Process
+    $nowMs = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+    $elapsedMs = [int]([math]::Max(0, $nowMs - $job.StartedAtMs))
+
+    if (-not $proc.HasExited) {
+        $prog = @{
+            phase     = "synthesizing"
+            completed = 0
+            total     = 0
+            percent   = 5
+            etaMs     = $null
+            message   = "Kokoro AI çalışıyor..."
+        }
+        if (Test-Path $job.ProgressJson) {
+            try {
+                $rawProg = [System.IO.File]::ReadAllText($job.ProgressJson, [System.Text.Encoding]::UTF8)
+                if (-not [string]::IsNullOrWhiteSpace($rawProg)) {
+                    $parsed = $rawProg | ConvertFrom-Json
+                    if ($null -ne $parsed.percent) { $prog.percent = [int]$parsed.percent }
+                    if ($null -ne $parsed.completed) { $prog.completed = [int]$parsed.completed }
+                    if ($null -ne $parsed.total) { $prog.total = [int]$parsed.total }
+                    if ($null -ne $parsed.etaMs) { $prog.etaMs = [int]$parsed.etaMs }
+                    if ($parsed.phase) { $prog.phase = [string]$parsed.phase }
+                    if ($parsed.message) { $prog.message = [string]$parsed.message }
+                }
+            } catch {}
+        }
+
+        return @{
+            StatusCode = 200
+            Body       = (@{
+                ok         = $true
+                pending    = $true
+                job_id     = $JobId
+                phase      = $prog.phase
+                completed  = $prog.completed
+                total      = $prog.total
+                percent    = $prog.percent
+                elapsed_ms = $elapsedMs
+                eta_ms     = $prog.etaMs
+                message    = $prog.message
+            } | ConvertTo-Json -Compress)
+        }
+    }
+
+    # Süreç tamamlandı -> M4A dönüştür, kaydet ve temizle
+    try {
+        $exitCode = $proc.ExitCode
+        $stderrText = ""
+        if ($proc.StartInfo.RedirectStandardError) {
+            try { $stderrText = $proc.StandardError.ReadToEnd().Trim() } catch {}
+        }
+        if ([string]::IsNullOrWhiteSpace($stderrText) -and (Test-Path $job.ProgressJson)) {
+            try {
+                $pErr = ([System.IO.File]::ReadAllText($job.ProgressJson, [System.Text.Encoding]::UTF8) | ConvertFrom-Json)
+                if ($pErr.error) { $stderrText = [string]$pErr.error }
+            } catch {}
+        }
+        $proc.Dispose()
+
+        if ($exitCode -ne 0 -or -not (Test-Path $job.OutWav)) {
+            $errMsg = if ($stderrText) { $stderrText } else { "Kokoro TTS çıkış kodu: $exitCode" }
+            return @{
+                StatusCode = 500
+                Body       = (@{ ok = $false; pending = $false; message = "Kokoro TTS hatası: $errMsg" } | ConvertTo-Json -Compress)
+            }
+        }
+
+        $wavBytes = [System.IO.File]::ReadAllBytes($job.OutWav)
+        $m4aBytes = Convert-WavBytesToM4aBytes -WavBytes $wavBytes
+
+        $durationMs = 0
+        $segments = @()
+        if (Test-Path $job.OutMeta) {
+            $metaObj = (Get-Content -Path $job.OutMeta -Raw -Encoding UTF8) | ConvertFrom-Json
+            if ($metaObj.durationMs) { $durationMs = [int]$metaObj.durationMs }
+            if ($null -ne $metaObj.segments) {
+                foreach ($seg in $metaObj.segments) {
+                    $segments += @{
+                        text     = [string]$seg.text
+                        start_ms = [int]$seg.start_ms
+                        end_ms   = [int]$seg.end_ms
+                    }
+                }
+            }
+        }
+        if ($durationMs -le 0) {
+            $pcmLen = [math]::Max(0, $wavBytes.Length - 44)
+            $durationMs = [int][math]::Round((($pcmLen / 2.0) * 1000.0) / 24000.0)
+        }
+        if ($segments.Count -eq 0) {
+            $pcmBytes = if ($wavBytes.Length -gt 44) { $wavBytes[44..($wavBytes.Length - 1)] } else { [byte[]]@() }
+            $segments = Compute-AudioSentenceSegments -Content $job.Content -PcmBytes $pcmBytes -SampleRate 24000
+        }
+
+        if (-not (Test-Path $ContentAudioDir)) { New-Item -ItemType Directory -Path $ContentAudioDir -Force | Out-Null }
+        if (-not (Test-Path $RootAudioDir)) { New-Item -ItemType Directory -Path $RootAudioDir -Force | Out-Null }
+
+        $fileName = "$($job.SafeId).m4a"
+        [System.IO.File]::WriteAllBytes((Join-Path $ContentAudioDir $fileName), $m4aBytes)
+        [System.IO.File]::WriteAllBytes((Join-Path $RootAudioDir $fileName), $m4aBytes)
+
+        $sizeKb = [math]::Round($m4aBytes.Length / 1024.0, 1)
+        Write-Host "[Kokoro Local TTS] Hazir: $fileName ($sizeKb KB, $([math]::Round($durationMs/1000.0, 1)) sn, $($segments.Count) cumle, uretim: $([math]::Round($elapsedMs/1000.0, 1)) sn)" -ForegroundColor Green
+
+        $payload = @{
+            ok                = $true
+            pending           = $false
+            model             = "kokoro-82m-local"
+            voice             = $job.KokoroVoice
+            file_name         = $fileName
+            audio_url         = "https://line-reader.pages.dev/audio/$fileName"
+            local_preview_url = "/audio/$fileName"
+            duration_ms       = $durationMs
+            elapsed_ms        = $elapsedMs
+            size_kb           = $sizeKb
+            audio_segments    = $segments
+        }
+        return @{ StatusCode = 200; Body = ($payload | ConvertTo-Json -Depth 8 -Compress) }
+    }
+    finally {
+        $script:ActiveAudioJobs.Remove($JobId)
+        Remove-Item -Path $job.InJson, $job.OutWav, $job.OutMeta, $job.ProgressJson, "$($job.ProgressJson).tmp", $job.StderrLog -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Invoke-ChatterboxGpuTtsAudio([string]$SafeId, [string]$Preset, [string]$Content) {
+    $scriptPath = Join-Path $PSScriptRoot "chatterbox_tts.py"
+    $venvPython = Join-Path $PSScriptRoot ".venv_chatterbox\Scripts\python.exe"
+    if (-not (Test-Path $scriptPath)) {
+        return @{ StatusCode = 500; Body = (@{ ok = $false; message = "chatterbox_tts.py bulunamadı." } | ConvertTo-Json -Compress) }
+    }
+    if (-not (Test-Path $venvPython)) {
+        return @{
+            StatusCode = 400
+            Body       = (@{ ok = $false; message = "Chatterbox GPU henüz kurulmamış. PowerShell'de tools\article_studio klasöründe '.\install_chatterbox.ps1' çalıştırın." } | ConvertTo-Json -Compress)
+        }
+    }
+
+    $tmpDir = [System.IO.Path]::GetTempPath()
+    $jobId = "cb_$([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())"
+    $inJson = Join-Path $tmpDir "lr_cb_${jobId}.json"
+    $outWav = Join-Path $tmpDir "lr_cb_${jobId}.wav"
+    $outMeta = Join-Path $tmpDir "lr_cb_${jobId}.meta.json"
+    $progressJson = Join-Path $tmpDir "lr_cb_${jobId}.progress.json"
+    $stderrLog = Join-Path $tmpDir "lr_cb_${jobId}.err.log"
+
+    $inPayload = (@{ text = $Content; voice = $Preset } | ConvertTo-Json -Compress)
+    [System.IO.File]::WriteAllText($inJson, $inPayload, (New-Object System.Text.UTF8Encoding($false)))
+
+    $initProgress = (@{
+        phase     = "starting"
+        completed = 0
+        total     = 0
+        percent   = 2
+        elapsedMs = 0
+        etaMs     = $null
+        message   = "Chatterbox GPU (RTX 5060) başlatılıyor..."
+    } | ConvertTo-Json -Compress)
+    [System.IO.File]::WriteAllText($progressJson, $initProgress, (New-Object System.Text.UTF8Encoding($false)))
+
+    Write-Host "[Chatterbox GPU TTS] Asenkron is baslatildi ($jobId): $Preset -> $SafeId ..." -ForegroundColor Magenta
+
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $venvPython
+    $psi.Arguments = "`"$scriptPath`" `"$inJson`" `"$outWav`" `"$outMeta`" `"$progressJson`""
+    $psi.WorkingDirectory = $PSScriptRoot
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.RedirectStandardError = $false
+    $psi.RedirectStandardOutput = $false
+
+    $proc = New-Object System.Diagnostics.Process
+    $proc.StartInfo = $psi
+    $null = $proc.Start()
+
+    $script:ActiveAudioJobs[$jobId] = @{
+        Process      = $proc
+        SafeId       = $SafeId
+        KokoroVoice  = "chatterbox:$Preset"
+        Content      = $Content
+        InJson       = $inJson
+        OutWav       = $outWav
+        OutMeta      = $outMeta
+        ProgressJson = $progressJson
+        StderrLog    = $stderrLog
+        StartedAtMs  = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+    }
+
+    return @{
+        StatusCode = 200
+        Body       = (@{
+            ok         = $true
+            pending    = $true
+            job_id     = $jobId
+            percent    = 2
+            elapsed_ms = 0
+            eta_ms     = $null
+            message    = "Chatterbox GPU (RTX 5060) başlatılıyor..."
+        } | ConvertTo-Json -Compress)
+    }
+}
+
+function Invoke-F5TtsGpuAudio([string]$SafeId, [string]$Preset, [string]$Content) {
+    $scriptPath = Join-Path $PSScriptRoot "f5_tts_runner.py"
+    $venvPython = Join-Path $PSScriptRoot ".venv_f5tts\Scripts\python.exe"
+    if (-not (Test-Path $scriptPath)) {
+        return @{ StatusCode = 500; Body = (@{ ok = $false; message = "f5_tts_runner.py bulunamadı." } | ConvertTo-Json -Compress) }
+    }
+    if (-not (Test-Path $venvPython)) {
+        return @{
+            StatusCode = 400
+            Body       = (@{ ok = $false; message = "F5-TTS GPU henüz kurulmamış. PowerShell'de tools\article_studio klasöründe '.\install_f5tts.ps1' çalıştırın." } | ConvertTo-Json -Compress)
+        }
+    }
+
+    $tmpDir = [System.IO.Path]::GetTempPath()
+    $jobId = "f5_$([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())"
+    $inJson = Join-Path $tmpDir "lr_f5_${jobId}.json"
+    $outWav = Join-Path $tmpDir "lr_f5_${jobId}.wav"
+    $outMeta = Join-Path $tmpDir "lr_f5_${jobId}.meta.json"
+    $progressJson = Join-Path $tmpDir "lr_f5_${jobId}.progress.json"
+    $stderrLog = Join-Path $tmpDir "lr_f5_${jobId}.err.log"
+
+    $inPayload = (@{ text = $Content; voice = $Preset } | ConvertTo-Json -Compress)
+    [System.IO.File]::WriteAllText($inJson, $inPayload, (New-Object System.Text.UTF8Encoding($false)))
+
+    $initProgress = (@{
+        phase     = "starting"
+        completed = 0
+        total     = 0
+        percent   = 2
+        elapsedMs = 0
+        etaMs     = $null
+        message   = "F5-TTS Diffusion (RTX 5060) başlatılıyor..."
+    } | ConvertTo-Json -Compress)
+    [System.IO.File]::WriteAllText($progressJson, $initProgress, (New-Object System.Text.UTF8Encoding($false)))
+
+    Write-Host "[F5-TTS GPU] Asenkron is baslatildi ($jobId): $Preset -> $SafeId ..." -ForegroundColor Cyan
+
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $venvPython
+    $psi.Arguments = "`"$scriptPath`" `"$inJson`" `"$outWav`" `"$outMeta`" `"$progressJson`""
+    $psi.WorkingDirectory = $PSScriptRoot
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.RedirectStandardError = $false
+    $psi.RedirectStandardOutput = $false
+
+    $proc = New-Object System.Diagnostics.Process
+    $proc.StartInfo = $psi
+    $null = $proc.Start()
+
+    $script:ActiveAudioJobs[$jobId] = @{
+        Process      = $proc
+        SafeId       = $SafeId
+        KokoroVoice  = "f5tts:$Preset"
+        Content      = $Content
+        InJson       = $inJson
+        OutWav       = $outWav
+        OutMeta      = $outMeta
+        ProgressJson = $progressJson
+        StderrLog    = $stderrLog
+        StartedAtMs  = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+    }
+
+    return @{
+        StatusCode = 200
+        Body       = (@{
+            ok         = $true
+            pending    = $true
+            job_id     = $jobId
+            percent    = 2
+            elapsed_ms = 0
+            eta_ms     = $null
+            message    = "F5-TTS Diffusion (RTX 5060) başlatılıyor..."
+        } | ConvertTo-Json -Compress)
+    }
+}
+
+function Invoke-GeminiGenerateAudio([string]$RawJson) {
     $reqData = $RawJson | ConvertFrom-Json
     $rawId = if ($reqData.id) { ([string]$reqData.id).Trim() } else { "article-$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())" }
     $safeId = [regex]::Replace($rawId.ToLowerInvariant(), '[^a-z0-9_-]+', '-').Trim('-')
@@ -1151,7 +1643,43 @@ function Invoke-GeminiGenerateAudio([string]$RawJson) {
         }
     }
 
-    $styleHint = if ($level -in @("A1", "A2")) {
+    if ($voiceName.StartsWith("f5tts:")) {
+        $f5Preset = $voiceName.Substring(6).Trim()
+        return Invoke-F5TtsGpuAudio -SafeId $safeId -Preset $f5Preset -Content $content
+    }
+
+    if ($voiceName.StartsWith("chatterbox:")) {
+        $cbPreset = $voiceName.Substring(11).Trim()
+        return Invoke-ChatterboxGpuTtsAudio -SafeId $safeId -Preset $cbPreset -Content $content
+    }
+
+    if ($voiceName.StartsWith("kokoro:")) {
+        $kokoroVoice = $voiceName.Substring(7).Trim()
+        return Invoke-KokoroLocalTtsAudio -SafeId $safeId -KokoroVoice $kokoroVoice -Content $content
+    }
+
+    if ($voiceName.StartsWith("edge:")) {
+        $edgeVoice = $voiceName.Substring(5).Trim()
+        return Invoke-EdgeNeuralTtsAudio -SafeId $safeId -EdgeVoice $edgeVoice -Content $content
+    }
+
+    $cfg = Get-AdminConfig
+    if ([string]::IsNullOrWhiteSpace($cfg.geminiApiKey)) {
+        return @{
+            StatusCode = 400
+            Body       = (@{ ok = $false; needsKey = $true; message = "Önce Gemini API anahtarınızı girip kaydedin (veya API anahtarsız Edge Neural sesi seçin)." } | ConvertTo-Json -Compress)
+        }
+    }
+
+    $preferPro = $false
+    if ($voiceName.StartsWith("pro:")) {
+        $preferPro = $true
+        $voiceName = $voiceName.Substring(4).Trim()
+    }
+
+    $styleHint = if ($preferPro) {
+        "Perform the following English article as a real, deeply engaging human podcast storyteller having a warm conversation with a friend. Use natural subtle breaths, brief thoughtful micro-pauses before key insights, organic emotional inflection, and gentle emphasis on important words—never robotic or monotonous. Read ONLY the article text below, without adding any intro or outro:"
+    } elseif ($level -in @("A1", "A2")) {
         "Read the following English learning article aloud in a warm, friendly, clear, unhurried podcast host voice suited for beginner learners. Pause briefly between sentences and slightly longer between paragraphs. Read ONLY the article text below, without adding any intro or outro:"
     } else {
         "Read the following English article aloud in a warm, natural, engaging human podcast narrator voice with clear articulation, natural rhythm, brief pauses between sentences, and slightly longer pauses between paragraphs. Read ONLY the article text below, without adding any intro or outro:"
@@ -1179,7 +1707,11 @@ function Invoke-GeminiGenerateAudio([string]$RawJson) {
     }
     $requestBody = $requestObj | ConvertTo-Json -Depth 10 -Compress
 
-    $ttsModels = @("gemini-2.5-flash-preview-tts", "gemini-2.5-pro-preview-tts")
+    $ttsModels = if ($preferPro) {
+        @("gemini-2.5-pro-preview-tts", "gemini-2.5-flash-preview-tts")
+    } else {
+        @("gemini-2.5-flash-preview-tts", "gemini-2.5-pro-preview-tts")
+    }
     [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
 
     $lastErrorMsg = "Gemini podcast sesi üretemedi."
@@ -1828,6 +2360,79 @@ try {
                 $body = Read-RequestBody $req
                 $audioRes = Invoke-GeminiGenerateAudio $body
                 Send-Response -Response $res -StatusCode $audioRes.StatusCode -Body $audioRes.Body -ContentType "application/json; charset=utf-8"
+            }
+            elseif ($method -eq "GET" -and $path -eq "/api/ai/audio-status") {
+                $jobId = $req.QueryString["job_id"]
+                $statusRes = Get-KokoroAudioJobStatus $jobId
+                Send-Response -Response $res -StatusCode $statusRes.StatusCode -Body $statusRes.Body -ContentType "application/json; charset=utf-8"
+            }
+            elseif ($method -eq "POST" -and $path -eq "/api/ai/upload-audio") {
+                $body = Read-RequestBody $req
+                $rawId = "article-$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
+                if ($body -match '"id"\s*:\s*"([^"]+)"') { $rawId = $Matches[1].Trim() }
+                $safeId = [regex]::Replace($rawId.ToLowerInvariant(), '[^a-z0-9_-]+', '-').Trim('-')
+                if ([string]::IsNullOrWhiteSpace($safeId)) { $safeId = "article-audio" }
+
+                $durationMs = 0
+                if ($body -match '"duration_ms"\s*:\s*(\d+)') { $durationMs = [int]$Matches[1] }
+
+                $contentText = ""
+                if ($body -match '"content_b64"\s*:\s*"([A-Za-z0-9+/=]+)"') {
+                    try { $contentText = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Matches[1])) } catch {}
+                }
+
+                if ($body -match 'data:audio/([^;]+);base64,([A-Za-z0-9+/=]+)') {
+                    $mimeSub = $Matches[1].ToLowerInvariant()
+                    $rawBytes = [Convert]::FromBase64String($Matches[2])
+                    $m4aBytes = $rawBytes
+
+                    if ($mimeSub -like "*wav*") {
+                        $m4aBytes = Convert-WavBytesToM4aBytes -WavBytes $rawBytes
+                    } elseif ($mimeSub -like "*mpeg*" -or $mimeSub -like "*mp3*") {
+                        $tmpMp3 = Join-Path ([System.IO.Path]::GetTempPath()) "lr_up_$([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()).mp3"
+                        try {
+                            [System.IO.File]::WriteAllBytes($tmpMp3, $rawBytes)
+                            $m4aBytes = Convert-Mp3FileToM4aBytes -Mp3Path $tmpMp3
+                        } finally {
+                            Remove-Item -Path $tmpMp3 -Force -ErrorAction SilentlyContinue
+                        }
+                    }
+
+                    if ($durationMs -le 0) {
+                        $durationMs = [int][math]::Max(1000, [math]::Round(($m4aBytes.Length * 8.0) / 96.0))
+                    }
+
+                    $segments = @()
+                    if (-not [string]::IsNullOrWhiteSpace($contentText)) {
+                        $dummyPcm = New-Object byte[] ([int]($durationMs * 48))
+                        $segments = Compute-AudioSentenceSegments -Content $contentText -PcmBytes $dummyPcm -SampleRate 24000
+                    }
+
+                    if (-not (Test-Path $ContentAudioDir)) { New-Item -ItemType Directory -Path $ContentAudioDir -Force | Out-Null }
+                    if (-not (Test-Path $RootAudioDir)) { New-Item -ItemType Directory -Path $RootAudioDir -Force | Out-Null }
+
+                    $fileName = "$safeId.m4a"
+                    [System.IO.File]::WriteAllBytes((Join-Path $ContentAudioDir $fileName), $m4aBytes)
+                    [System.IO.File]::WriteAllBytes((Join-Path $RootAudioDir $fileName), $m4aBytes)
+
+                    $sizeKb = [math]::Round($m4aBytes.Length / 1024.0, 1)
+                    Write-Host "[Ses Yukle] Kaydedildi: $fileName ($sizeKb KB, $([math]::Round($durationMs/1000.0, 1)) sn, $($segments.Count) cumle)" -ForegroundColor Green
+
+                    Send-JsonObject -Response $res -StatusCode 200 -Payload @{
+                        ok                = $true
+                        file_name         = $fileName
+                        audio_url         = "https://line-reader.pages.dev/audio/$fileName"
+                        local_preview_url = "/audio/$fileName"
+                        duration_ms       = $durationMs
+                        size_kb           = $sizeKb
+                        audio_segments    = $segments
+                    }
+                } else {
+                    Send-JsonObject -Response $res -StatusCode 400 -Payload @{
+                        ok      = $false
+                        message = "Geçerli bir ses dosyası (.mp3, .wav, .m4a) seçin."
+                    }
+                }
             }
             elseif ($method -eq "POST" -and $path -eq "/api/ai/generate-image") {
                 $body = Read-RequestBody $req

@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 
 import 'animated_theme_painters.dart';
@@ -308,6 +311,7 @@ class AppThemeBackdrop extends StatelessWidget {
     required this.child,
     this.presetOverride,
     this.showForegroundOverlay = false,
+    this.transitionKey,
   });
 
   final Widget child;
@@ -317,6 +321,10 @@ class AppThemeBackdrop extends StatelessWidget {
   /// Ana Menü kartlarının üst köşelerine tıklamayı engellemeyen ön plan
   /// katmanını çizer.
   final bool showForegroundOverlay;
+
+  /// Sekme değişimi gibi görsel geçişlerde hareketli arka planı kısa süre
+  /// duraklatmak için kullanılır (ör. aktif sekme indeksi).
+  final Object? transitionKey;
 
   @override
   Widget build(BuildContext context) {
@@ -328,6 +336,7 @@ class AppThemeBackdrop extends StatelessWidget {
         preset: preset,
         showForegroundOverlay:
             showForegroundOverlay && preset == AppThemePreset.sakuraGarden,
+        transitionKey: transitionKey,
         child: child,
       );
     }
@@ -339,14 +348,122 @@ class AppThemeBackdrop extends StatelessWidget {
           Positioned.fill(
             child: IgnorePointer(
               child: RepaintBoundary(
-                child: CustomPaint(
-                  painter: AppThemeMeshPainter(preset),
+                child: _CachedStaticBackdrop(
+                  cacheKey: preset,
+                  paintStatic: (canvas, size) {
+                    AppThemeMeshPainter(preset).paint(canvas, size);
+                  },
+                  fallbackPainter: AppThemeMeshPainter(preset),
                 ),
               ),
             ),
           ),
         child,
       ],
+    );
+  }
+}
+
+/// Statik gradyan veya hareketli temaların sabit arka plan katmanını
+/// `(cacheKey, fiziksel boyut)` bazında tek seferlik `ui.Image` olarak
+/// önbelleğe alır; GPU her karede 5-6 shader yerine tek bir hazır doku çizer.
+class _CachedStaticBackdrop extends StatefulWidget {
+  const _CachedStaticBackdrop({
+    required this.cacheKey,
+    required this.paintStatic,
+    this.fallbackPainter,
+    this.onCacheStateChanged,
+  });
+
+  final Object cacheKey;
+  final void Function(Canvas canvas, Size size) paintStatic;
+  final CustomPainter? fallbackPainter;
+  final ValueChanged<bool>? onCacheStateChanged;
+
+  @override
+  State<_CachedStaticBackdrop> createState() => _CachedStaticBackdropState();
+}
+
+class _CachedStaticBackdropState extends State<_CachedStaticBackdrop> {
+  ui.Image? _cachedImage;
+  Object? _renderedKey;
+  int _renderedPhysicalWidth = 0;
+  int _renderedPhysicalHeight = 0;
+  int _generation = 0;
+
+  @override
+  void dispose() {
+    _generation++;
+    _cachedImage?.dispose();
+    _cachedImage = null;
+    super.dispose();
+  }
+
+  void _ensureRasterized(Size logicalSize, double dpr) {
+    if (logicalSize.isEmpty || dpr <= 0) return;
+    final pw = (logicalSize.width * dpr).round().clamp(1, 4096);
+    final ph = (logicalSize.height * dpr).round().clamp(1, 4096);
+
+    if (_renderedKey == widget.cacheKey &&
+        _renderedPhysicalWidth == pw &&
+        _renderedPhysicalHeight == ph) {
+      return;
+    }
+
+    _renderedKey = widget.cacheKey;
+    _renderedPhysicalWidth = pw;
+    _renderedPhysicalHeight = ph;
+    final myGen = ++_generation;
+
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    canvas.scale(pw / logicalSize.width, ph / logicalSize.height);
+    widget.paintStatic(canvas, logicalSize);
+    final picture = recorder.endRecording();
+
+    picture.toImage(pw, ph).then((image) {
+      picture.dispose();
+      if (!mounted || myGen != _generation) {
+        image.dispose();
+        return;
+      }
+      final prev = _cachedImage;
+      setState(() {
+        _cachedImage = image;
+      });
+      prev?.dispose();
+      widget.onCacheStateChanged?.call(true);
+    }).catchError((_) {
+      picture.dispose();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final size = constraints.biggest;
+        if (!size.isEmpty) {
+          _ensureRasterized(size, dpr);
+        }
+        final img = _cachedImage;
+        if (img != null) {
+          return RawImage(
+            image: img,
+            fit: BoxFit.fill,
+            filterQuality: FilterQuality.low,
+          );
+        }
+        if (widget.fallbackPainter != null) {
+          return CustomPaint(
+            isComplex: true,
+            willChange: false,
+            painter: widget.fallbackPainter,
+          );
+        }
+        return const SizedBox.expand();
+      },
     );
   }
 }
@@ -359,11 +476,13 @@ class _AnimatedThemeBackdropHost extends StatefulWidget {
   const _AnimatedThemeBackdropHost({
     required this.preset,
     required this.showForegroundOverlay,
+    required this.transitionKey,
     required this.child,
   });
 
   final AppThemePreset preset;
   final bool showForegroundOverlay;
+  final Object? transitionKey;
   final Widget child;
 
   @override
@@ -385,6 +504,11 @@ class _AnimatedThemeBackdropHostState extends State<_AnimatedThemeBackdropHost>
   bool _isAppVisible = true;
   bool _tickerEnabled = true;
   bool _isRouteTransitioning = false;
+  bool _isScrolling = false;
+  bool _isTabTransitioning = false;
+  bool _hasCachedStaticBase = false;
+  Timer? _scrollResumeTimer;
+  Timer? _tabResumeTimer;
   Animation<double>? _routeAnim;
   Animation<double>? _secondaryRouteAnim;
 
@@ -455,7 +579,40 @@ class _AnimatedThemeBackdropHostState extends State<_AnimatedThemeBackdropHost>
   @override
   void didUpdateWidget(covariant _AnimatedThemeBackdropHost oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.preset != widget.preset) {
+      _hasCachedStaticBase = false;
+    }
+    if (oldWidget.transitionKey != widget.transitionKey) {
+      _pauseBrieflyForTabSwitch();
+    }
     _syncPlayback();
+  }
+
+  void _pauseBrieflyForTabSwitch() {
+    _tabResumeTimer?.cancel();
+    _isTabTransitioning = true;
+    _tabResumeTimer = Timer(const Duration(milliseconds: 180), () {
+      if (!mounted) return;
+      _isTabTransitioning = false;
+      _syncPlayback();
+    });
+  }
+
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (notification is ScrollStartNotification ||
+        notification is ScrollUpdateNotification) {
+      if (!_isScrolling) {
+        _isScrolling = true;
+        _syncPlayback();
+      }
+      _scrollResumeTimer?.cancel();
+      _scrollResumeTimer = Timer(const Duration(milliseconds: 180), () {
+        if (!mounted) return;
+        _isScrolling = false;
+        _syncPlayback();
+      });
+    }
+    return false;
   }
 
   @override
@@ -482,6 +639,8 @@ class _AnimatedThemeBackdropHostState extends State<_AnimatedThemeBackdropHost>
     final shouldRun = _isAppVisible &&
         _tickerEnabled &&
         !_isRouteTransitioning &&
+        !_isScrolling &&
+        !_isTabTransitioning &&
         !AppThemeController.shared.isAnimationPaused;
     if (shouldRun) {
       if (!_controller.isAnimating) {
@@ -496,6 +655,8 @@ class _AnimatedThemeBackdropHostState extends State<_AnimatedThemeBackdropHost>
 
   @override
   void dispose() {
+    _scrollResumeTimer?.cancel();
+    _tabResumeTimer?.cancel();
     _routeAnim?.removeStatusListener(_onRouteAnimationStatus);
     _secondaryRouteAnim?.removeStatusListener(_onRouteAnimationStatus);
     AppThemeController.shared.removeListener(_syncPlayback);
@@ -515,6 +676,29 @@ class _AnimatedThemeBackdropHostState extends State<_AnimatedThemeBackdropHost>
         Positioned.fill(
           child: IgnorePointer(
             child: RepaintBoundary(
+              child: _CachedStaticBackdrop(
+                cacheKey: widget.preset,
+                paintStatic: (canvas, size) {
+                  AnimatedThemePainter.paintStaticBase(
+                    widget.preset,
+                    canvas,
+                    size,
+                  );
+                },
+                onCacheStateChanged: (ready) {
+                  if (mounted && _hasCachedStaticBase != ready) {
+                    setState(() {
+                      _hasCachedStaticBase = ready;
+                    });
+                  }
+                },
+              ),
+            ),
+          ),
+        ),
+        Positioned.fill(
+          child: IgnorePointer(
+            child: RepaintBoundary(
               child: ValueListenableBuilder<double>(
                 valueListenable: _throttledProgress,
                 builder: (context, progress, _) {
@@ -523,6 +707,7 @@ class _AnimatedThemeBackdropHostState extends State<_AnimatedThemeBackdropHost>
                       preset: widget.preset,
                       progress: progress,
                       isEcoMode: isEco,
+                      skipStaticBackground: _hasCachedStaticBase,
                     ),
                   );
                 },
@@ -530,7 +715,10 @@ class _AnimatedThemeBackdropHostState extends State<_AnimatedThemeBackdropHost>
             ),
           ),
         ),
-        widget.child,
+        NotificationListener<ScrollNotification>(
+          onNotification: _handleScrollNotification,
+          child: widget.child,
+        ),
         if (widget.showForegroundOverlay)
           Positioned.fill(
             child: IgnorePointer(

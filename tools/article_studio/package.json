@@ -1,0 +1,11 @@
+{
+  "name": "linereader-article-studio-tts",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "kokoro-js": "latest"
+  },
+  "allowScripts": {
+    "onnxruntime-node@1.21.0": true
+  }
+}

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/localization/app_locale.dart';
 import '../../core/localization/app_strings.dart';
+import '../../core/platform/web_back_bridge.dart';
 import '../../core/settings/api_key_controller.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tts/tts_service.dart';
@@ -33,8 +34,18 @@ import 'widgets/word_list_editor_dialog.dart';
 /// tetiklemek için kullanılan hafif denetleyici.
 class WordsSearchTriggerController extends ChangeNotifier {
   String? _pendingQuery;
+  bool Function()? _backHandler;
 
   String? get pendingQuery => _pendingQuery;
+
+  void attachBackHandler(bool Function()? handler) {
+    _backHandler = handler;
+  }
+
+  /// Arama paneli açıksa kapatır ve `true` döner; kapalıysa `false` döner.
+  bool handleSystemBack() {
+    return _backHandler?.call() ?? false;
+  }
 
   void triggerSearch(String rawQuery) {
     final trimmed = rawQuery.trim();
@@ -109,6 +120,7 @@ class _WordsScreenState extends State<WordsScreen> {
   final Set<String> _selectedSynonyms = <String>{};
   final Set<String> _selectedAntonyms = <String>{};
   TtsService? _fallbackTtsService;
+  Object? _searchHistoryToken;
 
   TtsService _resolveTtsService() {
     return widget.ttsService ?? (_fallbackTtsService ??= TtsService());
@@ -138,6 +150,7 @@ class _WordsScreenState extends State<WordsScreen> {
           shouldAttemptGeminiProvider: () => false,
         );
     widget.searchTriggerController?.addListener(_handleExternalSearchTrigger);
+    widget.searchTriggerController?.attachBackHandler(_handleBackFromHost);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -152,7 +165,9 @@ class _WordsScreenState extends State<WordsScreen> {
     if (oldWidget.searchTriggerController != widget.searchTriggerController) {
       oldWidget.searchTriggerController
           ?.removeListener(_handleExternalSearchTrigger);
+      oldWidget.searchTriggerController?.attachBackHandler(null);
       widget.searchTriggerController?.addListener(_handleExternalSearchTrigger);
+      widget.searchTriggerController?.attachBackHandler(_handleBackFromHost);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _consumePendingExternalSearch();
@@ -165,6 +180,7 @@ class _WordsScreenState extends State<WordsScreen> {
   void dispose() {
     _suggestDebounce?.cancel();
     widget.searchTriggerController?.removeListener(_handleExternalSearchTrigger);
+    widget.searchTriggerController?.attachBackHandler(null);
     _searchController.dispose();
     _searchFocusNode.dispose();
     if (_ownsSearchService) {
@@ -172,6 +188,12 @@ class _WordsScreenState extends State<WordsScreen> {
     }
     _fallbackTtsService?.dispose();
     super.dispose();
+  }
+
+  bool _handleBackFromHost() {
+    if (!mounted || !_isSearchPanelOpen) return false;
+    _clearTopSearch();
+    return true;
   }
 
   void _handleExternalSearchTrigger() {
@@ -204,6 +226,9 @@ class _WordsScreenState extends State<WordsScreen> {
   }
 
   void _clearTopSearch({bool keepText = false}) {
+    final token = _searchHistoryToken;
+    _searchHistoryToken = null;
+    WebBackBridge.shared.popEntrySilently(token);
     _suggestDebounce?.cancel();
     _suggestGeneration++;
     _searchGeneration++;
@@ -300,6 +325,17 @@ class _WordsScreenState extends State<WordsScreen> {
     final myGen = ++_searchGeneration;
     _suggestDebounce?.cancel();
     _suggestGeneration++;
+
+    if (kIsWeb && _searchHistoryToken == null) {
+      _searchHistoryToken = WebBackBridge.shared.pushEntry(
+        onBack: () {
+          if (mounted && _isSearchPanelOpen) {
+            _searchHistoryToken = null;
+            _clearTopSearch();
+          }
+        },
+      );
+    }
 
     setState(() {
       _prefixSuggestions = const <WordPrefixSuggestion>[];
@@ -409,6 +445,26 @@ class _WordsScreenState extends State<WordsScreen> {
     }
 
     final lexicon = detail.lexiconInfo;
+    // Yeni aranan kelimede eş/zıt anlamlılar otomatik seçili gelmez;
+    // kullanıcı yalnızca eklemek istediklerine tıklayarak tikler.
+    // Daha önce kaydedilmiş bir kelimeyse mevcut seçimler korunur.
+    final preselectedSynonyms = <String>{};
+    final preselectedAntonyms = <String>{};
+    if (matched != null) {
+      final savedSynKeys = matched.synonyms.map(_normalizeKey).toSet();
+      final savedAntKeys = matched.antonyms.map(_normalizeKey).toSet();
+      for (final s in lexicon?.synonyms ?? const <String>[]) {
+        if (savedSynKeys.contains(_normalizeKey(s))) {
+          preselectedSynonyms.add(s);
+        }
+      }
+      for (final a in lexicon?.antonyms ?? const <String>[]) {
+        if (savedAntKeys.contains(_normalizeKey(a))) {
+          preselectedAntonyms.add(a);
+        }
+      }
+    }
+
     setState(() {
       _searchDetail = WordSearchDetail(
         word: detail.word,
@@ -422,10 +478,10 @@ class _WordsScreenState extends State<WordsScreen> {
         ..addAll(preselected);
       _selectedSynonyms
         ..clear()
-        ..addAll(lexicon?.synonyms ?? const <String>[]);
+        ..addAll(preselectedSynonyms);
       _selectedAntonyms
         ..clear()
-        ..addAll(lexicon?.antonyms ?? const <String>[]);
+        ..addAll(preselectedAntonyms);
       _isSearchingWord = false;
     });
   }

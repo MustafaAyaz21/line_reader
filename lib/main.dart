@@ -5,6 +5,7 @@ import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 
 import 'core/localization/app_locale.dart';
 import 'core/platform/process_text_channel.dart';
+import 'core/platform/web_back_bridge.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/app_theme_controller.dart';
 import 'features/home/home_screen.dart';
@@ -20,6 +21,7 @@ void main() {
   }
   if (kIsWeb) {
     databaseFactory = databaseFactoryFfiWeb;
+    WebBackBridge.shared.ensureInitialized();
   }
   ProcessTextChannel.ensureInitialized();
   runApp(const LineReaderApp());
@@ -71,6 +73,9 @@ class _LineReaderAppState extends State<LineReaderApp> {
           return MaterialApp(
             title: 'Line Reader',
             debugShowCheckedModeBanner: false,
+            navigatorObservers: kIsWeb
+                ? <NavigatorObserver>[WebBackBridge.shared.navigatorObserver]
+                : const <NavigatorObserver>[],
             theme: AppTheme.forPreset(
               preset,
               classicBrightness: Brightness.light,

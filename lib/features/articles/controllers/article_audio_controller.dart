@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../../core/config/api_config.dart';
 import '../models/article.dart';
+import '../services/offline_articles_service.dart';
 import '../utils/article_text_parser.dart';
 
 /// Makale sesli okuma motoru modu.
@@ -799,7 +800,7 @@ class ArticleAudioController extends ChangeNotifier {
     }
   }
 
-  String _resolveAbsoluteAudioUrl(String rawUrl) {
+  static String resolveAbsoluteAudioUrl(String rawUrl) {
     final trimmed = rawUrl.trim();
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
       return trimmed;
@@ -808,8 +809,8 @@ class ArticleAudioController extends ChangeNotifier {
     return 'https://line-reader.pages.dev/$cleanRel';
   }
 
-  List<String> _candidateAudioUrls(String rawUrl) {
-    final primary = _resolveAbsoluteAudioUrl(rawUrl);
+  static List<String> candidateAudioUrls(String rawUrl) {
+    final primary = resolveAbsoluteAudioUrl(rawUrl);
     final urls = <String>[primary];
     // Cloudflare Pages henüz yayınlamadıysa veya mobil operatör engellediyse
     // GitHub raw `content/audio/...` (ve kök) yedek adreslerini dene.
@@ -825,6 +826,8 @@ class ArticleAudioController extends ChangeNotifier {
     }
     return urls;
   }
+
+  List<String> _candidateAudioUrls(String rawUrl) => candidateAudioUrls(rawUrl);
 
   /// İndirilen veya önbellekteki baytların gerçekten geçerli bir ses dosyası
   /// (M4A/MP4 `ftyp`, WAV `RIFF`, MP3 `ID3`/sync) olduğunu doğrular;
@@ -922,6 +925,17 @@ class ArticleAudioController extends ChangeNotifier {
     }
 
     try {
+      // Önce kullanıcının kalıcı olarak indirdiği çevrimdışı paketi kontrol et.
+      await OfflineArticlesService.shared.ensureInitialized();
+      final offlinePath =
+          OfflineArticlesService.shared.localAudioPath(article.id);
+      if (offlinePath != null && offlinePath.isNotEmpty) {
+        final offlineFile = File(offlinePath);
+        if (await _isValidCachedAudioFile(offlineFile)) {
+          return offlineFile.path;
+        }
+      }
+
       final tempDir = await getTemporaryDirectory();
       final cacheDir = Directory(p.join(tempDir.path, 'article_audio'));
       if (!await cacheDir.exists()) {

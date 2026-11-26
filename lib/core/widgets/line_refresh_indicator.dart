@@ -1,7 +1,9 @@
 import 'dart:math' as math;
-import 'dart:ui' show PathMetric;
+import 'dart:ui' show ImageFilter, PathMetric;
 
 import 'package:flutter/material.dart';
+
+import '../theme/app_theme.dart';
 
 /// Line Reader için özel olarak tasarlanmış, aşağı çekildiğinde modern **LR**
 /// monogramını çizip etrafında ince bir ışık halkası döndüren yenileme göstergesi.
@@ -111,13 +113,20 @@ class _LineRefreshIndicatorState extends State<LineRefreshIndicator>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final visuals = AppThemeVisuals.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final double pullProgress =
         (_dragOffset / _triggerThreshold).clamp(0.0, 1.0);
     final bool isVisible = _dragOffset > 0 || _isRefreshing;
 
-    final Color badgeBg =
-        widget.backgroundColor ?? colorScheme.surfaceContainerHigh;
+    // Tema ile tam uyumlu, arkayı gösteren yarı saydam buzlu cam katmanı
+    final Color badgeBg = widget.backgroundColor ??
+        (visuals.hasBackdrop
+            ? visuals.dialogSurfaceColor.withAlpha(isDark ? 95 : 130)
+            : colorScheme.surfaceContainerHigh.withAlpha(isDark ? 150 : 185));
+    final Color borderColor = visuals.hasBackdrop
+        ? colorScheme.primary.withAlpha(isDark ? 90 : 75)
+        : colorScheme.outlineVariant.withAlpha(90);
     final Color lColor = widget.strokeColor ?? colorScheme.onSurface;
     final Color rColor = colorScheme.primary;
 
@@ -144,35 +153,46 @@ class _LineRefreshIndicatorState extends State<LineRefreshIndicator>
                       height: 56,
                       margin: const EdgeInsets.only(top: 10),
                       decoration: BoxDecoration(
-                        color: badgeBg,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: colorScheme.outlineVariant.withAlpha(90),
-                          width: 1.2,
-                        ),
+                        borderRadius: BorderRadius.circular(18),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withAlpha(isDark ? 90 : 28),
+                            color: Colors.black.withAlpha(isDark ? 65 : 22),
                             blurRadius: 16,
                             offset: const Offset(0, 6),
                           ),
                         ],
                       ),
-                      child: AnimatedBuilder(
-                        animation: _animController,
-                        builder: (context, _) {
-                          return CustomPaint(
-                            size: const Size(56, 56),
-                            painter: LrStrokeRingPainter(
-                              progress: _isRefreshing
-                                  ? _animController.value
-                                  : pullProgress,
-                              lColor: lColor,
-                              accentColor: rColor,
-                              isLooping: _isRefreshing,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: badgeBg,
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(
+                                color: borderColor,
+                                width: 1.2,
+                              ),
                             ),
-                          );
-                        },
+                            child: AnimatedBuilder(
+                              animation: _animController,
+                              builder: (context, _) {
+                                return CustomPaint(
+                                  size: const Size(56, 56),
+                                  painter: LrStrokeRingPainter(
+                                    progress: _isRefreshing
+                                        ? _animController.value
+                                        : pullProgress,
+                                    lColor: lColor,
+                                    accentColor: rColor,
+                                    isLooping: _isRefreshing,
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),

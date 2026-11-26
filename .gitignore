@@ -55,3 +55,18 @@ tools/article_studio/admin_config.local.json
 tools/article_studio/firebase_service_account.local.json
 *.jks
 *.keystore
+
+# Python virtual environments & caches
+.venv*/
+**/.venv*/
+venv/
+**/venv/
+__pycache__/
+**/__pycache__/
+
+# Node modules & local model/tool caches
+node_modules/
+**/node_modules/
+.cache/
+**/.cache/
+*.onnx

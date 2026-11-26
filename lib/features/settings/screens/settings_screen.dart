@@ -11,6 +11,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_theme_backdrop.dart';
 import '../../../core/theme/app_theme_controller.dart';
 import '../../../core/theme/app_theme_preset.dart';
+import '../../../core/widgets/line_refresh_indicator.dart';
 import '../../auth/controllers/auth_controller.dart';
 import '../../auth/models/auth_user.dart';
 import '../../auth/screens/auth_screen.dart';
@@ -232,7 +233,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   context: context,
                   titleBuilder: (ls) =>
                       ls.t('Profil ve Hesap', 'Profile & Account'),
-                  bodyBuilder: (ctx, th, cs, ls) => RefreshIndicator(
+                  bodyBuilder: (ctx, th, cs, ls) => LineRefreshIndicator(
                     onRefresh: () async {
                       if (widget.authController.isAuthenticated) {
                         await widget.authController

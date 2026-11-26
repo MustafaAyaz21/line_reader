@@ -479,7 +479,7 @@ async function handleWordExamples(request, env, url) {
   const cacheKey = `v2:${word}`;
 
   // 0) Cloudflare Edge Cache kontrolü (< 20 ms)
-  const edgeCacheKey = new Request(`https://cache.linereader.internal/examples/v2/${encodeURIComponent(word)}`);
+  const edgeCacheKey = new Request(`https://cache.linereader.internal/examples/v3/${encodeURIComponent(word)}`);
   const edgeCache = typeof caches !== "undefined" ? caches.default : null;
   if (edgeCache) {
     try {

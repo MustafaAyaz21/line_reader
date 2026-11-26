@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -33,6 +35,7 @@ import '../models/article_reader_models.dart';
 import '../services/article_passage_translation_service.dart';
 import '../services/article_word_lexicon_service.dart';
 import '../services/article_word_translation_service.dart';
+import '../services/offline_articles_service.dart';
 import '../utils/article_text_parser.dart';
 import '../widgets/article_audio_player_bar.dart';
 import '../widgets/article_passage_translation_sheet.dart';
@@ -184,6 +187,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
     _audioController.addListener(_handleAudioStateChanged);
     _scrollController.addListener(_handleScrollChanged);
 
+    OfflineArticlesService.shared.ensureInitialized();
     _loadInitialReaderData();
   }
 
@@ -1135,6 +1139,82 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
     );
   }
 
+  Future<void> _handleDownloadOffline() async {
+    final result =
+        await OfflineArticlesService.shared.downloadArticle(widget.article);
+    if (!mounted) return;
+    final colorScheme = Theme.of(context).colorScheme;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(result.message),
+          backgroundColor: result.ok ? null : colorScheme.error,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+  }
+
+  Future<void> _handleDeleteOffline() async {
+    final s = context.l10n;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        final colorScheme = Theme.of(dialogContext).colorScheme;
+        return AlertDialog(
+          title: Text(s.t('Makaleyi Sil', 'Delete Article')),
+          content: Text(
+            s.t(
+              'Bu makaleyi cihazdan silmek istiyor musunuz?',
+              'Do you want to delete this article from your device?',
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(s.t('Vazgeç', 'Cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: colorScheme.error,
+                foregroundColor: colorScheme.onError,
+              ),
+              child: Text(s.t('Sil', 'Delete')),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    if (_audioController.isVisible || _audioController.isPlaying) {
+      await _audioController.closePlayer();
+    }
+
+    final deleted = await OfflineArticlesService.shared
+        .deleteOfflineArticle(widget.article.id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            deleted
+                ? s.t('Makale cihazdan silindi.', 'Article deleted from device.')
+                : s.t(
+                    'Makale silinemedi.',
+                    'Could not delete article from device.',
+                  ),
+          ),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+  }
+
   @override
   Widget build(BuildContext context) {
     final tone = _preferences.tone;
@@ -1281,6 +1361,62 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                 ],
               ),
               actions: <Widget>[
+                if (OfflineArticlesService.shared.isSupported)
+                  ListenableBuilder(
+                    listenable: OfflineArticlesService.shared,
+                    builder: (context, _) {
+                      final offlineService = OfflineArticlesService.shared;
+                      final isDownloading =
+                          offlineService.isDownloading(widget.article.id);
+                      final isDownloaded =
+                          offlineService.isDownloaded(widget.article.id);
+                      if (isDownloading) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.2,
+                              color: palette.underlineColor,
+                            ),
+                          ),
+                        );
+                      }
+                      if (isDownloaded) {
+                        return IconButton(
+                          key: const ValueKey<String>(
+                            'reader_delete_offline_button',
+                          ),
+                          tooltip: context.l10n.t(
+                            'Cihazdan sil',
+                            'Delete from device',
+                          ),
+                          onPressed: _handleDeleteOffline,
+                          icon: Icon(
+                            Icons.delete_outline_rounded,
+                            size: 22,
+                            color: palette.textColor,
+                          ),
+                        );
+                      }
+                      return IconButton(
+                        key: const ValueKey<String>(
+                          'reader_download_offline_button',
+                        ),
+                        tooltip: context.l10n.t(
+                          'Çevrimdışı indir',
+                          'Download for offline',
+                        ),
+                        onPressed: _handleDownloadOffline,
+                        icon: Icon(
+                          Icons.download_for_offline_outlined,
+                          size: 22,
+                          color: palette.textColor,
+                        ),
+                      );
+                    },
+                  ),
                 // Makaleyi sesli dinleme (Podcast AI / Cihaz Sesi) butonu
                 if (_audioController.hasPlayableContent)
                   IconButton(
@@ -1526,6 +1662,34 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
     );
   }
 
+  Widget _buildHeaderCoverImage(Article article, {required double height}) {
+    final localCover = !kIsWeb
+        ? OfflineArticlesService.shared.localCoverPath(article.id)
+        : null;
+    if (localCover != null && localCover.isNotEmpty) {
+      return Image.file(
+        File(localCover),
+        height: height,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Image.network(
+          article.displayImageUrl,
+          height: height,
+          width: double.infinity,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+        ),
+      );
+    }
+    return Image.network(
+      article.displayImageUrl,
+      height: height,
+      width: double.infinity,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+    );
+  }
+
   Widget _buildDocumentHeader(
     ArticleReaderPalette palette,
     ArticleLevel? parsedLevel,
@@ -1696,13 +1860,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
                   flex: 5,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),
-                    child: Image.network(
-                      article.displayImageUrl,
-                      height: 220,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                    ),
+                    child: _buildHeaderCoverImage(article, height: 220),
                   ),
                 ),
               ],
@@ -1712,13 +1870,7 @@ class _ArticleReaderScreenState extends State<ArticleReaderScreen> {
             const SizedBox(height: 14),
             ClipRRect(
               borderRadius: BorderRadius.circular(16),
-              child: Image.network(
-                article.displayImageUrl,
-                height: 180,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-              ),
+              child: _buildHeaderCoverImage(article, height: 180),
             ),
             const SizedBox(height: 14),
             Text(

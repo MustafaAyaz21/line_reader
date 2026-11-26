@@ -7,6 +7,7 @@ import '../../../core/settings/api_key_controller.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/tts/tts_service.dart';
 import '../../../core/widgets/line_loading_indicator.dart';
+import '../../../core/widgets/line_refresh_indicator.dart';
 import '../../articles/controllers/article_reading_progress_controller.dart';
 import '../../articles/controllers/articles_controller.dart';
 import '../../articles/models/article.dart';
@@ -619,7 +620,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
           const SizedBox(width: 4),
         ],
       ),
-      body: RefreshIndicator(
+      body: LineRefreshIndicator(
         onRefresh: () async {
           await widget.articlesController?.refresh(force: true);
         },
@@ -629,251 +630,265 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                   message: 'Makaleler yükleniyor...',
                 ),
               )
-            : SingleChildScrollView(
+            : CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Search Bar
-                    Container(
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerHigh,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: colorScheme.outlineVariant.withAlpha(50),
-                        ),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      child: Row(
+                slivers: [
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    sliver: SliverToBoxAdapter(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Icon(
-                            Icons.search_rounded,
-                            size: 20,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: TextField(
-                              controller: _searchController,
-                              onChanged: (_) => setState(() {}),
-                              decoration: InputDecoration(
-                                hintText: s.t(
-                                  'Makale, konu veya kelime ara...',
-                                  'Search articles, topics or words...',
-                                ),
-                                hintStyle: TextStyle(
-                                  fontSize: 13.5,
-                                  color: colorScheme.onSurfaceVariant.withAlpha(160),
-                                ),
-                                border: InputBorder.none,
-                                isDense: true,
+                          // Search Bar
+                          Container(
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: colorScheme.surfaceContainerHigh,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: colorScheme.outlineVariant.withAlpha(50),
                               ),
                             ),
-                          ),
-                          if (_searchController.text.isNotEmpty)
-                            GestureDetector(
-                              onTap: () {
-                                _searchController.clear();
-                                setState(() {});
-                              },
-                              child: Icon(
-                                Icons.close_rounded,
-                                size: 18,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-
-                    // Guest Sign In Banner (if guest)
-                    if (widget.authController != null)
-                      ListenableBuilder(
-                        listenable: widget.authController!,
-                        builder: (context, _) {
-                          if (widget.authController!.isAuthenticated ||
-                              widget.authController!.isLoading) {
-                            return const SizedBox.shrink();
-                          }
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 14),
-                            child: _GuestSignInBanner(
-                              onTap: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute<bool>(
-                                    builder: (_) => AuthScreen(
-                                      controller: widget.authController!,
-                                      canPop: true,
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.search_rounded,
+                                  size: 20,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: TextField(
+                                    controller: _searchController,
+                                    onChanged: (_) => setState(() {}),
+                                    decoration: InputDecoration(
+                                      hintText: s.t(
+                                        'Makale, konu veya kelime ara...',
+                                        'Search articles, topics or words...',
+                                      ),
+                                      hintStyle: TextStyle(
+                                        fontSize: 13.5,
+                                        color: colorScheme.onSurfaceVariant.withAlpha(160),
+                                      ),
+                                      border: InputBorder.none,
+                                      isDense: true,
                                     ),
+                                  ),
+                                ),
+                                if (_searchController.text.isNotEmpty)
+                                  GestureDetector(
+                                    onTap: () {
+                                      _searchController.clear();
+                                      setState(() {});
+                                    },
+                                    child: Icon(
+                                      Icons.close_rounded,
+                                      size: 18,
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+
+                          // Guest Sign In Banner (if guest)
+                          if (widget.authController != null)
+                            ListenableBuilder(
+                              listenable: widget.authController!,
+                              builder: (context, _) {
+                                if (widget.authController!.isAuthenticated ||
+                                    widget.authController!.isLoading) {
+                                  return const SizedBox.shrink();
+                                }
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 14),
+                                  child: _GuestSignInBanner(
+                                    onTap: () {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute<bool>(
+                                          builder: (_) => AuthScreen(
+                                            controller: widget.authController!,
+                                            canPop: true,
+                                          ),
+                                        ),
+                                      );
+                                    },
                                   ),
                                 );
                               },
                             ),
-                          );
-                        },
-                      ),
 
-                    // Continue Reading Banner (if progress exists)
-                    Builder(
-                      builder: (context) {
-                        final lastProgress = progressController.lastProgress;
-                        if (lastProgress == null ||
-                            lastProgress.isCompleted ||
-                            progressController.isContinueReadingDismissed(
-                              lastProgress.articleId,
-                            )) {
-                          return const SizedBox.shrink();
-                        }
-                        final article = _findVisibleArticleById(lastProgress.articleId);
-                        if (article == null) return const SizedBox.shrink();
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 14),
-                          child: _ContinueReadingCard(
-                            article: article,
-                            progress: lastProgress,
-                            onTap: () => _openResumeArticle(
-                              context,
-                              article,
-                              progressController,
-                            ),
-                            onDismiss: () => progressController
-                                .dismissContinueReading(lastProgress.articleId),
-                          ),
-                        );
-                      },
-                    ),
-
-                    // CEFR Level Filter Row (Lower down, thumb-friendly 38px)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            s.t('SEVİYE FİLTRESİ', 'LEVEL FILTER'),
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.8,
-                              color: colorScheme.onSurfaceVariant.withAlpha(160),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              children: [
-                                _MobileLevelPill(
-                                  label: s.t('Tümü (${allArticles.length})', 'All (${allArticles.length})'),
-                                  isSelected: _selectedLevel == null,
-                                  accentColor: colorScheme.primary,
-                                  onTap: () => setState(() => _selectedLevel = null),
+                          // Continue Reading Banner (if progress exists)
+                          Builder(
+                            builder: (context) {
+                              final lastProgress = progressController.lastProgress;
+                              if (lastProgress == null ||
+                                  lastProgress.isCompleted ||
+                                  progressController.isContinueReadingDismissed(
+                                    lastProgress.articleId,
+                                  )) {
+                                return const SizedBox.shrink();
+                              }
+                              final article = _findVisibleArticleById(lastProgress.articleId);
+                              if (article == null) return const SizedBox.shrink();
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 14),
+                                child: _ContinueReadingCard(
+                                  article: article,
+                                  progress: lastProgress,
+                                  onTap: () => _openResumeArticle(
+                                    context,
+                                    article,
+                                    progressController,
+                                  ),
+                                  onDismiss: () => progressController
+                                      .dismissContinueReading(lastProgress.articleId),
                                 ),
-                                const SizedBox(width: 8),
-                                ...ArticleLevel.values.map((lvl) {
-                                  final count = allArticles
-                                      .where((a) => ArticleLevel.tryParse(a.level) == lvl)
-                                      .length;
-                                  return Padding(
-                                    padding: const EdgeInsets.only(right: 8),
-                                    child: _MobileLevelPill(
-                                      label: '${lvl.code} ($count)',
-                                      isSelected: _selectedLevel == lvl,
-                                      accentColor: lvl.accentColor,
-                                      onTap: () => setState(() => _selectedLevel = lvl),
-                                    ),
-                                  );
-                                }),
+                              );
+                            },
+                          ),
+
+                          // CEFR Level Filter Row (Lower down, thumb-friendly 38px)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  s.t('SEVİYE FİLTRESİ', 'LEVEL FILTER'),
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.8,
+                                    color: colorScheme.onSurfaceVariant.withAlpha(160),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: Row(
+                                    children: [
+                                      _MobileLevelPill(
+                                        label: s.t('Tümü (${allArticles.length})', 'All (${allArticles.length})'),
+                                        isSelected: _selectedLevel == null,
+                                        accentColor: colorScheme.primary,
+                                        onTap: () => setState(() => _selectedLevel = null),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      ...ArticleLevel.values.map((lvl) {
+                                        final count = allArticles
+                                            .where((a) => ArticleLevel.tryParse(a.level) == lvl)
+                                            .length;
+                                        return Padding(
+                                          padding: const EdgeInsets.only(right: 8),
+                                          child: _MobileLevelPill(
+                                            label: '${lvl.code} ($count)',
+                                            isSelected: _selectedLevel == lvl,
+                                            accentColor: lvl.accentColor,
+                                            onTap: () => setState(() => _selectedLevel = lvl),
+                                          ),
+                                        );
+                                      }),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // Featured Hero Banner (Mobile)
+                          if (heroArticle != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 18),
+                              child: RepaintBoundary(
+                                child: _MobileHeroCard(
+                                  article: heroArticle,
+                                  onTap: () => _openResumeArticle(
+                                    context,
+                                    heroArticle,
+                                    progressController,
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                          // Recent Articles Section Header
+                          Padding(
+                            padding: const EdgeInsets.only(top: 22, bottom: 10),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  s.t('Yeni Makaleler', 'Recent Articles'),
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.2,
+                                  ),
+                                ),
+                                Text(
+                                  s.t('${filteredArticles.length} makale', '${filteredArticles.length} articles'),
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
                         ],
                       ),
                     ),
-
-                    // Featured Hero Banner (Mobile)
-                    if (heroArticle != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 18),
-                        child: _MobileHeroCard(
-                          article: heroArticle,
-                          onTap: () => _openResumeArticle(
-                            context,
-                            heroArticle,
-                            progressController,
-                          ),
-                        ),
-                      ),
-
-                    // Recent Articles Section Header
-                    Padding(
-                      padding: const EdgeInsets.only(top: 22, bottom: 10),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            s.t('Yeni Makaleler', 'Recent Articles'),
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.2,
-                            ),
-                          ),
-                          Text(
-                            s.t('${filteredArticles.length} makale', '${filteredArticles.length} articles'),
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Articles Feed List
-                    if (filteredArticles.isEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(vertical: 40),
-                        alignment: Alignment.center,
-                        child: Column(
-                          children: [
-                            Icon(
-                              Icons.article_outlined,
-                              size: 44,
-                              color: colorScheme.onSurfaceVariant.withAlpha(120),
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              s.t('Bu filtreye uygun makale bulunamadı.', 'No articles found matching this filter.'),
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
+                  ),
+                  if (filteredArticles.isEmpty)
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+                      sliver: SliverToBoxAdapter(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 40),
+                          alignment: Alignment.center,
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.article_outlined,
+                                size: 44,
+                                color: colorScheme.onSurfaceVariant.withAlpha(120),
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 12),
+                              Text(
+                                s.t('Bu filtreye uygun makale bulunamadı.', 'No articles found matching this filter.'),
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      )
-                    else
-                      ListView.separated(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
+                      ),
+                    )
+                  else
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+                      sliver: SliverList.separated(
                         itemCount: feedArticles.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 12),
                         itemBuilder: (context, index) {
                           final art = feedArticles[index];
                           final lvl = ArticleLevel.tryParse(art.level);
-                          return _MobileArticleFeedCard(
-                            article: art,
-                            level: lvl,
-                            onTap: () => _openResumeArticle(
-                              context,
-                              art,
-                              progressController,
+                          return RepaintBoundary(
+                            child: _MobileArticleFeedCard(
+                              article: art,
+                              level: lvl,
+                              onTap: () => _openResumeArticle(
+                                context,
+                                art,
+                                progressController,
+                              ),
                             ),
                           );
                         },
                       ),
-                  ],
-                ),
+                    ),
+                ],
               ),
       ),
     );

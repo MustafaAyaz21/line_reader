@@ -170,12 +170,71 @@ async function readParallelFiles(enPath, trPath, source, maxLines, pairs, wordFr
   return added;
 }
 
-function pickDiverseExamples(candidates, limit = 3) {
-  candidates.sort((a, b) => b[0] - a[0]);
+function loadFreeDictPrimaryRoots() {
+  const teiPath = path.join(RAW_DIR, 'freedict', 'eng-tur.tei');
+  const map = new Map();
+  if (!fs.existsSync(teiPath)) return map;
+
+  try {
+    const xml = fs.readFileSync(teiPath, 'utf8');
+    const entryRe = /<entry\b[^>]*>([\s\S]*?)<\/entry>/gi;
+    const orthRe = /<orth[^>]*>([\s\S]*?)<\/orth>/i;
+    const quoteRe = /<quote[^>]*>([\s\S]*?)<\/quote>/gi;
+
+    let m;
+    while ((m = entryRe.exec(xml)) !== null) {
+      const block = m[1];
+      const om = orthRe.exec(block);
+      if (!om) continue;
+      const word = om[1].replace(/<[^>]+>/g, '').trim().replace(/İ/g, 'i').toLowerCase();
+      if (!/^[a-z]{2,20}$/.test(word)) continue;
+
+      const roots = map.get(word) || new Set();
+      if (roots.size >= 4) continue;
+
+      quoteRe.lastIndex = 0;
+      let qm;
+      while ((qm = quoteRe.exec(block)) !== null) {
+        const trText = qm[1]
+          .replace(/<[^>]+>/g, '')
+          .replace(/\([^)]*\)/g, '')
+          .replace(/İ/g, 'i')
+          .replace(/I/g, 'ı')
+          .toLowerCase();
+        const toks = trText.match(TR_WORD_RE) || [];
+        for (const tok of toks) {
+          if (tok.length >= 3 && !TR_STOPWORDS.has(tok)) {
+            roots.add(tok.slice(0, 5));
+            if (roots.size >= 4) break;
+          }
+        }
+        if (roots.size >= 4) break;
+      }
+      if (roots.size > 0) map.set(word, roots);
+    }
+  } catch (err) {
+    console.log(`[Uyarı] FreeDict kökleri okunamadı: ${err.message}`);
+  }
+  return map;
+}
+
+function pickDiverseExamples(candidates, limit = 3, primaryRoots = null) {
+  const scored = candidates.map(([baseScore, en, tr, source]) => {
+    let bonus = 0;
+    if (primaryRoots && primaryRoots.size > 0) {
+      const trRoots = trContentTokens(tr).map((t) => t.slice(0, 5));
+      if (trRoots.some((r) => primaryRoots.has(r))) {
+        bonus += 80; // Kelimenin asıl Türkçe anlamını taşıyan cümlelere yüksek öncelik
+      }
+    }
+    return [baseScore + bonus, en, tr, source];
+  });
+
+  scored.sort((a, b) => b[0] - a[0]);
   const selected = [];
   const usedRoots = new Set();
 
-  for (const [, en, tr, source] of candidates) {
+  for (const [, en, tr, source] of scored) {
     const roots = new Set(trContentTokens(tr).map((t) => t.slice(0, 5)));
     let diff = 0;
     for (const r of roots) if (!usedRoots.has(r)) diff++;
@@ -188,7 +247,7 @@ function pickDiverseExamples(candidates, limit = 3) {
   }
 
   const chosenEn = new Set(selected.map((s) => s.english.toLowerCase()));
-  for (const [, en, tr, source] of candidates) {
+  for (const [, en, tr, source] of scored) {
     if (chosenEn.has(en.toLowerCase())) continue;
     selected.push({ english: en, turkish: tr, source });
     chosenEn.add(en.toLowerCase());
@@ -257,7 +316,6 @@ function writeD1Batches(rows, batchSize) {
         'INSERT INTO corpus_lexicon (word, meanings_json, examples_json, freq_rank, updated_at)\nVALUES\n  ' +
           values.join(',\n  ') +
           '\nON CONFLICT(word) DO UPDATE SET\n' +
-          '  meanings_json = excluded.meanings_json,\n' +
           '  examples_json = excluded.examples_json,\n' +
           '  freq_rank = excluded.freq_rank,\n' +
           '  updated_at = excluded.updated_at;'
@@ -315,37 +373,31 @@ async function main() {
 
   console.log(`[Hedef] ${targetLookup.size.toLocaleString()} İngilizce kelime indeksleniyor...`);
 
+  const primaryRootsMap = loadFreeDictPrimaryRoots();
+  console.log(`[Sözlük Kökleri] FreeDict ana anlam kökleri: ${primaryRootsMap.size.toLocaleString()} kelime`);
+
   const wordCandidates = new Map();
-  const wordTrCo = new Map();
-  const globalTrFreq = new Map();
+  const wordSourceCounts = new Map();
 
   for (const [en, tr, source] of pairs) {
-    const trToks = new Set(trContentTokens(tr));
-    for (const t of trToks) {
-      globalTrFreq.set(t, (globalTrFreq.get(t) || 0) + 1);
-    }
-
     const enToks = new Set(en.toLowerCase().match(WORD_RE) || []);
     const baseScore = scoreSentence(en, source);
     for (const w of enToks) {
       if (!targetLookup.has(w)) continue;
+      let counts = wordSourceCounts.get(w);
+      if (!counts) {
+        counts = { tatoeba: 0, subtitle: 0 };
+        wordSourceCounts.set(w, counts);
+      }
+      if (counts[source] >= 25) continue;
+      counts[source]++;
+
       let bucket = wordCandidates.get(w);
       if (!bucket) {
         bucket = [];
         wordCandidates.set(w, bucket);
       }
-      if (bucket.length < 30) {
-        bucket.push([baseScore, en, tr, source]);
-      }
-
-      let coMap = wordTrCo.get(w);
-      if (!coMap) {
-        coMap = new Map();
-        wordTrCo.set(w, coMap);
-      }
-      for (const t of trToks) {
-        coMap.set(t, (coMap.get(t) || 0) + 1);
-      }
+      bucket.push([baseScore, en, tr, source]);
     }
   }
 
@@ -361,15 +413,9 @@ async function main() {
     rank++;
     const cands = wordCandidates.get(word);
     if (!cands || cands.length === 0) continue;
-    const examples = pickDiverseExamples(cands, 3);
+    const examples = pickDiverseExamples(cands, 3, primaryRootsMap.get(word));
     if (examples.length === 0) continue;
-    const meanings = inferRankedMeanings(
-      wordTrCo.get(word) || new Map(),
-      globalTrFreq,
-      totalPairs,
-      wordFreq.get(word) || cands.length
-    );
-    rows.push([word, meanings, examples, rank]);
+    rows.push([word, [], examples, rank]);
   }
 
   fs.mkdirSync(OUT_DIR, { recursive: true });

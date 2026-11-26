@@ -13,6 +13,7 @@ class AnimatedThemePainter extends CustomPainter {
     required this.progress,
     this.isPreview = false,
     this.isEcoMode = false,
+    this.skipStaticBackground = false,
   });
 
   final AppThemePreset preset;
@@ -26,6 +27,43 @@ class AnimatedThemePainter extends CustomPainter {
 
   /// Pil Dostu Animasyon modunda parçacık sayısı azaltılır.
   final bool isEcoMode;
+
+  /// Sabit arka plan katmanı üstteki `ui.Image` önbelleğinden çizildiğinde
+  /// her karede sabit gradyan/resif/tepe çizimini atlar.
+  final bool skipStaticBackground;
+
+  /// Hareketli temaların yalnızca sabit (animasyonsuz) arka plan katmanlarını
+  /// bir defalık `ui.Image` önbelleğine almak için çizer.
+  static void paintStaticBase(
+    AppThemePreset preset,
+    Canvas canvas,
+    Size size,
+  ) {
+    if (size.isEmpty) return;
+    final rect = Offset.zero & size;
+    switch (preset) {
+      case AppThemePreset.amethystGalaxy:
+        _paintAmethystGalaxyBase(canvas, rect, size);
+        return;
+      case AppThemePreset.oceanDepths:
+        _paintOceanDepthsBase(canvas, rect, size);
+        return;
+      case AppThemePreset.warmLatteBokeh:
+        _paintWarmLatteBokehBase(canvas, rect, size);
+        return;
+      case AppThemePreset.sageSunlight:
+        _paintSageSunlightBase(canvas, rect);
+        return;
+      case AppThemePreset.sakuraGarden:
+        _paintSakuraGardenBase(canvas, rect, size);
+        return;
+      case AppThemePreset.aleviPower:
+        _paintAleviPowerBase(canvas, rect, size);
+        return;
+      default:
+        return;
+    }
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -59,10 +97,7 @@ class AnimatedThemePainter extends CustomPainter {
   // ---------------------------------------------------------------------------
   // 1. AMETİST GALAKSİ
   // ---------------------------------------------------------------------------
-  void _paintAmethystGalaxy(Canvas canvas, Rect rect, Size size) {
-    final t = progress;
-    final tau = math.pi * 2;
-
+  static void _paintAmethystGalaxyBase(Canvas canvas, Rect rect, Size size) {
     // Koyu mor-gece uzay zemini (#0C0719 -> #140B26)
     final bgPaint = Paint()
       ..shader = const LinearGradient(
@@ -78,20 +113,29 @@ class AnimatedThemePainter extends CustomPainter {
     canvas.drawRect(rect, bgPaint);
 
     // Hafif uzay nebulası derinliği
-    _drawSoftGlow(
+    _drawSoftGlowStatic(
       canvas,
       Offset(size.width * 0.22, size.height * 0.18),
       size.shortestSide * 0.65,
       const Color(0xFF4C1D95),
       0.16,
     );
-    _drawSoftGlow(
+    _drawSoftGlowStatic(
       canvas,
       Offset(size.width * 0.82, size.height * 0.80),
       size.shortestSide * 0.60,
       const Color(0xFF831843),
       0.14,
     );
+  }
+
+  void _paintAmethystGalaxy(Canvas canvas, Rect rect, Size size) {
+    final t = progress;
+    final tau = math.pi * 2;
+
+    if (!skipStaticBackground) {
+      _paintAmethystGalaxyBase(canvas, rect, size);
+    }
 
     // Çok yavaş göz kırpan arka plan yıldızları
     final starCount = isPreview ? 18 : 42;
@@ -259,10 +303,7 @@ class AnimatedThemePainter extends CustomPainter {
   // ---------------------------------------------------------------------------
   // 2. OKYANUS DERİNLİKLERİ
   // ---------------------------------------------------------------------------
-  void _paintOceanDepths(Canvas canvas, Rect rect, Size size) {
-    final t = progress;
-    final tau = math.pi * 2;
-
+  static void _paintOceanDepthsBase(Canvas canvas, Rect rect, Size size) {
     // Derin okyanus petrol yeşili-lacivert zemini (#07171F -> #051218 -> #081D24)
     final bgPaint = Paint()
       ..shader = const LinearGradient(
@@ -276,6 +317,15 @@ class AnimatedThemePainter extends CustomPainter {
         stops: <double>[0.0, 0.52, 1.0],
       ).createShader(rect);
     canvas.drawRect(rect, bgPaint);
+  }
+
+  void _paintOceanDepths(Canvas canvas, Rect rect, Size size) {
+    final t = progress;
+    final tau = math.pi * 2;
+
+    if (!skipStaticBackground) {
+      _paintOceanDepthsBase(canvas, rect, size);
+    }
 
     // Yukarıdan diyagonal inip çok ağır salınan yumuşak sualtı ışık hüzmeleri
     final rayCount = isPreview ? 3 : 5;
@@ -551,10 +601,7 @@ class AnimatedThemePainter extends CustomPainter {
   // ---------------------------------------------------------------------------
   // 3. SICAK LATTE BOKEH
   // ---------------------------------------------------------------------------
-  void _paintWarmLatteBokeh(Canvas canvas, Rect rect, Size size) {
-    final t = progress;
-    final tau = math.pi * 2;
-
+  static void _paintWarmLatteBokehBase(Canvas canvas, Rect rect, Size size) {
     // Sıcak latte-kum gradient zemin (#FBF7F0 -> #F3E5D5), mavi ışıksız
     final bgPaint = Paint()
       ..shader = const LinearGradient(
@@ -570,20 +617,29 @@ class AnimatedThemePainter extends CustomPainter {
     canvas.drawRect(rect, bgPaint);
 
     // Yumuşak sıcak atmosfer parıltıları
-    _drawSoftGlow(
+    _drawSoftGlowStatic(
       canvas,
       Offset(size.width * 0.82, size.height * 0.16),
       size.shortestSide * 0.65,
       const Color(0xFFFDE2B8),
       0.42,
     );
-    _drawSoftGlow(
+    _drawSoftGlowStatic(
       canvas,
       Offset(size.width * 0.18, size.height * 0.85),
       size.shortestSide * 0.62,
       const Color(0xFFF6C89F),
       0.32,
     );
+  }
+
+  void _paintWarmLatteBokeh(Canvas canvas, Rect rect, Size size) {
+    final t = progress;
+    final tau = math.pi * 2;
+
+    if (!skipStaticBackground) {
+      _paintWarmLatteBokehBase(canvas, rect, size);
+    }
 
     // Aşağıdan yukarıya yavaşça yükselen kayısı, karamel ve bal tonlarında bokeh daireleri
     const bokehColors = <Color>[
@@ -630,10 +686,7 @@ class AnimatedThemePainter extends CustomPainter {
   // ---------------------------------------------------------------------------
   // 4. ADAÇAYI & GÜN IŞIĞI
   // ---------------------------------------------------------------------------
-  void _paintSageSunlight(Canvas canvas, Rect rect, Size size) {
-    final t = progress;
-    final tau = math.pi * 2;
-
+  static void _paintSageSunlightBase(Canvas canvas, Rect rect) {
     // Fildişi-krem zemin (#F5F9F3 -> #FBF6EC)
     final bgPaint = Paint()
       ..shader = const LinearGradient(
@@ -647,6 +700,15 @@ class AnimatedThemePainter extends CustomPainter {
         stops: <double>[0.0, 0.5, 1.0],
       ).createShader(rect);
     canvas.drawRect(rect, bgPaint);
+  }
+
+  void _paintSageSunlight(Canvas canvas, Rect rect, Size size) {
+    final t = progress;
+    final tau = math.pi * 2;
+
+    if (!skipStaticBackground) {
+      _paintSageSunlightBase(canvas, rect);
+    }
 
     // Sakinçe süzülen yumuşak adaçayı yeşili ve gün ışığı sis bulutları
     final clouds = <({double x, double y, double r, Color color, double alpha, double phase})>[
@@ -702,9 +764,7 @@ class AnimatedThemePainter extends CustomPainter {
   // ---------------------------------------------------------------------------
   // 5. SAKURA BAHÇESİ (ÖZEL TEMA — BULANIKSIZ, KESKİN VEKTÖR)
   // ---------------------------------------------------------------------------
-  void _paintSakuraGarden(Canvas canvas, Rect rect, Size size) {
-    final t = progress;
-    final tau = math.pi * 2;
+  static void _paintSakuraGardenBase(Canvas canvas, Rect rect, Size size) {
     final w = size.width;
     final h = size.height;
 
@@ -770,19 +830,33 @@ class AnimatedThemePainter extends CustomPainter {
       (x: 0.24, y: 0.86, rx: 0.13, ry: 0.030, dark: const Color(0xFF735B66), light: const Color(0xFF917A85)),
       (x: 0.08, y: 0.90, rx: 0.14, ry: 0.034, dark: const Color(0xFF634C57), light: const Color(0xFF826C77)),
     ];
+    final stonePaint = Paint();
     for (final s in stones) {
       final cx = w * s.x;
       final cy = h * s.y;
       final rx = w * s.rx;
       final ry = h * s.ry;
+      stonePaint.color = s.dark;
       canvas.drawOval(
         Rect.fromCenter(center: Offset(cx, cy + 2), width: rx * 2, height: ry * 2),
-        Paint()..color = s.dark,
+        stonePaint,
       );
+      stonePaint.color = s.light;
       canvas.drawOval(
         Rect.fromCenter(center: Offset(cx - 1, cy - 1), width: rx * 1.84, height: ry * 1.56),
-        Paint()..color = s.light,
+        stonePaint,
       );
+    }
+  }
+
+  void _paintSakuraGarden(Canvas canvas, Rect rect, Size size) {
+    final t = progress;
+    final tau = math.pi * 2;
+    final w = size.width;
+    final h = size.height;
+
+    if (!skipStaticBackground) {
+      _paintSakuraGardenBase(canvas, rect, size);
     }
 
     // Dere yüzeyinde çok hafif su dalgacıkları
@@ -1005,7 +1079,7 @@ class AnimatedThemePainter extends CustomPainter {
   // ---------------------------------------------------------------------------
   // YARDIMCILAR
   // ---------------------------------------------------------------------------
-  void _drawSoftGlow(
+  static void _drawSoftGlowStatic(
     Canvas canvas,
     Offset center,
     double radius,
@@ -1026,6 +1100,16 @@ class AnimatedThemePainter extends CustomPainter {
     canvas.drawCircle(center, radius, paint);
   }
 
+  void _drawSoftGlow(
+    Canvas canvas,
+    Offset center,
+    double radius,
+    Color color,
+    double opacity,
+  ) {
+    _drawSoftGlowStatic(canvas, center, radius, color, opacity);
+  }
+
   /// Deterministik [0, 1) pseudo-random üretici (her karede aynı kararlı konumlar).
   double _hash(int seed) {
     final x = math.sin(seed * 12.9898 + 78.233) * 43758.5453;
@@ -1035,14 +1119,9 @@ class AnimatedThemePainter extends CustomPainter {
   // ---------------------------------------------------------------------------
   // 6. ALEVİ POWER (Özel Tema 2 — Zülfikar, Mandala, Galaksiler & Bulutlar)
   // ---------------------------------------------------------------------------
-  void _paintAleviPower(Canvas canvas, Rect rect, Size size) {
-    final t = progress;
-    const tau = math.pi * 2;
+  static void _paintAleviPowerBase(Canvas canvas, Rect rect, Size size) {
     final w = size.width;
     final h = size.height;
-    final baseDim = math.min(w, h);
-    final unit = isPreview ? baseDim / 360.0 : (baseDim / 420.0).clamp(0.75, 1.45);
-    const inkColor = Color(0xFF0B1021);
 
     // 1) Derin Gece Lacivert -> Mor Gökyüzü
     final skyPaint = Paint()
@@ -1064,6 +1143,20 @@ class AnimatedThemePainter extends CustomPainter {
     canvas.drawCircle(Offset(w * 0.20, h * 0.22), w * 0.28, backCloudPaint);
     canvas.drawCircle(Offset(w * 0.80, h * 0.30), w * 0.32, backCloudPaint);
     canvas.drawCircle(Offset(w * 0.30, h * 0.76), w * 0.36, backCloudPaint);
+  }
+
+  void _paintAleviPower(Canvas canvas, Rect rect, Size size) {
+    final t = progress;
+    const tau = math.pi * 2;
+    final w = size.width;
+    final h = size.height;
+    final baseDim = math.min(w, h);
+    final unit = isPreview ? baseDim / 360.0 : (baseDim / 420.0).clamp(0.75, 1.45);
+    const inkColor = Color(0xFF0B1021);
+
+    if (!skipStaticBackground) {
+      _paintAleviPowerBase(canvas, rect, size);
+    }
 
     // 2) Yıldız noktaları (Eco modda daha az)
     final dotCount = isPreview ? 18 : (isEcoMode ? 24 : 52);
@@ -1514,7 +1607,8 @@ class AnimatedThemePainter extends CustomPainter {
     return oldDelegate.preset != preset ||
         oldDelegate.progress != progress ||
         oldDelegate.isPreview != isPreview ||
-        oldDelegate.isEcoMode != isEcoMode;
+        oldDelegate.isEcoMode != isEcoMode ||
+        oldDelegate.skipStaticBackground != skipStaticBackground;
   }
 }
 

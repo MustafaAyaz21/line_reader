@@ -2210,15 +2210,43 @@
             <div style="border:1px solid var(--border);border-radius:12px;padding:12px;background:var(--surface-alt);display:flex;flex-direction:column;gap:10px;">
               <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
                 <select id="podcastVoiceSelect" class="ai-select" style="font-size:12.5px;">
-                  <option value="Kore" ${(article._voiceName || "Kore") === "Kore" ? "selected" : ""}>Kore — Sıcak Kadın Anlatıcı</option>
-                  <option value="Aoede" ${article._voiceName === "Aoede" ? "selected" : ""}>Aoede — Doğal Podcast Sesi</option>
-                  <option value="Charon" ${article._voiceName === "Charon" ? "selected" : ""}>Charon — Derin Erkek Anlatıcı</option>
-                  <option value="Puck" ${article._voiceName === "Puck" ? "selected" : ""}>Puck — Canlı Erkek Anlatıcı</option>
-                  <option value="Fenrir" ${article._voiceName === "Fenrir" ? "selected" : ""}>Fenrir — Belgesel Tarzı</option>
+                  <optgroup label="F5-TTS Diffusion (RTX 5060 • En Berrak &amp; Hızlı Klon)">
+                    <option value="f5tts:normal" ${article._voiceName === "f5tts:normal" ? "selected" : ""}>F5-TTS Doğal Tempo — custom.wav/mp3 (RTX 5060)</option>
+                    <option value="f5tts:calm" ${article._voiceName === "f5tts:calm" ? "selected" : ""}>F5-TTS Sakin Tempo — custom.wav/mp3 (RTX 5060)</option>
+                  </optgroup>
+                  <optgroup label="Chatterbox GPU (RTX 5060 • Gerçek İnsan Sesi • Sınırsız)">
+                    <option value="chatterbox:expressive" ${article._voiceName === "chatterbox:expressive" ? "selected" : ""}>Podcast Sunucusu — Nefesli &amp; Duygulu (RTX 5060)</option>
+                    <option value="chatterbox:natural" ${article._voiceName === "chatterbox:natural" ? "selected" : ""}>Doğal Hikayeci — Sıcak İnsan Sesi (RTX 5060)</option>
+                    <option value="chatterbox:calm" ${article._voiceName === "chatterbox:calm" ? "selected" : ""}>Sakin Belgesel — Net &amp; Akıcı (RTX 5060)</option>
+                    <option value="chatterbox:custom" ${article._voiceName === "chatterbox:custom" ? "selected" : ""}>Özel Klon Ses (voices/custom.wav • RTX 5060)</option>
+                  </optgroup>
+                  <optgroup label="Kokoro Studio (Ücretsiz • %100 Yerel • Limitsiz)">
+                    <option value="kokoro:af_heart" ${article._voiceName === "kokoro:af_heart" ? "selected" : ""}>Heart — Sıcak &amp; İnsansı Kadın (Kokoro Studio)</option>
+                    <option value="kokoro:am_michael" ${article._voiceName === "kokoro:am_michael" ? "selected" : ""}>Michael — Doğal Erkek Podcast (Kokoro Studio)</option>
+                    <option value="kokoro:af_bella" ${article._voiceName === "kokoro:af_bella" ? "selected" : ""}>Bella — Akıcı Kadın Anlatıcı (Kokoro Studio)</option>
+                    <option value="kokoro:bf_emma" ${article._voiceName === "kokoro:bf_emma" ? "selected" : ""}>Emma — İngiliz Aksanı Kadın (Kokoro Studio)</option>
+                    <option value="kokoro:bm_george" ${article._voiceName === "kokoro:bm_george" ? "selected" : ""}>George — İngiliz Aksanı Erkek (Kokoro Studio)</option>
+                  </optgroup>
+                  <optgroup label="Gemini Pro (Nefes &amp; Düşünme Tonlamalı)">
+                    <option value="pro:Aoede" ${article._voiceName === "pro:Aoede" ? "selected" : ""}>Aoede Pro — İnsansı Hikayeci (Gemini Pro)</option>
+                    <option value="pro:Charon" ${article._voiceName === "pro:Charon" ? "selected" : ""}>Charon Pro — Derin Anlatıcı (Gemini Pro)</option>
+                    <option value="pro:Fenrir" ${article._voiceName === "pro:Fenrir" ? "selected" : ""}>Fenrir Pro — Belgesel Tarzı (Gemini Pro)</option>
+                  </optgroup>
+                  <optgroup label="Gemini Flash (Standart)">
+                    <option value="Kore" ${(article._voiceName || "Kore") === "Kore" ? "selected" : ""}>Kore — Sıcak Kadın Anlatıcı</option>
+                    <option value="Aoede" ${article._voiceName === "Aoede" ? "selected" : ""}>Aoede — Doğal Podcast Sesi</option>
+                    <option value="Charon" ${article._voiceName === "Charon" ? "selected" : ""}>Charon — Derin Erkek Anlatıcı</option>
+                    <option value="Puck" ${article._voiceName === "Puck" ? "selected" : ""}>Puck — Canlı Erkek Anlatıcı</option>
+                    <option value="Fenrir" ${article._voiceName === "Fenrir" ? "selected" : ""}>Fenrir — Belgesel Tarzı</option>
+                  </optgroup>
                 </select>
                 <button type="button" class="btn btn-ai btn-sm" id="generateAudioBtn">
                   ${article.audio_url ? "🎙 Podcast Sesini Yeniden Üret" : "🎙 Podcast Sesi Üret"}
                 </button>
+                <button type="button" class="btn btn-sm" id="uploadAudioBtn" style="background:rgba(139,92,246,0.16);border-color:rgba(139,92,246,0.45);color:#c4b5fd;font-weight:700;" title="Bilgisayardan hazır MP3, WAV veya M4A ses dosyası yükler">
+                  📁 Ses Yükle
+                </button>
+                <input type="file" id="uploadAudioFileInput" accept="audio/*,.mp3,.wav,.m4a" style="display:none;" />
                 <button type="button" class="btn btn-ai btn-sm" id="generateImageBtn" style="background:linear-gradient(135deg,#0ea5e9,#6366f1);">
                   ${article.image_url ? "🖼️ Fotoğrafı Yeniden Üret" : "🖼️ Fotoğraf Üret"}
                 </button>
@@ -2236,6 +2264,15 @@
                     ? `🎙 Hazır (${Array.isArray(article.audio_segments) ? article.audio_segments.length : 0} cümle eşleşti)`
                     : "Henüz ses yok (uygulamada cihaz sesiyle okunur)"}
                 </span>
+              </div>
+              <div id="podcastProgressBox" style="display:none;flex-direction:column;gap:6px;padding:10px 12px;border-radius:10px;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.28);">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;">
+                  <span id="podcastProgressMsg" style="font-weight:700;color:var(--text);">⏳ Podcast sesi hazırlanıyor...</span>
+                  <span id="podcastProgressMeta" style="font-variant-numeric:tabular-nums;color:var(--text-muted);font-weight:600;">%0 • Geçen: 0 sn • Kalan: hesaplanıyor...</span>
+                </div>
+                <div style="height:7px;border-radius:999px;background:rgba(148,163,184,0.2);overflow:hidden;">
+                  <div id="podcastProgressFill" style="height:100%;width:4%;border-radius:999px;background:linear-gradient(90deg,#3b82f6,#8b5cf6);transition:width 0.35s ease;"></div>
+                </div>
               </div>
               ${article.audio_url ? `
                 <audio controls preload="metadata" style="width:100%;height:38px;" src="${escapeHtml(article._local_audio_preview || article.audio_url)}${article._audioCacheBust ? `?v=${article._audioCacheBust}` : ""}"></audio>
@@ -2539,6 +2576,77 @@
       if (generateAudioBtn) {
         generateAudioBtn.addEventListener("click", () => {
           generatePodcastAudioForArticle(article, generateAudioBtn);
+        });
+      }
+
+      const uploadAudioBtn = document.getElementById("uploadAudioBtn");
+      const uploadAudioFileInput = document.getElementById("uploadAudioFileInput");
+      if (uploadAudioBtn && uploadAudioFileInput) {
+        uploadAudioBtn.addEventListener("click", () => uploadAudioFileInput.click());
+        uploadAudioFileInput.addEventListener("change", async () => {
+          const file = uploadAudioFileInput.files && uploadAudioFileInput.files[0];
+          uploadAudioFileInput.value = "";
+          if (!file) return;
+
+          const prevText = uploadAudioBtn.textContent;
+          uploadAudioBtn.disabled = true;
+          uploadAudioBtn.textContent = "⏳ Ses yükleniyor...";
+          try {
+            // Tarayıcı üzerinden gerçek ses süresini (ms) ölç
+            let durationMs = 0;
+            try {
+              const objUrl = URL.createObjectURL(file);
+              durationMs = await new Promise((resolve) => {
+                const a = new Audio();
+                a.preload = "metadata";
+                a.onloadedmetadata = () => {
+                  const ms = Number.isFinite(a.duration) ? Math.round(a.duration * 1000) : 0;
+                  URL.revokeObjectURL(objUrl);
+                  resolve(ms);
+                };
+                a.onerror = () => { URL.revokeObjectURL(objUrl); resolve(0); };
+                a.src = objUrl;
+              });
+            } catch (_) {}
+
+            const dataUrl = await new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(String(reader.result || ""));
+              reader.onerror = () => reject(new Error("Ses dosyası okunamadı."));
+              reader.readAsDataURL(file);
+            });
+
+            const contentStr = String(article.content || "");
+            const contentB64 = btoa(unescape(encodeURIComponent(contentStr)));
+
+            const res = await fetch("/api/ai/upload-audio", {
+              method: "POST",
+              headers: { "Content-Type": "application/json; charset=utf-8" },
+              body: JSON.stringify({
+                id: article.id || uniqueIdFor(article.title || "article", article.level),
+                duration_ms: durationMs,
+                content_b64: contentB64,
+                data_url: dataUrl
+              })
+            });
+            const data = await res.json();
+            if (!res.ok || !data.ok) {
+              throw new Error((data && data.message) || "Ses dosyası yüklenemedi.");
+            }
+            article.audio_url = data.audio_url || "";
+            article.audio_segments = Array.isArray(data.audio_segments) ? data.audio_segments : [];
+            article._local_audio_preview = data.local_preview_url || "";
+            article._audioCacheBust = Date.now();
+            state.dirty = true;
+            renderAll();
+            const secs = Math.round((data.duration_ms || 0) / 1000);
+            showToast(`🎙 Ses dosyası yüklendi (${secs} sn • ${data.size_kb || "?"} KB • ${article.audio_segments.length} cümle).`, "success");
+          } catch (err) {
+            showToast(err.message || "Ses yükleme hatası.", "error");
+          } finally {
+            uploadAudioBtn.disabled = false;
+            uploadAudioBtn.textContent = prevText;
+          }
         });
       }
 
@@ -3176,10 +3284,12 @@
     }
 
     async function generatePodcastAudioForArticle(article, triggerBtn = null, silentFail = false) {
-      if (!hasGeminiKey) {
+      const selectedVoice = article._voiceName || "Kore";
+      const isLocalVoice = selectedVoice.startsWith("f5tts:") || selectedVoice.startsWith("chatterbox:") || selectedVoice.startsWith("kokoro:") || selectedVoice.startsWith("edge:");
+      if (!isLocalVoice && !hasGeminiKey) {
         aiEl.settingsDrawer.classList.add("open");
         aiEl.apiKeyInput.focus();
-        showToast("Podcast sesi üretmek için önce Gemini API anahtarınızı kaydedin.", "error");
+        showToast("Gemini sesi üretmek için önce Gemini API anahtarınızı kaydedin (veya Chatterbox GPU / Kokoro seçin).", "error");
         return false;
       }
       if (!(article.content || "").trim()) {
@@ -3188,10 +3298,40 @@
       }
 
       const prevBtnText = triggerBtn ? triggerBtn.textContent : "";
-      if (triggerBtn) {
-        triggerBtn.disabled = true;
-        triggerBtn.textContent = "⏳ Podcast sesi üretiliyor...";
-      }
+      const startedAt = Date.now();
+      let livePercent = 3;
+      let liveEtaMs = null;
+      let liveMsg = isLocalVoice ? "Kokoro AI başlatılıyor..." : "Podcast sesi üretiliyor...";
+
+      const formatSecs = (ms) => {
+        const total = Math.max(0, Math.round(ms / 1000));
+        if (total < 60) return `${total} sn`;
+        const m = Math.floor(total / 60);
+        const s = total % 60;
+        return `${m} dk ${s} sn`;
+      };
+
+      const updateProgressUi = () => {
+        const elapsedMs = Date.now() - startedAt;
+        const etaText = liveEtaMs != null ? `~${formatSecs(liveEtaMs)}` : "hesaplanıyor...";
+        const box = document.getElementById("podcastProgressBox");
+        const msgEl = document.getElementById("podcastProgressMsg");
+        const metaEl = document.getElementById("podcastProgressMeta");
+        const fillEl = document.getElementById("podcastProgressFill");
+        if (box) box.style.display = "flex";
+        if (msgEl) msgEl.textContent = `🎙 ${liveMsg}`;
+        if (metaEl) {
+          metaEl.textContent = `%${livePercent} • Geçen: ${formatSecs(elapsedMs)} • Kalan: ${etaText}`;
+        }
+        if (fillEl) fillEl.style.width = `${Math.max(3, Math.min(100, livePercent))}%`;
+        if (triggerBtn) {
+          triggerBtn.disabled = true;
+          triggerBtn.textContent = `⏳ %${livePercent} (${formatSecs(elapsedMs)})`;
+        }
+      };
+
+      updateProgressUi();
+      const tickTimer = setInterval(updateProgressUi, 1000);
 
       try {
         const res = await fetch("/api/ai/generate-audio", {
@@ -3201,12 +3341,38 @@
             id: article.id || uniqueIdFor(article.title || "article", article.level),
             level: levelMeta(article.level).code,
             content: article.content,
-            voiceName: article._voiceName || "Kore"
+            voiceName: selectedVoice
           })
         });
-        const data = await res.json();
+        let data = await res.json();
         if (!res.ok || !data.ok) {
           throw new Error((data && (data.message || data.error)) || "Podcast sesi üretilemedi.");
+        }
+
+        // Asenkron Kokoro AI işi: gerçek ilerleme yüzdesi ve kalan süreyi canlı çek
+        if (data.pending && data.job_id) {
+          const jobId = data.job_id;
+          while (true) {
+            await new Promise((r) => setTimeout(r, 700));
+            const stRes = await fetch(`/api/ai/audio-status?job_id=${encodeURIComponent(jobId)}`);
+            const stData = await stRes.json();
+            if (!stRes.ok || !stData.ok) {
+              throw new Error((stData && (stData.message || stData.error)) || "Podcast sesi üretilemedi.");
+            }
+            if (stData.pending) {
+              if (typeof stData.percent === "number") livePercent = stData.percent;
+              if (typeof stData.eta_ms === "number") liveEtaMs = stData.eta_ms;
+              if (stData.message) liveMsg = stData.message;
+              updateProgressUi();
+              continue;
+            }
+            data = stData;
+            livePercent = 100;
+            liveEtaMs = 0;
+            liveMsg = "Tamamlandı!";
+            updateProgressUi();
+            break;
+          }
         }
 
         article.audio_url = data.audio_url || "";
@@ -3218,7 +3384,8 @@
 
         if (!silentFail) {
           const secs = Math.round((data.duration_ms || 0) / 1000);
-          showToast(`🎙 Podcast AI sesi hazır (${secs} sn • ${data.size_kb || "?"} KB • ${article.audio_segments.length} cümle).`, "success");
+          const spent = formatSecs(Date.now() - startedAt);
+          showToast(`🎙 Podcast AI sesi hazır (${secs} sn ses • ${spent} sürede üretildi • ${article.audio_segments.length} cümle).`, "success");
         }
         return true;
       } catch (err) {
@@ -3227,6 +3394,9 @@
         }
         return false;
       } finally {
+        clearInterval(tickTimer);
+        const box = document.getElementById("podcastProgressBox");
+        if (box) box.style.display = "none";
         if (triggerBtn) {
           triggerBtn.disabled = false;
           triggerBtn.textContent = prevBtnText;
