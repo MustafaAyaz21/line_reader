@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -10,6 +9,7 @@ import 'package:sqflite/sqflite.dart';
 import '../../../core/database/app_database.dart';
 import '../models/word_lexicon_info.dart';
 import '../utils/english_morphology_resolver.dart';
+import '../utils/gzip_decoder.dart';
 
 /// Doğrulanmış Amerikan (US) / İngiliz (UK) IPA okunuşlarını ve eş/zıt anlamlı
 /// kelimeleri sağlayan, çevrimdışı paket + otomatik büyüyen SQLite önbellek +
@@ -73,7 +73,7 @@ class WordLexiconService {
         byteData.offsetInBytes,
         byteData.lengthInBytes,
       );
-      final rawBytes = gzip.decode(compressed);
+      final rawBytes = await decodeGzipBytes(compressed);
       final decoded = jsonDecode(utf8.decode(rawBytes));
       if (decoded is! Map) {
         _bundledCache = <String, WordLexiconInfo>{};
@@ -519,13 +519,14 @@ class WordLexiconService {
           'prop': 'wikitext',
           'format': 'json',
           'redirects': '1',
+          if (kIsWeb) 'origin': '*',
         },
       );
       final response = await _httpClient.get(
         uri,
-        headers: const <String, String>{
+        headers: <String, String>{
           'Accept': 'application/json',
-          'User-Agent': 'LineReader/1.0',
+          if (!kIsWeb) 'User-Agent': 'LineReader/1.0',
         },
       ).timeout(_timeout);
       if (response.statusCode != 200) return null;
