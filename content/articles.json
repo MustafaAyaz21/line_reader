@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-11-27T11:39:38.980Z",
+  "updated_at": "2026-11-27T11:47:42.216Z",
   "articles": [
     {
       "id": "b2-the-timeless-impact-of-english-literature",
@@ -1356,157 +1356,157 @@
           "p": 0,
           "s": 0,
           "start_ms": 0,
-          "end_ms": 8178
+          "end_ms": 8197
         },
         {
           "p": 0,
           "s": 1,
-          "start_ms": 8178,
-          "end_ms": 13630
+          "start_ms": 8197,
+          "end_ms": 13662
         },
         {
           "p": 0,
           "s": 2,
-          "start_ms": 13630,
-          "end_ms": 19082
+          "start_ms": 13662,
+          "end_ms": 19127
         },
         {
           "p": 0,
           "s": 3,
-          "start_ms": 19082,
-          "end_ms": 26471
+          "start_ms": 19127,
+          "end_ms": 26533
         },
         {
           "p": 0,
           "s": 4,
-          "start_ms": 26471,
-          "end_ms": 34361
+          "start_ms": 26533,
+          "end_ms": 34442
         },
         {
           "p": 0,
           "s": 5,
-          "start_ms": 34361,
-          "end_ms": 40029
+          "start_ms": 34442,
+          "end_ms": 40123
         },
         {
           "p": 1,
           "s": 0,
-          "start_ms": 40029,
-          "end_ms": 46126
+          "start_ms": 40123,
+          "end_ms": 46235
         },
         {
           "p": 1,
           "s": 1,
-          "start_ms": 46126,
-          "end_ms": 51506
+          "start_ms": 46235,
+          "end_ms": 51628
         },
         {
           "p": 1,
           "s": 2,
-          "start_ms": 51506,
-          "end_ms": 58465
+          "start_ms": 51628,
+          "end_ms": 58602
         },
         {
           "p": 1,
           "s": 3,
-          "start_ms": 58465,
-          "end_ms": 64706
+          "start_ms": 58602,
+          "end_ms": 64858
         },
         {
           "p": 1,
           "s": 4,
-          "start_ms": 64706,
-          "end_ms": 74031
+          "start_ms": 64858,
+          "end_ms": 74206
         },
         {
           "p": 1,
           "s": 5,
-          "start_ms": 74031,
-          "end_ms": 83931
+          "start_ms": 74206,
+          "end_ms": 84129
         },
         {
           "p": 2,
           "s": 0,
-          "start_ms": 83931,
-          "end_ms": 93400
+          "start_ms": 84129,
+          "end_ms": 93620
         },
         {
           "p": 2,
           "s": 1,
-          "start_ms": 93400,
-          "end_ms": 102080
+          "start_ms": 93620,
+          "end_ms": 102320
         },
         {
           "p": 2,
           "s": 2,
-          "start_ms": 102080,
-          "end_ms": 106241
+          "start_ms": 102320,
+          "end_ms": 106491
         },
         {
           "p": 2,
           "s": 3,
-          "start_ms": 106241,
-          "end_ms": 114203
+          "start_ms": 106491,
+          "end_ms": 114472
         },
         {
           "p": 2,
           "s": 4,
-          "start_ms": 114203,
-          "end_ms": 119081
+          "start_ms": 114472,
+          "end_ms": 119362
         },
         {
           "p": 3,
           "s": 0,
-          "start_ms": 119081,
-          "end_ms": 123673
+          "start_ms": 119362,
+          "end_ms": 123964
         },
         {
           "p": 3,
           "s": 1,
-          "start_ms": 123673,
-          "end_ms": 130990
+          "start_ms": 123964,
+          "end_ms": 131298
         },
         {
           "p": 3,
           "s": 2,
-          "start_ms": 130990,
-          "end_ms": 136657
+          "start_ms": 131298,
+          "end_ms": 136979
         },
         {
           "p": 3,
           "s": 3,
-          "start_ms": 136657,
-          "end_ms": 143759
+          "start_ms": 136979,
+          "end_ms": 144097
         },
         {
           "p": 3,
           "s": 4,
-          "start_ms": 143759,
-          "end_ms": 153873
+          "start_ms": 144097,
+          "end_ms": 154236
         },
         {
           "p": 4,
           "s": 0,
-          "start_ms": 153873,
-          "end_ms": 161764
+          "start_ms": 154236,
+          "end_ms": 162145
         },
         {
           "p": 4,
           "s": 1,
-          "start_ms": 161764,
-          "end_ms": 172166
+          "start_ms": 162145,
+          "end_ms": 172571
         },
         {
           "p": 4,
           "s": 2,
-          "start_ms": 172166,
-          "end_ms": 174748
+          "start_ms": 172571,
+          "end_ms": 175160
         },
         {
           "p": 4,
           "s": 3,
-          "start_ms": 174748,
-          "end_ms": 186800
+          "start_ms": 175160,
+          "end_ms": 187240
         }
       ]
     },
