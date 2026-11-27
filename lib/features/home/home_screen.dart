@@ -414,6 +414,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
   }
 
+  String _hashForStackIndex(int stackIndex) {
+    return switch (stackIndex) {
+      _stackBrowserIndex => '#/browser',
+      _stackWordsIndex => '#/words',
+      _ => '#/articles',
+    };
+  }
+
   void _switchToStackIndex(
     int targetStackIndex, {
     bool recordHistory = true,
@@ -424,6 +432,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     if (kIsWeb && recordHistory) {
       WebBackBridge.shared.pushEntry(
+        hash: _hashForStackIndex(targetStackIndex),
         onBack: () {
           if (!mounted) return;
           _switchToStackIndex(previousStackIndex, recordHistory: false);

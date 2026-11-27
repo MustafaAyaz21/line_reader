@@ -328,6 +328,7 @@ class _WordsScreenState extends State<WordsScreen> {
 
     if (kIsWeb && _searchHistoryToken == null) {
       _searchHistoryToken = WebBackBridge.shared.pushEntry(
+        hash: '#/words/search',
         onBack: () {
           if (mounted && _isSearchPanelOpen) {
             _searchHistoryToken = null;

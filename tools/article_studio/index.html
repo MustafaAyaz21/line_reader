@@ -2210,15 +2210,15 @@
             <div style="border:1px solid var(--border);border-radius:12px;padding:12px;background:var(--surface-alt);display:flex;flex-direction:column;gap:10px;">
               <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
                 <select id="podcastVoiceSelect" class="ai-select" style="font-size:12.5px;">
-                  <optgroup label="F5-TTS Diffusion (RTX 5060 • En Berrak &amp; Hızlı Klon)">
-                    <option value="f5tts:normal" ${article._voiceName === "f5tts:normal" ? "selected" : ""}>F5-TTS Doğal Tempo — custom.wav/mp3 (RTX 5060)</option>
-                    <option value="f5tts:calm" ${article._voiceName === "f5tts:calm" ? "selected" : ""}>F5-TTS Sakin Tempo — custom.wav/mp3 (RTX 5060)</option>
-                  </optgroup>
                   <optgroup label="Chatterbox GPU (RTX 5060 • Gerçek İnsan Sesi • Sınırsız)">
+                    <option value="chatterbox:custom" ${article._voiceName === "chatterbox:custom" ? "selected" : ""}>Özel Klon Ses (voices/custom.wav • RTX 5060)</option>
                     <option value="chatterbox:expressive" ${article._voiceName === "chatterbox:expressive" ? "selected" : ""}>Podcast Sunucusu — Nefesli &amp; Duygulu (RTX 5060)</option>
                     <option value="chatterbox:natural" ${article._voiceName === "chatterbox:natural" ? "selected" : ""}>Doğal Hikayeci — Sıcak İnsan Sesi (RTX 5060)</option>
                     <option value="chatterbox:calm" ${article._voiceName === "chatterbox:calm" ? "selected" : ""}>Sakin Belgesel — Net &amp; Akıcı (RTX 5060)</option>
-                    <option value="chatterbox:custom" ${article._voiceName === "chatterbox:custom" ? "selected" : ""}>Özel Klon Ses (voices/custom.wav • RTX 5060)</option>
+                  </optgroup>
+                  <optgroup label="F5-TTS Diffusion (RTX 5060 • Hızlı Alternatif)">
+                    <option value="f5tts:normal" ${article._voiceName === "f5tts:normal" ? "selected" : ""}>F5-TTS Doğal Tempo — custom.wav/mp3 (RTX 5060)</option>
+                    <option value="f5tts:calm" ${article._voiceName === "f5tts:calm" ? "selected" : ""}>F5-TTS Sakin Tempo — custom.wav/mp3 (RTX 5060)</option>
                   </optgroup>
                   <optgroup label="Kokoro Studio (Ücretsiz • %100 Yerel • Limitsiz)">
                     <option value="kokoro:af_heart" ${article._voiceName === "kokoro:af_heart" ? "selected" : ""}>Heart — Sıcak &amp; İnsansı Kadın (Kokoro Studio)</option>

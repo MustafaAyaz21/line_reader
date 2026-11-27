@@ -163,7 +163,7 @@ def main():
     progress_path = sys.argv[4] if len(sys.argv) > 4 else None
 
     started_at = time.time()
-    with open(in_json, "r", encoding="utf-8") as f:
+    with open(in_json, "r", encoding="utf-8-sig") as f:
         payload = json.load(f)
 
     text = str(payload.get("text") or "").strip()
@@ -215,8 +215,8 @@ def main():
             if os.path.exists(candidate):
                 audio_prompt_path = candidate
                 break
-        exaggeration = 0.42
-        cfg_weight = 0.30
+        exaggeration = 0.48
+        cfg_weight = 0.50
 
     synth_started = time.time()
     write_progress(progress_path, {

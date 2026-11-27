@@ -4,7 +4,11 @@ typedef PopStateCallback = void Function();
 class PlatformWebHistory {
   void initialize(PopStateCallback onPopState) {}
 
-  void pushState() {}
+  String get currentHash => '';
+
+  void ensureBaseHash(String hash) {}
+
+  void pushHash(String hash) {}
 
   void back() {}
 
