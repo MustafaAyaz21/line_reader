@@ -1,3 +1,17 @@
+/// Bir İngilizce kelimenin kök (temel) kelimesini ve gramer ilişkisini taşır.
+/// Örn: `"bought"` -> `baseWord: "buy"`, `relationLabelTr: "2. / 3. hali"`.
+class WordInflectionInfo {
+  const WordInflectionInfo({
+    required this.baseWord,
+    required this.relationLabelTr,
+    required this.relationLabelEn,
+  });
+
+  final String baseWord;
+  final String relationLabelTr;
+  final String relationLabelEn;
+}
+
 /// Yaygın İngilizce çekim eklerini (-s, -es, -ies, -ed, -ing, -ly, -er, -est,
 /// -tion/-sion varyasyonları vb.) ve düzensiz fiil/isim biçimlerini hafif ve
 /// hızlı biçimde kök/temel form adaylarına indirgeyen çözümleyici.

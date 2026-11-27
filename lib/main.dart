@@ -4,8 +4,8 @@ import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 
 import 'core/localization/app_locale.dart';
+import 'core/navigation/app_router.dart';
 import 'core/platform/process_text_channel.dart';
-import 'core/platform/web_back_bridge.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/app_theme_controller.dart';
 import 'features/home/home_screen.dart';
@@ -21,7 +21,6 @@ void main() {
   }
   if (kIsWeb) {
     databaseFactory = databaseFactoryFfiWeb;
-    WebBackBridge.shared.ensureInitialized();
   }
   ProcessTextChannel.ensureInitialized();
   runApp(const LineReaderApp());
@@ -45,17 +44,34 @@ class LineReaderApp extends StatefulWidget {
 
 class _LineReaderAppState extends State<LineReaderApp> {
   late final AppLocaleController _localeController;
+  AppRouterDelegate? _routerDelegate;
+  PlatformRouteInformationProvider? _routeInformationProvider;
+  RootBackButtonDispatcher? _backButtonDispatcher;
 
   @override
   void initState() {
     super.initState();
     _localeController = AppLocaleController()..load();
     AppThemeController.shared.load();
+    if (kIsWeb) {
+      _routerDelegate = AppRouterDelegate(
+        controller: AppRouteController.shared,
+        homeBuilder: (_) => const HomeScreen(),
+      );
+      _routeInformationProvider = PlatformRouteInformationProvider(
+        initialRouteInformation: RouteInformation(
+          uri: Uri(path: '/articles'),
+        ),
+      );
+      _backButtonDispatcher = RootBackButtonDispatcher();
+    }
   }
 
   @override
   void dispose() {
     _localeController.dispose();
+    _routerDelegate?.dispose();
+    _routeInformationProvider?.dispose();
     super.dispose();
   }
 
@@ -70,23 +86,38 @@ class _LineReaderAppState extends State<LineReaderApp> {
         ]),
         builder: (context, _) {
           final preset = AppThemeController.shared.preset;
+          final lightTheme = AppTheme.forPreset(
+            preset,
+            classicBrightness: Brightness.light,
+          );
+          final darkTheme = AppTheme.forPreset(
+            preset,
+            classicBrightness: Brightness.dark,
+          );
+
+          if (kIsWeb) {
+            return MaterialApp.router(
+              title: 'Line Reader',
+              debugShowCheckedModeBanner: false,
+              theme: lightTheme,
+              darkTheme: darkTheme,
+              themeMode: preset.themeMode,
+              themeAnimationDuration: Duration.zero,
+              routerDelegate: _routerDelegate!,
+              routeInformationParser: const AppRouteInformationParser(),
+              routeInformationProvider: _routeInformationProvider!,
+              backButtonDispatcher: _backButtonDispatcher!,
+            );
+          }
+
           return MaterialApp(
             title: 'Line Reader',
             debugShowCheckedModeBanner: false,
-            navigatorObservers: kIsWeb
-                ? <NavigatorObserver>[WebBackBridge.shared.navigatorObserver]
-                : const <NavigatorObserver>[],
-            theme: AppTheme.forPreset(
-              preset,
-              classicBrightness: Brightness.light,
-            ),
-            darkTheme: AppTheme.forPreset(
-              preset,
-              classicBrightness: Brightness.dark,
-            ),
+            theme: lightTheme,
+            darkTheme: darkTheme,
             themeMode: preset.themeMode,
             themeAnimationDuration: Duration.zero,
-            home: kIsWeb ? const HomeScreen() : const SplashScreen(),
+            home: const SplashScreen(),
           );
         },
       ),

@@ -8,8 +8,8 @@ import '../../core/config/api_config.dart';
 import '../../core/database/app_database.dart';
 import '../../core/localization/app_locale.dart';
 import '../../core/localization/app_strings.dart';
+import '../../core/navigation/app_router.dart';
 import '../../core/platform/process_text_channel.dart';
-import '../../core/platform/web_back_bridge.dart';
 import '../../core/settings/api_key_controller.dart';
 import '../../core/settings/display_preferences_controller.dart';
 import '../../core/settings/ipa_accent_controller.dart';
@@ -84,6 +84,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     super.initState();
     _mobilePageController = PageController()
       ..addListener(_handleMobilePageScroll);
+    if (kIsWeb) {
+      AppRouteController.shared.addListener(_syncTabFromRouter);
+    }
     WidgetsBinding.instance.addObserver(this);
     _ensureInitialized();
     IpaAccentController.shared.load();
@@ -300,6 +303,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _mobilePageController
       ..removeListener(_handleMobilePageScroll)
       ..dispose();
+    if (kIsWeb) {
+      AppRouteController.shared.removeListener(_syncTabFromRouter);
+    }
     super.dispose();
   }
 
@@ -414,30 +420,39 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
   }
 
-  String _hashForStackIndex(int stackIndex) {
+  AppTabRoute _tabForStackIndex(int stackIndex) {
     return switch (stackIndex) {
-      _stackBrowserIndex => '#/browser',
-      _stackWordsIndex => '#/words',
-      _ => '#/articles',
+      _stackBrowserIndex => AppTabRoute.browser,
+      _stackWordsIndex => AppTabRoute.words,
+      _ => AppTabRoute.articles,
     };
+  }
+
+  int _stackIndexForTab(AppTabRoute tab) {
+    return switch (tab) {
+      AppTabRoute.browser => _stackBrowserIndex,
+      AppTabRoute.words => _stackWordsIndex,
+      AppTabRoute.articles => _stackMainMenuIndex,
+    };
+  }
+
+  void _syncTabFromRouter() {
+    if (!mounted) return;
+    final targetStackIndex = _stackIndexForTab(AppRouteController.shared.tab);
+    if (targetStackIndex == _activeStackIndex) return;
+    _switchToStackIndex(targetStackIndex, updateRouter: false);
   }
 
   void _switchToStackIndex(
     int targetStackIndex, {
-    bool recordHistory = true,
+    bool updateRouter = true,
   }) {
     _ensureInitialized();
     final previousStackIndex = _activeStackIndex;
     if (previousStackIndex == targetStackIndex) return;
 
-    if (kIsWeb && recordHistory) {
-      WebBackBridge.shared.pushEntry(
-        hash: _hashForStackIndex(targetStackIndex),
-        onBack: () {
-          if (!mounted) return;
-          _switchToStackIndex(previousStackIndex, recordHistory: false);
-        },
-      );
+    if (kIsWeb && updateRouter) {
+      AppRouteController.shared.setTab(_tabForStackIndex(targetStackIndex));
     }
 
     setState(() {

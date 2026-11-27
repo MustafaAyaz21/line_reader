@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/localization/app_locale.dart';
 import '../../core/localization/app_strings.dart';
-import '../../core/platform/web_back_bridge.dart';
+import '../../core/navigation/app_router.dart';
 import '../../core/settings/api_key_controller.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/tts/tts_service.dart';
@@ -120,7 +120,6 @@ class _WordsScreenState extends State<WordsScreen> {
   final Set<String> _selectedSynonyms = <String>{};
   final Set<String> _selectedAntonyms = <String>{};
   TtsService? _fallbackTtsService;
-  Object? _searchHistoryToken;
 
   TtsService _resolveTtsService() {
     return widget.ttsService ?? (_fallbackTtsService ??= TtsService());
@@ -151,6 +150,10 @@ class _WordsScreenState extends State<WordsScreen> {
         );
     widget.searchTriggerController?.addListener(_handleExternalSearchTrigger);
     widget.searchTriggerController?.attachBackHandler(_handleBackFromHost);
+    if (kIsWeb) {
+      AppRouteController.shared
+          .attachCloseWordsSearchHandler(_closeSearchFromRouter);
+    }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -181,6 +184,9 @@ class _WordsScreenState extends State<WordsScreen> {
     _suggestDebounce?.cancel();
     widget.searchTriggerController?.removeListener(_handleExternalSearchTrigger);
     widget.searchTriggerController?.attachBackHandler(null);
+    if (kIsWeb) {
+      AppRouteController.shared.attachCloseWordsSearchHandler(null);
+    }
     _searchController.dispose();
     _searchFocusNode.dispose();
     if (_ownsSearchService) {
@@ -188,6 +194,11 @@ class _WordsScreenState extends State<WordsScreen> {
     }
     _fallbackTtsService?.dispose();
     super.dispose();
+  }
+
+  void _closeSearchFromRouter() {
+    if (!mounted || !_isSearchPanelOpen) return;
+    _clearTopSearch(updateRouter: false);
   }
 
   bool _handleBackFromHost() {
@@ -225,10 +236,10 @@ class _WordsScreenState extends State<WordsScreen> {
     return def?.id ?? lists.first.id;
   }
 
-  void _clearTopSearch({bool keepText = false}) {
-    final token = _searchHistoryToken;
-    _searchHistoryToken = null;
-    WebBackBridge.shared.popEntrySilently(token);
+  void _clearTopSearch({bool keepText = false, bool updateRouter = true}) {
+    if (kIsWeb && updateRouter) {
+      AppRouteController.shared.setWordsSearchOpen(false);
+    }
     _suggestDebounce?.cancel();
     _suggestGeneration++;
     _searchGeneration++;
@@ -326,16 +337,8 @@ class _WordsScreenState extends State<WordsScreen> {
     _suggestDebounce?.cancel();
     _suggestGeneration++;
 
-    if (kIsWeb && _searchHistoryToken == null) {
-      _searchHistoryToken = WebBackBridge.shared.pushEntry(
-        hash: '#/words/search',
-        onBack: () {
-          if (mounted && _isSearchPanelOpen) {
-            _searchHistoryToken = null;
-            _clearTopSearch();
-          }
-        },
-      );
+    if (kIsWeb) {
+      AppRouteController.shared.setWordsSearchOpen(true);
     }
 
     setState(() {
