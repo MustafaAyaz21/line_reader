@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-11-27T00:23:54.427Z",
+  "updated_at": "2026-11-27T11:25:45.150Z",
   "articles": [
     {
       "id": "b2-the-timeless-impact-of-english-literature",
@@ -594,97 +594,97 @@
           "p": 0,
           "s": 0,
           "start_ms": 0,
-          "end_ms": 7780
+          "end_ms": 6806
         },
         {
           "p": 0,
           "s": 1,
-          "start_ms": 8140,
-          "end_ms": 19180
+          "start_ms": 6806,
+          "end_ms": 17649
         },
         {
           "p": 0,
           "s": 2,
-          "start_ms": 19700,
-          "end_ms": 29900
+          "start_ms": 17649,
+          "end_ms": 27916
         },
         {
           "p": 0,
           "s": 3,
-          "start_ms": 30880,
-          "end_ms": 40100
+          "start_ms": 27916,
+          "end_ms": 36510
         },
         {
           "p": 1,
           "s": 0,
-          "start_ms": 40100,
-          "end_ms": 48780
+          "start_ms": 36510,
+          "end_ms": 45853
         },
         {
           "p": 1,
           "s": 1,
-          "start_ms": 50160,
-          "end_ms": 56680
+          "start_ms": 45853,
+          "end_ms": 52602
         },
         {
           "p": 1,
           "s": 2,
-          "start_ms": 58460,
-          "end_ms": 66560
+          "start_ms": 52602,
+          "end_ms": 62407
         },
         {
           "p": 1,
           "s": 3,
-          "start_ms": 67960,
-          "end_ms": 78020
+          "start_ms": 62407,
+          "end_ms": 73942
         },
         {
           "p": 2,
           "s": 0,
-          "start_ms": 79100,
-          "end_ms": 85560
+          "start_ms": 73942,
+          "end_ms": 80344
         },
         {
           "p": 2,
           "s": 1,
-          "start_ms": 85560,
-          "end_ms": 94380
+          "start_ms": 80344,
+          "end_ms": 90092
         },
         {
           "p": 2,
           "s": 2,
-          "start_ms": 94380,
-          "end_ms": 104500
+          "start_ms": 90092,
+          "end_ms": 101224
         },
         {
           "p": 2,
           "s": 3,
-          "start_ms": 104500,
-          "end_ms": 110840
+          "start_ms": 101224,
+          "end_ms": 108491
         },
         {
           "p": 3,
           "s": 0,
-          "start_ms": 111580,
-          "end_ms": 117840
+          "start_ms": 108491,
+          "end_ms": 114893
         },
         {
           "p": 3,
           "s": 1,
-          "start_ms": 117840,
-          "end_ms": 128580
+          "start_ms": 114893,
+          "end_ms": 128274
         },
         {
           "p": 3,
           "s": 2,
-          "start_ms": 128580,
-          "end_ms": 129980
+          "start_ms": 128274,
+          "end_ms": 135253
         },
         {
           "p": 3,
           "s": 3,
-          "start_ms": 129980,
-          "end_ms": 130230
+          "start_ms": 135253,
+          "end_ms": 144020
         }
       ]
     },
@@ -927,205 +927,205 @@
           "p": 0,
           "s": 0,
           "start_ms": 0,
-          "end_ms": 3780
+          "end_ms": 3315
         },
         {
           "p": 0,
           "s": 1,
-          "start_ms": 3780,
-          "end_ms": 7960
+          "start_ms": 3315,
+          "end_ms": 7087
         },
         {
           "p": 0,
           "s": 2,
-          "start_ms": 8100,
-          "end_ms": 12020
+          "start_ms": 7087,
+          "end_ms": 10687
         },
         {
           "p": 0,
           "s": 3,
-          "start_ms": 12320,
-          "end_ms": 16140
+          "start_ms": 10687,
+          "end_ms": 14688
         },
         {
           "p": 0,
           "s": 4,
-          "start_ms": 16340,
-          "end_ms": 21680
+          "start_ms": 14688,
+          "end_ms": 20632
         },
         {
           "p": 0,
           "s": 5,
-          "start_ms": 22000,
-          "end_ms": 27040
+          "start_ms": 20632,
+          "end_ms": 25089
         },
         {
           "p": 0,
           "s": 6,
-          "start_ms": 27040,
-          "end_ms": 33460
+          "start_ms": 25089,
+          "end_ms": 30804
         },
         {
           "p": 1,
           "s": 0,
-          "start_ms": 33580,
-          "end_ms": 37020
+          "start_ms": 30804,
+          "end_ms": 34234
         },
         {
           "p": 1,
           "s": 1,
-          "start_ms": 37020,
-          "end_ms": 40900
+          "start_ms": 34234,
+          "end_ms": 38291
         },
         {
           "p": 1,
           "s": 2,
-          "start_ms": 40900,
-          "end_ms": 43380
+          "start_ms": 38291,
+          "end_ms": 40634
         },
         {
           "p": 1,
           "s": 3,
-          "start_ms": 43380,
-          "end_ms": 47800
+          "start_ms": 40634,
+          "end_ms": 45207
         },
         {
           "p": 1,
           "s": 4,
-          "start_ms": 47800,
-          "end_ms": 50460
+          "start_ms": 45207,
+          "end_ms": 48178
         },
         {
           "p": 1,
           "s": 5,
-          "start_ms": 50460,
-          "end_ms": 55580
+          "start_ms": 48178,
+          "end_ms": 53551
         },
         {
           "p": 1,
           "s": 6,
-          "start_ms": 55580,
-          "end_ms": 59000
+          "start_ms": 53551,
+          "end_ms": 56751
         },
         {
           "p": 1,
           "s": 7,
-          "start_ms": 59000,
-          "end_ms": 63260
+          "start_ms": 56751,
+          "end_ms": 61437
         },
         {
           "p": 2,
           "s": 0,
-          "start_ms": 63520,
-          "end_ms": 67360
+          "start_ms": 61437,
+          "end_ms": 65038
         },
         {
           "p": 2,
           "s": 1,
-          "start_ms": 67600,
-          "end_ms": 71440
+          "start_ms": 65038,
+          "end_ms": 69096
         },
         {
           "p": 2,
           "s": 2,
-          "start_ms": 71760,
-          "end_ms": 76240
+          "start_ms": 69096,
+          "end_ms": 73896
         },
         {
           "p": 2,
           "s": 3,
-          "start_ms": 76380,
-          "end_ms": 79600
+          "start_ms": 73896,
+          "end_ms": 77325
         },
         {
           "p": 2,
           "s": 4,
-          "start_ms": 79660,
-          "end_ms": 83160
+          "start_ms": 77325,
+          "end_ms": 80869
         },
         {
           "p": 2,
           "s": 5,
-          "start_ms": 83160,
-          "end_ms": 87660
+          "start_ms": 80869,
+          "end_ms": 85327
         },
         {
           "p": 2,
           "s": 6,
-          "start_ms": 87660,
-          "end_ms": 93400
+          "start_ms": 85327,
+          "end_ms": 91270
         },
         {
           "p": 3,
           "s": 0,
-          "start_ms": 93400,
-          "end_ms": 98140
+          "start_ms": 91270,
+          "end_ms": 95385
         },
         {
           "p": 3,
           "s": 1,
-          "start_ms": 98280,
-          "end_ms": 102420
+          "start_ms": 95385,
+          "end_ms": 99843
         },
         {
           "p": 3,
           "s": 2,
-          "start_ms": 102420,
-          "end_ms": 104500
+          "start_ms": 99843,
+          "end_ms": 101958
         },
         {
           "p": 3,
           "s": 3,
-          "start_ms": 104500,
-          "end_ms": 108980
+          "start_ms": 101958,
+          "end_ms": 106758
         },
         {
           "p": 3,
           "s": 4,
-          "start_ms": 108980,
-          "end_ms": 112100
+          "start_ms": 106758,
+          "end_ms": 110016
         },
         {
           "p": 3,
           "s": 5,
-          "start_ms": 112100,
-          "end_ms": 114660
+          "start_ms": 110016,
+          "end_ms": 112873
         },
         {
           "p": 3,
           "s": 6,
-          "start_ms": 114660,
-          "end_ms": 118000
+          "start_ms": 112873,
+          "end_ms": 116417
         },
         {
           "p": 4,
           "s": 0,
-          "start_ms": 118000,
-          "end_ms": 121140
+          "start_ms": 116417,
+          "end_ms": 119674
         },
         {
           "p": 4,
           "s": 1,
-          "start_ms": 121140,
-          "end_ms": 124080
+          "start_ms": 119674,
+          "end_ms": 122418
         },
         {
           "p": 4,
           "s": 2,
-          "start_ms": 124080,
-          "end_ms": 129480
+          "start_ms": 122418,
+          "end_ms": 128476
         },
         {
           "p": 4,
           "s": 3,
-          "start_ms": 129480,
-          "end_ms": 133460
+          "start_ms": 128476,
+          "end_ms": 132876
         },
         {
           "p": 4,
           "s": 4,
-          "start_ms": 133460,
-          "end_ms": 138800
+          "start_ms": 132876,
+          "end_ms": 138420
         }
       ]
     },
@@ -1356,157 +1356,157 @@
           "p": 0,
           "s": 0,
           "start_ms": 0,
-          "end_ms": 6700
+          "end_ms": 8870
         },
         {
           "p": 0,
           "s": 1,
-          "start_ms": 6700,
-          "end_ms": 12080
+          "start_ms": 8870,
+          "end_ms": 14784
         },
         {
           "p": 0,
           "s": 2,
-          "start_ms": 12080,
-          "end_ms": 17480
+          "start_ms": 14784,
+          "end_ms": 20698
         },
         {
           "p": 0,
           "s": 3,
-          "start_ms": 17480,
-          "end_ms": 24720
+          "start_ms": 20698,
+          "end_ms": 28712
         },
         {
           "p": 0,
           "s": 4,
-          "start_ms": 24720,
-          "end_ms": 32460
+          "start_ms": 28712,
+          "end_ms": 37271
         },
         {
           "p": 0,
           "s": 5,
-          "start_ms": 32460,
-          "end_ms": 38040
+          "start_ms": 37271,
+          "end_ms": 43419
         },
         {
           "p": 1,
-          "s": 6,
-          "start_ms": 38040,
-          "end_ms": 45020
+          "s": 0,
+          "start_ms": 43419,
+          "end_ms": 50033
         },
         {
           "p": 1,
-          "s": 7,
-          "start_ms": 45020,
-          "end_ms": 50340
+          "s": 1,
+          "start_ms": 50033,
+          "end_ms": 55868
         },
         {
           "p": 1,
-          "s": 8,
-          "start_ms": 50340,
-          "end_ms": 57180
+          "s": 2,
+          "start_ms": 55868,
+          "end_ms": 63416
         },
         {
           "p": 1,
-          "s": 9,
-          "start_ms": 57180,
-          "end_ms": 63320
+          "s": 3,
+          "start_ms": 63416,
+          "end_ms": 70186
         },
         {
           "p": 1,
-          "s": 10,
-          "start_ms": 63320,
-          "end_ms": 72440
+          "s": 4,
+          "start_ms": 70186,
+          "end_ms": 80301
         },
         {
           "p": 1,
-          "s": 11,
-          "start_ms": 72440,
-          "end_ms": 82100
+          "s": 5,
+          "start_ms": 80301,
+          "end_ms": 91039
         },
         {
           "p": 2,
-          "s": 12,
-          "start_ms": 82100,
-          "end_ms": 92320
+          "s": 0,
+          "start_ms": 91039,
+          "end_ms": 101310
         },
         {
           "p": 2,
-          "s": 13,
-          "start_ms": 92320,
-          "end_ms": 100800
+          "s": 1,
+          "start_ms": 101310,
+          "end_ms": 110725
         },
         {
           "p": 2,
-          "s": 14,
-          "start_ms": 100800,
-          "end_ms": 104960
+          "s": 2,
+          "start_ms": 110725,
+          "end_ms": 115238
         },
         {
           "p": 2,
-          "s": 15,
-          "start_ms": 104960,
-          "end_ms": 112760
+          "s": 3,
+          "start_ms": 115238,
+          "end_ms": 123875
         },
         {
           "p": 2,
-          "s": 16,
-          "start_ms": 112760,
-          "end_ms": 117580
+          "s": 4,
+          "start_ms": 123875,
+          "end_ms": 129166
         },
         {
           "p": 3,
-          "s": 17,
-          "start_ms": 117580,
-          "end_ms": 123100
+          "s": 0,
+          "start_ms": 129166,
+          "end_ms": 134146
         },
         {
           "p": 3,
-          "s": 18,
-          "start_ms": 123100,
-          "end_ms": 130300
+          "s": 1,
+          "start_ms": 134146,
+          "end_ms": 142083
         },
         {
           "p": 3,
-          "s": 19,
-          "start_ms": 130300,
-          "end_ms": 135880
+          "s": 2,
+          "start_ms": 142083,
+          "end_ms": 148230
         },
         {
           "p": 3,
-          "s": 20,
-          "start_ms": 135880,
-          "end_ms": 142860
+          "s": 3,
+          "start_ms": 148230,
+          "end_ms": 155933
         },
         {
           "p": 3,
-          "s": 21,
-          "start_ms": 142860,
-          "end_ms": 152720
+          "s": 4,
+          "start_ms": 155933,
+          "end_ms": 166905
         },
         {
           "p": 4,
-          "s": 22,
-          "start_ms": 152720,
-          "end_ms": 161420
+          "s": 0,
+          "start_ms": 166905,
+          "end_ms": 175464
         },
         {
           "p": 4,
-          "s": 23,
-          "start_ms": 161420,
-          "end_ms": 171580
+          "s": 1,
+          "start_ms": 175464,
+          "end_ms": 186747
         },
         {
           "p": 4,
-          "s": 24,
-          "start_ms": 171580,
-          "end_ms": 174200
+          "s": 2,
+          "start_ms": 186747,
+          "end_ms": 189548
         },
         {
           "p": 4,
-          "s": 25,
-          "start_ms": 174200,
-          "end_ms": 187250
+          "s": 3,
+          "start_ms": 189548,
+          "end_ms": 202620
         }
       ]
     },
@@ -1746,187 +1746,187 @@
           "p": 0,
           "s": 0,
           "start_ms": 0,
-          "end_ms": 5180
+          "end_ms": 6618
         },
         {
           "p": 0,
           "s": 1,
-          "start_ms": 5180,
-          "end_ms": 14480
+          "start_ms": 6618,
+          "end_ms": 16170
         },
         {
           "p": 0,
           "s": 2,
-          "start_ms": 14480,
-          "end_ms": 21980
+          "start_ms": 16170,
+          "end_ms": 23849
         },
         {
           "p": 0,
           "s": 3,
-          "start_ms": 21980,
-          "end_ms": 28580
+          "start_ms": 23849,
+          "end_ms": 30592
+        },
+        {
+          "p": 1,
+          "s": 0,
+          "start_ms": 30592,
+          "end_ms": 35211
+        },
+        {
+          "p": 1,
+          "s": 1,
+          "start_ms": 35211,
+          "end_ms": 40643
+        },
+        {
+          "p": 1,
+          "s": 2,
+          "start_ms": 40643,
+          "end_ms": 45638
+        },
+        {
+          "p": 1,
+          "s": 3,
+          "start_ms": 45638,
+          "end_ms": 52755
         },
         {
           "p": 1,
           "s": 4,
-          "start_ms": 28580,
-          "end_ms": 33980
+          "start_ms": 52755,
+          "end_ms": 60059
         },
         {
           "p": 1,
           "s": 5,
-          "start_ms": 33980,
-          "end_ms": 39320
-        },
-        {
-          "p": 1,
-          "s": 6,
-          "start_ms": 39320,
-          "end_ms": 44240
-        },
-        {
-          "p": 1,
-          "s": 7,
-          "start_ms": 44240,
-          "end_ms": 51200
-        },
-        {
-          "p": 1,
-          "s": 8,
-          "start_ms": 51200,
-          "end_ms": 58340
-        },
-        {
-          "p": 1,
-          "s": 9,
-          "start_ms": 58340,
-          "end_ms": 62480
+          "start_ms": 60059,
+          "end_ms": 64242
         },
         {
           "p": 2,
-          "s": 10,
-          "start_ms": 62480,
-          "end_ms": 66800
+          "s": 0,
+          "start_ms": 64242,
+          "end_ms": 67738
         },
         {
           "p": 2,
-          "s": 11,
-          "start_ms": 66800,
-          "end_ms": 71960
+          "s": 1,
+          "start_ms": 67738,
+          "end_ms": 72983
         },
         {
           "p": 2,
-          "s": 12,
-          "start_ms": 71960,
-          "end_ms": 78320
+          "s": 2,
+          "start_ms": 72983,
+          "end_ms": 79476
         },
         {
           "p": 2,
-          "s": 13,
-          "start_ms": 78320,
-          "end_ms": 84500
+          "s": 3,
+          "start_ms": 79476,
+          "end_ms": 85781
         },
         {
           "p": 2,
-          "s": 14,
-          "start_ms": 84500,
-          "end_ms": 95900
+          "s": 4,
+          "start_ms": 85781,
+          "end_ms": 97518
         },
         {
           "p": 3,
-          "s": 15,
-          "start_ms": 95900,
-          "end_ms": 100940
+          "s": 0,
+          "start_ms": 97518,
+          "end_ms": 101764
         },
         {
           "p": 3,
-          "s": 16,
-          "start_ms": 100940,
-          "end_ms": 105980
+          "s": 1,
+          "start_ms": 101764,
+          "end_ms": 106883
         },
         {
           "p": 3,
-          "s": 17,
-          "start_ms": 105980,
-          "end_ms": 113660
+          "s": 2,
+          "start_ms": 106883,
+          "end_ms": 114750
         },
         {
           "p": 3,
-          "s": 18,
-          "start_ms": 113660,
-          "end_ms": 121280
+          "s": 3,
+          "start_ms": 114750,
+          "end_ms": 122553
         },
         {
           "p": 3,
-          "s": 19,
-          "start_ms": 121280,
-          "end_ms": 125120
+          "s": 4,
+          "start_ms": 122553,
+          "end_ms": 126424
         },
         {
           "p": 3,
-          "s": 20,
-          "start_ms": 125120,
-          "end_ms": 128780
+          "s": 5,
+          "start_ms": 126424,
+          "end_ms": 130108
         },
         {
           "p": 4,
-          "s": 21,
-          "start_ms": 128780,
-          "end_ms": 135020
+          "s": 0,
+          "start_ms": 130108,
+          "end_ms": 135602
         },
         {
           "p": 4,
-          "s": 22,
-          "start_ms": 135020,
-          "end_ms": 141680
+          "s": 1,
+          "start_ms": 135602,
+          "end_ms": 142407
         },
         {
           "p": 4,
-          "s": 23,
-          "start_ms": 141680,
-          "end_ms": 145160
+          "s": 2,
+          "start_ms": 142407,
+          "end_ms": 145903
         },
         {
           "p": 4,
-          "s": 24,
-          "start_ms": 145160,
-          "end_ms": 149840
+          "s": 3,
+          "start_ms": 145903,
+          "end_ms": 150648
         },
         {
           "p": 4,
-          "s": 25,
-          "start_ms": 149840,
-          "end_ms": 158360
+          "s": 4,
+          "start_ms": 150648,
+          "end_ms": 159388
         },
         {
           "p": 4,
-          "s": 26,
-          "start_ms": 158360,
-          "end_ms": 162680
+          "s": 5,
+          "start_ms": 159388,
+          "end_ms": 163758
         },
         {
           "p": 5,
-          "s": 27,
-          "start_ms": 162680,
-          "end_ms": 169520
+          "s": 0,
+          "start_ms": 163758,
+          "end_ms": 169877
         },
         {
           "p": 5,
-          "s": 28,
-          "start_ms": 169520,
-          "end_ms": 176240
+          "s": 1,
+          "start_ms": 169877,
+          "end_ms": 176744
         },
         {
           "p": 5,
-          "s": 29,
-          "start_ms": 176240,
-          "end_ms": 184700
+          "s": 2,
+          "start_ms": 176744,
+          "end_ms": 185422
         },
         {
           "p": 5,
-          "s": 30,
-          "start_ms": 184700,
-          "end_ms": 192500
+          "s": 3,
+          "start_ms": 185422,
+          "end_ms": 192040
         }
       ]
     }
