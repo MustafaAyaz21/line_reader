@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-11-26T21:30:36.520Z",
+  "updated_at": "2026-11-27T00:16:13.009Z",
   "articles": [
     {
       "id": "b2-the-timeless-impact-of-english-literature",
@@ -1349,7 +1349,166 @@
         "The puzzle was finally solved.": "Bulmaca nihayet çözüldü.",
         "It was not aliens, ghosts, or magnetism; it was a rare combination of water, ice, wind, and perfect timing that makes the rocks of Racetrack Playa appear to walk.": "Uzaylılar, hayaletler veya magnetism değildi; Racetrack Playa'nın kayalarının yürümesini sağlayan su, buz, rüzgar ve mükemmel zamanlamanın nadir bir kombinasyonuydu."
       },
-      "image_url": "https://getlinereader.com/images/b1-the-mystery-of-the-walking-rocks.png"
+      "audio_url": "https://line-reader.pages.dev/audio/b1-the-mystery-of-the-walking-rocks.m4a",
+      "image_url": "https://getlinereader.com/images/b1-the-mystery-of-the-walking-rocks.png",
+      "audio_segments": [
+        {
+          "p": 0,
+          "s": 0,
+          "start_ms": 0,
+          "end_ms": 6700
+        },
+        {
+          "p": 0,
+          "s": 1,
+          "start_ms": 6700,
+          "end_ms": 12080
+        },
+        {
+          "p": 0,
+          "s": 2,
+          "start_ms": 12080,
+          "end_ms": 17480
+        },
+        {
+          "p": 0,
+          "s": 3,
+          "start_ms": 17480,
+          "end_ms": 24720
+        },
+        {
+          "p": 0,
+          "s": 4,
+          "start_ms": 24720,
+          "end_ms": 32460
+        },
+        {
+          "p": 0,
+          "s": 5,
+          "start_ms": 32460,
+          "end_ms": 38040
+        },
+        {
+          "p": 1,
+          "s": 6,
+          "start_ms": 38040,
+          "end_ms": 45020
+        },
+        {
+          "p": 1,
+          "s": 7,
+          "start_ms": 45020,
+          "end_ms": 50340
+        },
+        {
+          "p": 1,
+          "s": 8,
+          "start_ms": 50340,
+          "end_ms": 57180
+        },
+        {
+          "p": 1,
+          "s": 9,
+          "start_ms": 57180,
+          "end_ms": 63320
+        },
+        {
+          "p": 1,
+          "s": 10,
+          "start_ms": 63320,
+          "end_ms": 72440
+        },
+        {
+          "p": 1,
+          "s": 11,
+          "start_ms": 72440,
+          "end_ms": 82100
+        },
+        {
+          "p": 2,
+          "s": 12,
+          "start_ms": 82100,
+          "end_ms": 92320
+        },
+        {
+          "p": 2,
+          "s": 13,
+          "start_ms": 92320,
+          "end_ms": 100800
+        },
+        {
+          "p": 2,
+          "s": 14,
+          "start_ms": 100800,
+          "end_ms": 104960
+        },
+        {
+          "p": 2,
+          "s": 15,
+          "start_ms": 104960,
+          "end_ms": 112760
+        },
+        {
+          "p": 2,
+          "s": 16,
+          "start_ms": 112760,
+          "end_ms": 117580
+        },
+        {
+          "p": 3,
+          "s": 17,
+          "start_ms": 117580,
+          "end_ms": 123100
+        },
+        {
+          "p": 3,
+          "s": 18,
+          "start_ms": 123100,
+          "end_ms": 130300
+        },
+        {
+          "p": 3,
+          "s": 19,
+          "start_ms": 130300,
+          "end_ms": 135880
+        },
+        {
+          "p": 3,
+          "s": 20,
+          "start_ms": 135880,
+          "end_ms": 142860
+        },
+        {
+          "p": 3,
+          "s": 21,
+          "start_ms": 142860,
+          "end_ms": 152720
+        },
+        {
+          "p": 4,
+          "s": 22,
+          "start_ms": 152720,
+          "end_ms": 161420
+        },
+        {
+          "p": 4,
+          "s": 23,
+          "start_ms": 161420,
+          "end_ms": 171580
+        },
+        {
+          "p": 4,
+          "s": 24,
+          "start_ms": 171580,
+          "end_ms": 174200
+        },
+        {
+          "p": 4,
+          "s": 25,
+          "start_ms": 174200,
+          "end_ms": 187250
+        }
+      ]
     },
     {
       "id": "b1-the-unlikely-architects-animals-that-build-compl",
