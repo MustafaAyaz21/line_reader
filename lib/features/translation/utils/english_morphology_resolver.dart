@@ -521,4 +521,198 @@ abstract final class EnglishMorphologyResolver {
     'elder': 'old',
     'eldest': 'old',
   };
+
+  /// Yalnızca 2. hali (Past Simple) olan düzensiz fiil biçimleri.
+  static const Set<String> _v2OnlyIrregulars = <String>{
+    'was', 'were', 'did', 'arose', 'ate', 'awoke', 'became', 'began',
+    'bit', 'blew', 'bore', 'broke', 'chose', 'came', 'drank', 'drew',
+    'drove', 'fell', 'flew', 'forbade', 'forgot', 'forgave', 'froze',
+    'gave', 'grew', 'hid', 'knew', 'lay', 'ran', 'rang', 'rode', 'rose',
+    'sang', 'sank', 'saw', 'shook', 'shrank', 'spoke', 'stole', 'swam',
+    'swore', 'threw', 'took', 'tore', 'went', 'woke', 'wore', 'wrote',
+  };
+
+  /// Yalnızca 3. hali (Past Participle) olan düzensiz fiil biçimleri.
+  static const Set<String> _v3OnlyIrregulars = <String>{
+    'been', 'done', 'arisen', 'eaten', 'awoken', 'begun', 'bitten',
+    'blown', 'born', 'borne', 'broken', 'chosen', 'drunk', 'drawn',
+    'driven', 'fallen', 'flown', 'forbidden', 'forgotten', 'forgiven',
+    'frozen', 'given', 'gotten', 'grown', 'hidden', 'known', 'lain',
+    'proven', 'rung', 'ridden', 'risen', 'sung', 'sunk', 'seen',
+    'shaken', 'shown', 'shrunk', 'spoken', 'stolen', 'swum', 'sworn',
+    'thrown', 'taken', 'torn', 'gone', 'woken', 'worn', 'written',
+  };
+
+  /// Düzensiz çoğul isimler.
+  static const Set<String> _irregularPlurals = <String>{
+    'children', 'men', 'women', 'people', 'feet', 'teeth', 'geese',
+    'mice', 'oxen', 'leaves', 'lives', 'knives', 'wives', 'wolves',
+    'halves', 'shelves', 'thieves', 'loaves', 'calves', 'scarves',
+    'selves', 'analyses', 'crises', 'theses', 'phenomena', 'criteria',
+    'data', 'media', 'cacti', 'fungi', 'alumni', 'indices', 'appendices',
+  };
+
+  /// Düzensiz karşılaştırma (comparative) sıfat/zarfları.
+  static const Set<String> _irregularComparatives = <String>{
+    'better', 'worse', 'farther', 'further', 'less', 'more', 'elder',
+  };
+
+  /// Düzensiz en üstünlük (superlative) sıfat/zarfları.
+  static const Set<String> _irregularSuperlatives = <String>{
+    'best', 'worst', 'farthest', 'furthest', 'least', 'most', 'eldest',
+  };
+
+  /// Düzensiz fiil, isim veya sıfatların kök kelimesini ve gramer ilişkisini
+  /// anında (0 ms) çözer. Düzenli çekimler için [resolveRegularInflection] kullanılır.
+  static WordInflectionInfo? resolveInflection(String rawWord) {
+    final word = normalize(rawWord);
+    if (word.isEmpty || word.contains(' ')) return null;
+
+    final base = _irregularMap[word];
+    if (base == null || base == word) return null;
+
+    if (_v2OnlyIrregulars.contains(word)) {
+      return WordInflectionInfo(
+        baseWord: base,
+        relationLabelTr: '2. hali',
+        relationLabelEn: 'past tense (V2)',
+      );
+    }
+    if (_v3OnlyIrregulars.contains(word)) {
+      return WordInflectionInfo(
+        baseWord: base,
+        relationLabelTr: '3. hali',
+        relationLabelEn: 'past participle (V3)',
+      );
+    }
+    if (_irregularPlurals.contains(word)) {
+      return WordInflectionInfo(
+        baseWord: base,
+        relationLabelTr: 'çoğul hali',
+        relationLabelEn: 'plural form',
+      );
+    }
+    if (_irregularComparatives.contains(word)) {
+      return WordInflectionInfo(
+        baseWord: base,
+        relationLabelTr: 'karşılaştırma hali',
+        relationLabelEn: 'comparative form',
+      );
+    }
+    if (_irregularSuperlatives.contains(word)) {
+      return WordInflectionInfo(
+        baseWord: base,
+        relationLabelTr: 'en üstünlük hali',
+        relationLabelEn: 'superlative form',
+      );
+    }
+
+    // Düzensiz fiillerin V2 ve V3 biçimi aynı olanlar (bought, made, caught vb.)
+    return WordInflectionInfo(
+      baseWord: base,
+      relationLabelTr: '2. / 3. hali',
+      relationLabelEn: 'past / past participle',
+    );
+  }
+
+  /// Düzenli çekimleri (-ed, -ing, -ies/-s/-es) yalnızca üretilen kök kelime
+  /// [isKnownBaseWord] ile doğrulandığında çözer; böylece "red", "king", "bus"
+  /// gibi kelimelerde yanlış pozitif üretmez.
+  static Future<WordInflectionInfo?> resolveRegularInflection(
+    String rawWord, {
+    required Future<bool> Function(String candidate) isKnownBaseWord,
+  }) async {
+    final word = normalize(rawWord);
+    if (word.length < 4 || word.contains(' ')) return null;
+
+    final irregular = resolveInflection(word);
+    if (irregular != null) return irregular;
+
+    Future<WordInflectionInfo?> firstKnown(
+      List<String> candidates,
+      String labelTr,
+      String labelEn,
+    ) async {
+      for (final c in candidates) {
+        if (c.length >= 2 && c != word && await isKnownBaseWord(c)) {
+          return WordInflectionInfo(
+            baseWord: c,
+            relationLabelTr: labelTr,
+            relationLabelEn: labelEn,
+          );
+        }
+      }
+      return null;
+    }
+
+    if (word.endsWith('ied') && word.length > 4) {
+      final hit = await firstKnown(
+        <String>['${word.substring(0, word.length - 3)}y'],
+        '2. / 3. hali',
+        'past / past participle',
+      );
+      if (hit != null) return hit;
+    } else if (word.endsWith('ed') && word.length > 4) {
+      final stem = word.substring(0, word.length - 2);
+      final candidates = <String>[
+        '${stem}e',
+        stem,
+        if (_hasDoubledConsonant(stem)) stem.substring(0, stem.length - 1),
+      ];
+      final hit = await firstKnown(
+        candidates,
+        '2. / 3. hali',
+        'past / past participle',
+      );
+      if (hit != null) return hit;
+    }
+
+    if (word.endsWith('ying') && word.length > 5) {
+      final hit = await firstKnown(
+        <String>[
+          '${word.substring(0, word.length - 4)}ie',
+          word.substring(0, word.length - 3),
+        ],
+        '-ing biçimi',
+        '-ing form',
+      );
+      if (hit != null) return hit;
+    } else if (word.endsWith('ing') && word.length > 4) {
+      final stem = word.substring(0, word.length - 3);
+      final candidates = <String>[
+        if (_hasDoubledConsonant(stem)) stem.substring(0, stem.length - 1),
+        stem,
+        '${stem}e',
+      ];
+      final hit = await firstKnown(candidates, '-ing biçimi', '-ing form');
+      if (hit != null) return hit;
+    }
+
+    if (word.endsWith('ies') && word.length > 4) {
+      final hit = await firstKnown(
+        <String>['${word.substring(0, word.length - 3)}y'],
+        'çoğul / 3. tekil hali',
+        'plural / 3rd person singular',
+      );
+      if (hit != null) return hit;
+    } else if (word.endsWith('s') &&
+        !word.endsWith('ss') &&
+        !word.endsWith('us') &&
+        !word.endsWith('is') &&
+        word.length > 3) {
+      final candidates = <String>[
+        if (word.endsWith('es') && word.length > 4)
+          word.substring(0, word.length - 2),
+        word.substring(0, word.length - 1),
+      ];
+      final hit = await firstKnown(
+        candidates,
+        'çoğul / 3. tekil hali',
+        'plural / 3rd person singular',
+      );
+      if (hit != null) return hit;
+    }
+
+    return null;
+  }
 }

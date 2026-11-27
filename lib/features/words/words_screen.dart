@@ -475,6 +475,7 @@ class _WordsScreenState extends State<WordsScreen> {
         meanings: List<MeaningEntry>.unmodifiable(mergedMeanings),
         examples: detail.examples,
         lexiconInfo: lexicon,
+        inflectionInfo: detail.inflectionInfo,
       );
       _matchedExistingWord = matched;
       _selectedMeaningIndices
@@ -1234,6 +1235,19 @@ class _WordsScreenState extends State<WordsScreen> {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: WordIpaBadge(lexiconInfo: detail.lexiconInfo),
+                ),
+              ],
+              if (detail.inflectionInfo != null) ...[
+                const SizedBox(height: 8),
+                WordInflectionReferenceBanner(
+                  inflectionInfo: detail.inflectionInfo,
+                  onTapBaseWord: (baseWord) {
+                    _searchController.text = baseWord;
+                    _searchController.selection = TextSelection.collapsed(
+                      offset: baseWord.length,
+                    );
+                    _performTopSearch(baseWord, dismissKeyboard: true);
+                  },
                 ),
               ],
               if (_matchedExistingWord != null) ...[

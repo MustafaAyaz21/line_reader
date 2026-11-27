@@ -237,6 +237,7 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
                   meanings: current.meanings,
                   examples: examples,
                   lexiconInfo: current.lexiconInfo,
+                  inflectionInfo: current.inflectionInfo,
                 );
               }
             });
@@ -353,6 +354,7 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
           meanings: List<MeaningEntry>.unmodifiable(mergedMeanings),
           examples: detail.examples,
           lexiconInfo: lexicon,
+          inflectionInfo: detail.inflectionInfo,
         );
         _matchedExistingWord = matched;
         _selectedIndices
@@ -496,6 +498,7 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
         meanings: List<MeaningEntry>.unmodifiable(updatedMeanings),
         examples: currentDetail.examples,
         lexiconInfo: currentDetail.lexiconInfo,
+        inflectionInfo: currentDetail.inflectionInfo,
       );
       _selectedIndices
         ..clear()
@@ -1272,6 +1275,20 @@ class _AddWordSearchScreenState extends State<AddWordSearchScreen> {
                 ),
             ],
           ),
+
+          if (detail.inflectionInfo != null) ...[
+            const SizedBox(height: 10),
+            WordInflectionReferenceBanner(
+              inflectionInfo: detail.inflectionInfo,
+              onTapBaseWord: (baseWord) {
+                _searchController.text = baseWord;
+                _searchController.selection = TextSelection.collapsed(
+                  offset: baseWord.length,
+                );
+                _performSearch(baseWord, dismissKeyboard: true);
+              },
+            ),
+          ],
 
           if (isExisting) ...[
             const SizedBox(height: 8),

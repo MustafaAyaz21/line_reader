@@ -4,6 +4,7 @@ import '../../../core/localization/app_strings.dart';
 import '../../../core/settings/display_preferences_controller.dart';
 import '../../../core/settings/ipa_accent_controller.dart';
 import '../../translation/models/word_lexicon_info.dart';
+import '../../translation/utils/english_morphology_resolver.dart';
 import '../models/word_search_detail.dart';
 
 /// Amerikan (US) ve İngiliz (UK) doğrulanmış IPA okunuşlarını kullanıcının
@@ -823,6 +824,95 @@ class WordExampleSourceBadge extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Çekimli/düzensiz kelimelerde (örn. `bought` -> `buy`) kök kelime bilgisini
+/// ve tek dokunuşla kök kelimeye geçiş bağlantısını gösterir.
+class WordInflectionReferenceBanner extends StatelessWidget {
+  const WordInflectionReferenceBanner({
+    super.key,
+    required this.inflectionInfo,
+    required this.onTapBaseWord,
+  });
+
+  final WordInflectionInfo? inflectionInfo;
+  final ValueChanged<String> onTapBaseWord;
+
+  @override
+  Widget build(BuildContext context) {
+    final info = inflectionInfo;
+    if (info == null) return const SizedBox.shrink();
+
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final s = context.l10n;
+
+    return Material(
+      key: const ValueKey<String>('word_inflection_reference_banner'),
+      color: colorScheme.tertiaryContainer.withAlpha(110),
+      borderRadius: BorderRadius.circular(10),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => onTapBaseWord(info.baseWord),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: colorScheme.tertiary.withAlpha(90),
+            ),
+          ),
+          child: Row(
+            children: <Widget>[
+              Icon(
+                Icons.subdirectory_arrow_right_rounded,
+                size: 16,
+                color: colorScheme.tertiary,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  s.t(
+                    '"${info.baseWord}" kelimesinin ${info.relationLabelTr}',
+                    '${info.relationLabelEn} of "${info.baseWord}"',
+                  ),
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: colorScheme.tertiary.withAlpha(32),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text(
+                      info.baseWord,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: colorScheme.tertiary,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(width: 3),
+                    Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 13,
+                      color: colorScheme.tertiary,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

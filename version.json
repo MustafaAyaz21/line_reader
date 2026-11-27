@@ -1,7 +1,7 @@
 {
-    "latest_version":  "0.1.53",
-    "version_code":  54,
+    "latest_version":  "0.1.54",
+    "version_code":  55,
     "min_version_code":  0,
-    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.53/app-release.apk",
-    "release_notes":  "Kelime listesi ikonları, sözlük arama hızlandırması, çevrimdışı ekran ve yeni sesli makale iyileştirmeleri."
+    "apk_url":  "https://github.com/MustafaAyaz21/line_reader/releases/download/v0.1.54/app-release.apk",
+    "release_notes":  "Kelime listesi ikonları, sözlük arama hızlandırması, kelimenin ikinci hali yazıldığında çıkacak uyarı."
 }

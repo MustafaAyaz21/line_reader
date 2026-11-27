@@ -1,5 +1,6 @@
 import '../../translation/models/word_lexicon_info.dart';
 import '../../translation/models/word_meaning.dart';
+import '../../translation/utils/english_morphology_resolver.dart';
 
 /// Manuel kelime aramasında gösterilen tek bir kısa örnek cümle.
 class WordExampleSentence {
@@ -24,6 +25,7 @@ class WordSearchDetail {
     required this.meanings,
     required this.examples,
     this.lexiconInfo,
+    this.inflectionInfo,
     this.isMisspelled = false,
     this.suggestions = const <String>[],
   });
@@ -32,6 +34,10 @@ class WordSearchDetail {
   final List<MeaningEntry> meanings;
   final List<WordExampleSentence> examples;
   final WordLexiconInfo? lexiconInfo;
+
+  /// Aranan kelime çekimli veya düzensiz bir biçimse (ör. `bought` -> `buy`)
+  /// temel kelimeye yönlendiren kök/çekim bilgisini taşır.
+  final WordInflectionInfo? inflectionInfo;
 
   /// Kelime İngilizce sözlüklerde geçersiz / yanlış yazılmış tespit edildiyse
   /// `true` olur; uydurma anlam veya hatalı telaffuz gösterilmez.

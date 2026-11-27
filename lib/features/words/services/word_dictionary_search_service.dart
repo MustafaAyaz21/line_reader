@@ -11,6 +11,7 @@ import '../../translation/models/word_meaning.dart';
 import '../../translation/services/local_dictionary_service.dart';
 import '../../translation/services/word_lexicon_service.dart';
 import '../../translation/services/word_translation_service.dart';
+import '../../translation/utils/english_morphology_resolver.dart';
 import '../../translation/utils/turkish_infinitive_normalizer.dart';
 import '../models/word_search_detail.dart';
 
@@ -164,6 +165,12 @@ Respond ONLY with valid JSON:
     final Future<WordLexiconInfo?> lexiconFuture = isSingleWord
         ? _lexiconService.lookup(normalizedWord).catchError((_) => null)
         : Future<WordLexiconInfo?>.value(null);
+    final Future<WordInflectionInfo?> inflectionFuture = isSingleWord
+        ? EnglishMorphologyResolver.resolveRegularInflection(
+            normalizedWord,
+            isKnownBaseWord: _lexiconService.hasKnownEnglishWord,
+          ).catchError((_) => null)
+        : Future<WordInflectionInfo?>.value(null);
     final Future<List<WordExampleSentence>> workerExamplesFuture =
         collectedExamples.length < _targetExamplesCount
             ? _fetchWorkerExamples(normalizedWord)
@@ -377,6 +384,7 @@ Respond ONLY with valid JSON:
                   meanings: cached.meanings,
                   examples: updatedExamples,
                   lexiconInfo: cached.lexiconInfo,
+                  inflectionInfo: cached.inflectionInfo,
                 );
               }
               onExamplesUpdated(updatedExamples);
@@ -457,6 +465,7 @@ Respond ONLY with valid JSON:
       );
     }
 
+    WordInflectionInfo? inflectionInfo;
     if (isSingleWord) {
       try {
         lexiconInfo = await lexiconFuture.timeout(
@@ -466,6 +475,14 @@ Respond ONLY with valid JSON:
           onTimeout: () => null,
         );
       } catch (_) {}
+      try {
+        inflectionInfo = await inflectionFuture.timeout(
+          const Duration(milliseconds: 400),
+          onTimeout: () => EnglishMorphologyResolver.resolveInflection(normalizedWord),
+        );
+      } catch (_) {
+        inflectionInfo = EnglishMorphologyResolver.resolveInflection(normalizedWord);
+      }
     }
 
     final result = WordSearchDetail(
@@ -473,6 +490,7 @@ Respond ONLY with valid JSON:
       meanings: List<MeaningEntry>.unmodifiable(collectedMeanings),
       examples: List<WordExampleSentence>.unmodifiable(collectedExamples),
       lexiconInfo: lexiconInfo,
+      inflectionInfo: inflectionInfo,
     );
     if (result.meanings.isNotEmpty) {
       _sessionCache[normalizedWord] = result;
