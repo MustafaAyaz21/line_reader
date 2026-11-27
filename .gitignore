@@ -70,3 +70,5 @@ node_modules/
 .cache/
 **/.cache/
 *.onnx
+tools/article_studio/voices/
+tools/article_studio/test_*
