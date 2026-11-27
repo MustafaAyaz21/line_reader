@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-11-27T00:23:54.427Z",
+  "updated_at": "2026-11-27T11:39:18.826Z",
   "articles": [
     {
       "id": "b2-the-timeless-impact-of-english-literature",
@@ -1356,157 +1356,157 @@
           "p": 0,
           "s": 0,
           "start_ms": 0,
-          "end_ms": 6700
+          "end_ms": 8178
         },
         {
           "p": 0,
           "s": 1,
-          "start_ms": 6700,
-          "end_ms": 12080
+          "start_ms": 8178,
+          "end_ms": 13630
         },
         {
           "p": 0,
           "s": 2,
-          "start_ms": 12080,
-          "end_ms": 17480
+          "start_ms": 13630,
+          "end_ms": 19082
         },
         {
           "p": 0,
           "s": 3,
-          "start_ms": 17480,
-          "end_ms": 24720
+          "start_ms": 19082,
+          "end_ms": 26471
         },
         {
           "p": 0,
           "s": 4,
-          "start_ms": 24720,
-          "end_ms": 32460
+          "start_ms": 26471,
+          "end_ms": 34361
         },
         {
           "p": 0,
           "s": 5,
-          "start_ms": 32460,
-          "end_ms": 38040
+          "start_ms": 34361,
+          "end_ms": 40029
         },
         {
           "p": 1,
-          "s": 6,
-          "start_ms": 38040,
-          "end_ms": 45020
+          "s": 0,
+          "start_ms": 40029,
+          "end_ms": 46126
         },
         {
           "p": 1,
-          "s": 7,
-          "start_ms": 45020,
-          "end_ms": 50340
+          "s": 1,
+          "start_ms": 46126,
+          "end_ms": 51506
         },
         {
           "p": 1,
-          "s": 8,
-          "start_ms": 50340,
-          "end_ms": 57180
+          "s": 2,
+          "start_ms": 51506,
+          "end_ms": 58465
         },
         {
           "p": 1,
-          "s": 9,
-          "start_ms": 57180,
-          "end_ms": 63320
+          "s": 3,
+          "start_ms": 58465,
+          "end_ms": 64706
         },
         {
           "p": 1,
-          "s": 10,
-          "start_ms": 63320,
-          "end_ms": 72440
+          "s": 4,
+          "start_ms": 64706,
+          "end_ms": 74031
         },
         {
           "p": 1,
-          "s": 11,
-          "start_ms": 72440,
-          "end_ms": 82100
+          "s": 5,
+          "start_ms": 74031,
+          "end_ms": 83931
         },
         {
           "p": 2,
-          "s": 12,
-          "start_ms": 82100,
-          "end_ms": 92320
+          "s": 0,
+          "start_ms": 83931,
+          "end_ms": 93400
         },
         {
           "p": 2,
-          "s": 13,
-          "start_ms": 92320,
-          "end_ms": 100800
+          "s": 1,
+          "start_ms": 93400,
+          "end_ms": 102080
         },
         {
           "p": 2,
-          "s": 14,
-          "start_ms": 100800,
-          "end_ms": 104960
+          "s": 2,
+          "start_ms": 102080,
+          "end_ms": 106241
         },
         {
           "p": 2,
-          "s": 15,
-          "start_ms": 104960,
-          "end_ms": 112760
+          "s": 3,
+          "start_ms": 106241,
+          "end_ms": 114203
         },
         {
           "p": 2,
-          "s": 16,
-          "start_ms": 112760,
-          "end_ms": 117580
+          "s": 4,
+          "start_ms": 114203,
+          "end_ms": 119081
         },
         {
           "p": 3,
-          "s": 17,
-          "start_ms": 117580,
-          "end_ms": 123100
+          "s": 0,
+          "start_ms": 119081,
+          "end_ms": 123673
         },
         {
           "p": 3,
-          "s": 18,
-          "start_ms": 123100,
-          "end_ms": 130300
+          "s": 1,
+          "start_ms": 123673,
+          "end_ms": 130990
         },
         {
           "p": 3,
-          "s": 19,
-          "start_ms": 130300,
-          "end_ms": 135880
+          "s": 2,
+          "start_ms": 130990,
+          "end_ms": 136657
         },
         {
           "p": 3,
-          "s": 20,
-          "start_ms": 135880,
-          "end_ms": 142860
+          "s": 3,
+          "start_ms": 136657,
+          "end_ms": 143759
         },
         {
           "p": 3,
-          "s": 21,
-          "start_ms": 142860,
-          "end_ms": 152720
+          "s": 4,
+          "start_ms": 143759,
+          "end_ms": 153873
         },
         {
           "p": 4,
-          "s": 22,
-          "start_ms": 152720,
-          "end_ms": 161420
+          "s": 0,
+          "start_ms": 153873,
+          "end_ms": 161764
         },
         {
           "p": 4,
-          "s": 23,
-          "start_ms": 161420,
-          "end_ms": 171580
+          "s": 1,
+          "start_ms": 161764,
+          "end_ms": 172166
         },
         {
           "p": 4,
-          "s": 24,
-          "start_ms": 171580,
-          "end_ms": 174200
+          "s": 2,
+          "start_ms": 172166,
+          "end_ms": 174748
         },
         {
           "p": 4,
-          "s": 25,
-          "start_ms": 174200,
-          "end_ms": 187250
+          "s": 3,
+          "start_ms": 174748,
+          "end_ms": 186800
         }
       ]
     },
